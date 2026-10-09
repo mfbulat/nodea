@@ -37,8 +37,11 @@ const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SMILEY: Record<string, string> = { smile: 'smile', laugh: 'laugh', sad: 'cry', angry: 'angry', surprise: 'surprise', neutral: 'boring' }
 const SYMBOL: Record<string, string> = { check: 'right', cross: 'wrong' }
 
+const C_SYMBOLS = ['heart', 'like', 'dislike', 'hourglass', 'telephone', 'pen', 'music', 'flight']
 export function toXMarker(m: string): string {
   const [g, v] = m.split('-')
+  if (g === 'tag') return 'tag-' + (v === 'purple' ? 'dark-purple' : v === 'gray' ? 'grey' : v)
+  if (g === 'symbol' && C_SYMBOLS.includes(v)) return 'c_symbol_' + v
   if (g === 'task') return TASK[+v]
   if (g === 'month') return 'month-' + MONTHS[+v - 1]
   if (g === 'week') return 'week-' + WEEK[+v - 1]
@@ -48,7 +51,9 @@ export function toXMarker(m: string): string {
   return m
 }
 export function fromXMarker(m: string): string | null {
+  if (m.startsWith('c_symbol_')) return 'symbol-' + m.slice(9)
   const [g, v] = m.split('-')
+  if (g === 'tag') return 'tag-' + (m === 'tag-dark-purple' ? 'purple' : m === 'tag-grey' ? 'gray' : v)
   if (g === 'task') { const i = TASK.indexOf(m); return i >= 0 ? `task-${i}` : null }
   if (g === 'month') { const i = MONTHS.indexOf(v); return i >= 0 ? `month-${i + 1}` : null }
   if (g === 'week') { const i = WEEK.indexOf(v); return i >= 0 ? `week-${i + 1}` : null }
