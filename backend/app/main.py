@@ -2,13 +2,14 @@ import logging
 
 from fastapi import FastAPI
 
-from .routers import auth, files, maps
+from .routers import auth, files, maps, templates
 from .storage import ensure_bucket
 
 app = FastAPI(title="MindMap API")
 app.include_router(auth.router)
 app.include_router(maps.router)
 app.include_router(files.router)
+app.include_router(templates.router)
 
 
 @app.on_event("startup")

@@ -50,6 +50,12 @@ export default function FileMenu() {
           <button role="menuitem" onClick={() => run('Импорт', async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}>
             <span>Открыть файл как новую карту…</span></button>
           <div className="menu-hint">.xmind, Markdown, OPML, FreeMind</div>
+          <button role="menuitem" onClick={() => run('Шаблон', async () => {
+            await useDoc.getState().flush()
+            const { doc, title } = useDoc.getState()
+            const name = prompt('Название шаблона', title)?.trim()
+            if (name && doc) { await api('/api/templates', { method: 'POST', json: { title: name, document: doc } }); alert('Шаблон сохранён') }
+          })}><span>Сохранить как шаблон…</span></button>
           <div className="menu-sep" />
           <div className="menu-hint">Экспорт</div>
           {EXPORTS.map(e => <button key={e.id} role="menuitem" onClick={() => doExport(e.id)}><span>{e.label}</span></button>)}

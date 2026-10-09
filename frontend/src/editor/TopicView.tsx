@@ -52,10 +52,12 @@ function Icon({ kind, x, y, size, color, topic, onIcon }: {
   )
 }
 
-export function TopicNode({ box, topic, style: s, content: c, selected, dim, hidden, central, relTarget, equationImage,
+export function TopicNode({ box, topic, style: s, content: c, selected, dim, hidden, central, relTarget, equationImage, highlight, current,
   onPointerDown, onDoubleClick, onIcon, onMarker }: {
   box: Box; topic: Topic; style: FullStyle; content: Content
   selected: boolean; dim: boolean; hidden: boolean; central: boolean; relTarget?: boolean
+  /** найдено поиском / текущий результат */
+  highlight?: boolean; current?: boolean
   /** для экспорта: формула, заранее отрисованная в картинку */
   equationImage?: string
   onPointerDown: (e: React.PointerEvent) => void; onDoubleClick: (e: React.MouseEvent) => void
@@ -72,7 +74,8 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
   const anchor = s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle'
   return (
     <g className="topic" data-id={topic.id} data-central={central || undefined} transform={`translate(${box.x},${box.y})`}
-      opacity={dim ? 0.35 : 1} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} style={{ cursor: 'pointer' }}>
+      opacity={dim ? 0.2 : 1} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} style={{ cursor: 'pointer', transition: 'opacity .4s' }}>
+      {highlight && <rect x={-6} y={-6} width={box.w + 12} height={box.h + 12} rx={10} fill={current ? '#ffd24d' : '#fff1b8'} opacity={0.9} />}
       {(selected || relTarget) && <rect x={-4} y={-4} width={box.w + 8} height={box.h + 8} rx={8} fill="none"
         stroke="var(--color-selection)" strokeWidth={2} strokeDasharray={relTarget ? '4 3' : undefined} />}
       {shape === 'underline' ? (

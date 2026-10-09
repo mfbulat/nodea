@@ -4,10 +4,13 @@ import { api } from '../api/client'
 import type { MapFull, MapSummary } from '../api/types'
 import TopBar from './TopBar'
 import { importAsNewMap } from '../editor/FileMenu'
+import TemplateGallery from './TemplateGallery'
+import type { MapDocument } from '../editor/model'
 
 export default function MapsPage() {
   const [maps, setMaps] = useState<MapSummary[] | null>(null)
   const [error, setError] = useState('')
+  const [gallery, setGallery] = useState(false)
   const nav = useNavigate()
 
   const reload = () => api<MapSummary[]>('/api/maps').then(setMaps).catch(e => setError(e.message))
@@ -17,8 +20,9 @@ export default function MapsPage() {
     try { setError(''); await fn(); await reload() } catch (e) { setError((e as Error).message) }
   }
 
-  const create = () => guard(async () => {
-    const m = await api<MapFull>('/api/maps', { method: 'POST', json: { title: 'Новая карта' } })
+  const create = (title: string, document: MapDocument) => guard(async () => {
+    setGallery(false)
+    const m = await api<MapFull>('/api/maps', { method: 'POST', json: { title, document } })
     nav(`/map/${m.id}`)
   })
   const rename = (m: MapSummary) => {
@@ -40,7 +44,7 @@ export default function MapsPage() {
           <div className="spacer" />
           <button onClick={() => guard(async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}
             title=".xmind, Markdown, OPML, FreeMind">Импорт…</button>
-          <button className="primary" onClick={create} style={{ marginLeft: 8 }}>+ Новая карта</button>
+          <button className="primary" onClick={() => setGallery(true)} style={{ marginLeft: 8 }}>+ Новая карта</button>
         </div>
         {error && <p className="error">{error}</p>}
         {maps === null ? <p className="muted">Загрузка…</p> : maps.length === 0 ? <p className="muted">Карт пока нет.</p> : (
@@ -60,6 +64,7 @@ export default function MapsPage() {
           </div>
         )}
       </div>
+      {gallery && <TemplateGallery onPick={create} onClose={() => setGallery(false)} />}
     </>
   )
 }

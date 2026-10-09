@@ -42,9 +42,36 @@ type Drag =
 
 type LabelEdit = { kind: 'relationship' | 'boundary'; id: string; x: number; y: number; value: string }
 
-export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; readOnly?: boolean }) {
+/** Лист для показа: при «только ветке» центральной становится выбранная тема */
+export function displaySheet(sheet: Sheet, drillId: string | null): Sheet {
+  if (!drillId) return sheet
+  const ref = indexSheet(sheet).get(drillId)
+  if (!ref) return sheet
+  const ids = new Set(indexSheet({ ...sheet, rootTopic: ref.topic, floatingTopics: [] }).keys())
+  return { ...sheet, rootTopic: { ...ref.topic, collapsed: false }, floatingTopics: [],
+    relationships: sheet.relationships?.filter(r => ids.has(r.end1) && ids.has(r.end2)) }
+}
+
+/** Темы, не прошедшие фильтр по маркерам/меткам (затемняются) */
+function filteredOut(sheet: Sheet, filter: { markers: string[]; labels: string[] } | null): Set<string> {
+  const out = new Set<string>()
+  if (!filter) return out
+  for (const [id, ref] of indexSheet(sheet)) {
+    const t = ref.topic
+    const ok = filter.markers.some(m => t.markers?.includes(m)) || filter.labels.some(l => t.labels?.includes(l))
+    if (!ok) out.add(id)
+  }
+  return out
+}
+
+export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds }: {
+  sheet: Sheet; readOnly?: boolean
+  /** режим презентации: видимы только эти темы, остальные приглушены */
+  focusIds?: Set<string> | null
+}) {
   const wrap = useRef<HTMLDivElement>(null)
-  const { view, selection, editingId, element, relating } = useEditor()
+  const { view, selection, editingId, element, relating, drillId, filter, search } = useEditor()
+  const sheet = useMemo(() => displaySheet(realSheet, drillId), [realSheet, drillId])
   const ed = useEditor.getState
   const [fontEpoch, setFontEpoch] = useState(0)
   useEffect(() => onFontsChanged(() => setFontEpoch(e => e + 1)), [])
@@ -62,7 +89,7 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   useLayoutEffect(() => {
     fitToScreen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet.id])
+  }, [sheet.id, drillId])
 
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
@@ -260,6 +287,33 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
       if (sy + b.h * v.zoom > height - 20) y -= sy + b.h * v.zoom - height + 20
       if (x !== v.x || y !== v.y) ed().setView({ x, y })
     }
+    canvasApi.animateTo = (ids: string[] | null, ms = 600) => {
+      const el = wrap.current
+      const layout = currentLayout()
+      if (!el || !layout) return
+      const { width, height } = el.getBoundingClientRect()
+      let b = layout.bounds
+      if (ids?.length) {
+        const bs = ids.map(i => layout.boxes.get(i)).filter((x): x is Box => !!x)
+        if (bs.length) b = { minX: Math.min(...bs.map(x => x.x)), minY: Math.min(...bs.map(x => x.y)),
+          maxX: Math.max(...bs.map(x => x.x + x.w)), maxY: Math.max(...bs.map(x => x.y + x.h)) }
+      }
+      const zoom = Math.max(0.1, Math.min(width / (b.maxX - b.minX + 120), height / (b.maxY - b.minY + 120), 2))
+      const target = { zoom, x: width / 2 - ((b.minX + b.maxX) / 2) * zoom, y: height / 2 - ((b.minY + b.maxY) / 2) * zoom }
+      const from = { ...ed().view }
+      const t0 = performance.now()
+      const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+      const token = ++animToken
+      const step = (now: number) => {
+        if (token !== animToken) return
+        const k = Math.min(1, (now - t0) / ms), e = ease(k)
+        ed().setView({ zoom: from.zoom + (target.zoom - from.zoom) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e })
+        if (k < 1) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+      // если вкладка не отрисовывается (rAF приостановлен), всё равно приходим к цели
+      setTimeout(() => { if (token === animToken) ed().setView(target) }, ms + 80)
+    }
     canvasApi.center = (id: string) => {
       const b = currentLayout()?.boxes.get(id)
       const el = wrap.current
@@ -291,7 +345,10 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   }
 
   const idx = useMemo(() => indexSheet(sheet), [sheet])
-  const selSet = new Set(selection)
+  const selSet = new Set(readOnly ? [] : selection)
+  const filterDim = useMemo(() => filteredOut(sheet, filter), [sheet, filter])
+  const hits = new Set(search.open ? search.hits : [])
+  const isDim = (id: string) => filterDim.has(id) || (!!focusIds && !focusIds.has(id))
   const dragIds = drag?.kind === 'topic' && drag.active ? topLevel(sheet, drag.ids) : []
   const ghostIds = new Set<string>()
   if (dragIds.length) for (const [id] of idx) if (dragIds.some(m => m === id || isAncestor(idx, m, id))) ghostIds.add(id)
@@ -356,13 +413,14 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
             if (!d) return null
             return <path key={e.from + '-' + e.to + e.kind} d={d} fill={filled ? color : 'none'}
               stroke={filled ? 'none' : color} strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth}
-              strokeLinecap="round" opacity={ghostIds.has(e.to) ? 0.25 : 1} />
+              strokeLinecap="round" opacity={ghostIds.has(e.to) || isDim(e.to) ? 0.2 : 1} style={{ transition: 'opacity .4s' }} />
           })}
           {[...r.layout.boxes.values()].map(b => {
             const ref = idx.get(b.id)
             if (!ref) return null
             return <TopicNode key={b.id} box={b} topic={ref.topic} style={r.styles.get(b.id)!} content={r.contents.get(b.id)!}
-              selected={selSet.has(b.id)} dim={ghostIds.has(b.id)} hidden={editingId === b.id}
+              selected={selSet.has(b.id)} dim={ghostIds.has(b.id) || isDim(b.id)} hidden={editingId === b.id}
+              highlight={hits.has(b.id)} current={search.open && search.hits[search.index] === b.id}
               central={levelOf(ref) === 'central'} relTarget={!!relating && hoverId === b.id && relating !== b.id}
               onPointerDown={e => onTopicPointerDown(e, b.id)}
               onDoubleClick={e => { e.stopPropagation(); if (!readOnly) ed().startEdit(b.id) }}
@@ -398,10 +456,10 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
               </g>
             )
           })}
-          {r.layout.toggles.map(t => (
+          {r.layout.toggles.filter(t => !readOnly || t.collapsed).map(t => (
             <g key={'t' + t.id} className={'toggle' + (t.collapsed ? ' collapsed' : '')}
               transform={`translate(${t.x},${t.y})`}
-              onPointerDown={e => { e.stopPropagation(); ed().select([t.id]); ed().toggleCollapse() }}>
+              onPointerDown={e => { if (readOnly) return; e.stopPropagation(); ed().select([t.id]); ed().toggleCollapse() }}>
               <circle r={t.collapsed ? 9 : 6} fill={bg} stroke={r.styles.get(t.id)!.lineColor} strokeWidth={1.5} />
               {t.collapsed
                 ? <text textAnchor="middle" dy="3.5" fontSize={9} fill={r.styles.get(t.id)!.lineColor}>{t.count > 99 ? '99+' : t.count}</text>
@@ -488,9 +546,12 @@ export function CalloutTail({ from, to, style }: { from: Pt; to: Pt; style: Full
     fill={style.fill === 'transparent' ? '#fff8db' : style.fill} stroke={style.borderColor} strokeWidth={1} />
 }
 
+let animToken = 0
+
 export const canvasApi = {
   fit: () => {}, zoomBy: (_k: number) => {}, zoomTo: (_z: number) => {}, focus: () => {},
   ensureVisible: (_id: string) => {}, center: (_id: string) => {},
+  animateTo: (_ids: string[] | null, _ms?: number) => {},
 }
 
 export function isTyping(e: Event) {

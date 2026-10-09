@@ -75,7 +75,7 @@ function prune(sheet: Sheet) {
 }
 
 export type ElementSel = { kind: 'relationship' | 'boundary'; id: string } | null
-export type PanelId = 'format' | 'versions' | 'notes' | 'comments' | 'markers' | null
+export type PanelId = 'format' | 'versions' | 'notes' | 'comments' | 'markers' | 'filter' | null
 
 let layoutRef: LayoutResult | null = null
 export const setCurrentLayout = (l: LayoutResult) => { layoutRef = l }
@@ -96,6 +96,13 @@ interface EditorState {
   relating: string | null
   dialog: { kind: 'link' | 'labels' | 'equation' | 'sticker'; id: string } | null
   userName: string
+  viewMode: 'map' | 'outline'
+  zen: boolean
+  presenting: boolean
+  /** «показать только ветку»: id темы, показываемой как центральная */
+  drillId: string | null
+  filter: { markers: string[]; labels: string[] } | null
+  search: { open: boolean; query: string; hits: string[]; index: number }
 
   reset: () => void
   sheet: () => Sheet | null
@@ -149,6 +156,14 @@ interface EditorState {
   renameSheet: (id: string, title: string) => void
   moveSheet: (id: string, delta: number) => void
   revealTopic: (id: string) => boolean
+  setViewMode: (m: 'map' | 'outline') => void
+  setZen: (z: boolean) => void
+  setPresenting: (p: boolean) => void
+  drillDown: (id?: string) => void
+  drillUp: () => void
+  setFilter: (f: EditorState['filter']) => void
+  setSearch: (patch: Partial<EditorState['search']>) => void
+  replaceAll: (query: string, replacement: string) => number
 }
 
 export const useEditor = create<EditorState>((set, get) => {
@@ -170,11 +185,14 @@ export const useEditor = create<EditorState>((set, get) => {
     sheetId: null, selection: [], editingId: null, editSeed: null, past: [], future: [],
     view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null,
     element: null, panel: 'format', relating: null, dialog: null, userName: '',
+    viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,
+    search: { open: false, query: '', hits: [], index: 0 },
 
     reset: () => {
       const d = useDoc.getState().doc
       set({ sheetId: d?.sheets[0]?.id ?? null, selection: d ? [d.sheets[0].rootTopic.id] : [], editingId: null, past: [], future: [],
-        element: null, relating: null, dialog: null })
+        element: null, relating: null, dialog: null, drillId: null, filter: null, presenting: false,
+        search: { open: false, query: '', hits: [], index: 0 } })
     },
     sheet: () => { const d = useDoc.getState().doc; return d ? current(d) : null },
     mutate,
@@ -509,7 +527,7 @@ export const useEditor = create<EditorState>((set, get) => {
     setSheetId: id => {
       const d = doc()
       const sh = d.sheets.find(s => s.id === id)
-      if (sh) set({ sheetId: id, selection: [sh.rootTopic.id], element: null, editingId: null, relating: null })
+      if (sh) set({ sheetId: id, selection: [sh.rootTopic.id], element: null, editingId: null, relating: null, drillId: null })
     },
     addSheet: () => {
       const sh: Sheet = { id: uid(), title: `Лист ${doc().sheets.length + 1}`, rootTopic: { id: uid(), title: 'Центральная тема', children: [] } }
@@ -544,6 +562,57 @@ export const useEditor = create<EditorState>((set, get) => {
       const [s] = d.sheets.splice(i, 1)
       d.sheets.splice(j, 0, s)
     }),
+    setViewMode: m => set({ viewMode: m, editingId: null }),
+    setZen: z => set({ zen: z }),
+    setPresenting: p => set({ presenting: p, editingId: null, relating: null }),
+    drillDown: id => {
+      const target = id ?? primary()
+      const sheet = get().sheet()
+      if (!target || !sheet) return
+      const kind = indexSheet(sheet).get(target)?.kind
+      if (kind === 'root') { set({ drillId: null }); return }
+      set({ drillId: target, selection: [target], element: null })
+    },
+    drillUp: () => {
+      const { drillId } = get()
+      const sheet = get().sheet()
+      if (!drillId || !sheet) return
+      const parent = indexSheet(sheet).get(drillId)?.parent
+      set({ drillId: parent && parent.id !== sheet.rootTopic.id ? parent.id : null, selection: [drillId] })
+    },
+    setFilter: f => set({ filter: f && (f.markers.length || f.labels.length) ? f : null }),
+    setSearch: patch => {
+      const cur = { ...get().search, ...patch }
+      if (patch.query !== undefined) {
+        const sheet = get().sheet()
+        const q = cur.query.trim().toLowerCase()
+        cur.hits = !q || !sheet ? [] : [...indexSheet(sheet).values()].filter(r => {
+          const t = r.topic
+          return t.title.toLowerCase().includes(q) || t.notes?.plain?.toLowerCase().includes(q)
+            || t.labels?.some(l => l.toLowerCase().includes(q))
+        }).map(r => r.topic.id)
+        cur.index = 0
+      }
+      set({ search: cur })
+      const hit = cur.hits[cur.index]
+      if (cur.open && hit && (patch.query !== undefined || patch.index !== undefined)) {
+        get().revealTopic(hit)
+        set({ search: cur })
+      }
+    },
+    replaceAll: (query, replacement) => {
+      if (!query) return 0
+      let n = 0
+      const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      mutate(sh => {
+        for (const ref of indexSheet(sh).values()) {
+          const next = ref.topic.title.replace(re, () => { n++; return replacement })
+          if (next !== ref.topic.title) ref.topic.title = next
+        }
+      })
+      get().setSearch({ query })
+      return n
+    },
     revealTopic: id => {
       const d = doc()
       const sh = d.sheets.find(s => indexSheet(s).has(id))

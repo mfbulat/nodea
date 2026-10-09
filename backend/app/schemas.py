@@ -58,3 +58,16 @@ class VersionSummary(BaseModel):
 
 class VersionOut(VersionSummary):
     document: dict
+
+
+class TemplateCreate(BaseModel):
+    title: str = Field(max_length=500)
+    document: dict
+
+
+class TemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    title: str
+    document: dict
+    created_at: datetime
