@@ -40,7 +40,7 @@ test('правки по ссылке доходят в обе стороны, к
   await expect(topic(page, 'От гостя')).toBeVisible()
 
   // участники и курсор гостя у владельца
-  await expect(page.getByTestId('presence').locator('span')).toHaveCount(1)
+  await expect(page.getByTestId('presence').locator('span[data-peer]')).toHaveCount(1)
   await g.mouse.move(300, 400)
   await g.mouse.move(320, 420)
   await expect(page.getByTestId('peer-cursor')).toBeVisible()

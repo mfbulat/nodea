@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useEditor } from '../editor/store'
+import { avatarColor } from '../ui/avatar'
 import { api } from '../api/client'
 import { useCollab } from './session'
 
@@ -90,13 +92,18 @@ export default function ShareDialog({ mapId, onClose, onExport }: { mapId: strin
 }
 
 /** Аватары участников, которые сейчас в карте */
+/** Аватары сверху справа: вы и участники онлайн; при наведении — список имён (как в веб-версии). */
 export function Presence() {
   const peers = useCollab(s => s.peers)
-  if (!peers.length) return null
+  const me = useEditor(s => s.userName)
+  const [hover, setHover] = useState(false)
+  if (!me && !peers.length) return null
+  const all = [{ key: 'me', name: me || 'Гость', color: avatarColor(me || 'Гость') }, ...peers.map(p => ({ key: String(p.clientId), name: p.name, color: p.color }))]
   return (
-    <div className="presence" data-testid="presence" title={peers.map(p => p.name).join(', ')}>
-      {peers.slice(0, 6).map(p => <span key={p.clientId} style={{ background: p.color }}>{p.name.slice(0, 1).toUpperCase()}</span>)}
-      {peers.length > 6 && <span className="more">+{peers.length - 6}</span>}
+    <div className="presence" data-testid="presence" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      {all.slice(0, 5).map(p => <span key={p.key} data-peer={p.key !== 'me' || undefined} style={{ background: p.color }}>{p.name.slice(0, 1).toUpperCase()}</span>)}
+      {all.length > 5 && <span className="more">+{all.length - 5}</span>}
+      {hover && <div className="presence-tip">{all.map(p => <div key={p.key}>{p.name}{p.key === 'me' ? ' (вы)' : ''}</div>)}</div>}
     </div>
   )
 }
