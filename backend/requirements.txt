@@ -9,3 +9,5 @@ argon2-cffi==23.1.0
 PyJWT==2.10.1
 boto3==1.35.90
 python-multipart==0.0.20
+pycrdt==0.14.8
+pycrdt-websocket==0.16.5
