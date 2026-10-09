@@ -27,6 +27,8 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
         <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Маркеры</button>
         <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Стикеры</button>
       </div>
+      {tab === 'markers' && <button className="wide legend-btn" onClick={() => ed.setSheet({ legend: !sheet.legend })}>
+        {sheet.legend ? 'Скрыть легенду' : 'Показать легенду'}</button>}
       {!id && <p className="muted">Выберите тему.</p>}
       {tab === 'markers' && MARKER_GROUPS.map(g => (
         <div key={g.id}>
@@ -169,6 +171,28 @@ export function SheetTabs() {
             disabled={l === 'Удалить' && sheets.length < 2}>{l as string}</button>)}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Легенда: маркеры, использованные на листе, с редактируемыми подписями */
+export function Legend({ sheet, readOnly }: { sheet: Sheet; readOnly: boolean }) {
+  const ed = useEditor.getState()
+  if (!sheet.legend) return null
+  const used = [...new Set([...indexSheet(sheet).values()].flatMap(r => r.topic.markers ?? []))]
+  return (
+    <div className="island legend" data-testid="legend">
+      <div className="legend-head"><b>Легенда</b>
+        {!readOnly && <button className="ibtn" aria-label="Скрыть легенду" onClick={() => ed.setSheet({ legend: false })}>×</button>}</div>
+      {!used.length && <span className="muted">Маркеров пока нет</span>}
+      {used.map(m => (
+        <div key={m} className="legend-row">
+          <svg width={18} height={18}><MarkerIcon id={m} x={1} y={1} size={16} /></svg>
+          <input value={sheet.markerNames?.[m] ?? markerName(m)} readOnly={readOnly} aria-label="Подпись маркера"
+            onChange={e => ed.setSheet({ markerNames: { ...(sheet.markerNames ?? {}), [m]: e.target.value } })}
+            onKeyDown={e => e.stopPropagation()} />
+        </div>
+      ))}
     </div>
   )
 }

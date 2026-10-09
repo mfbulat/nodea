@@ -1,6 +1,7 @@
 import type { Box } from './layout'
 import type { Topic } from './model'
 import type { FullStyle } from './themes'
+import { WEIGHTS } from './themes'
 import type { Content, IconKind } from './measure'
 import { shapePath } from './paths'
 import { MarkerIcon } from './markers'
@@ -70,7 +71,7 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
   // ячейки таблицы растягиваются — содержимое центрируется; обычная тема рисуется по своей фигуре
   const sw = box.cell ? box.w : c.shapeW, sh = box.cell ? box.h : c.shapeH
   const ox = box.cell ? (box.w - c.shapeW) / 2 : 0, oy = box.cell ? (box.h - c.shapeH) / 2 : 0
-  const r = Math.min(8, sh / 2) + 4
+  const r = Math.min(6, sh / 2) + 3
   const t = c.text
   const tx = t ? (s.textAlign === 'left' ? t.x : s.textAlign === 'right' ? t.x + t.textW : t.x + t.textW / 2) : 0
   const anchor = s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle'
@@ -102,7 +103,7 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
           : <Icon key={i} kind={ic.kind} x={ic.x} y={ic.y} size={ic.size} color={s.textColor} topic={topic} onIcon={onIcon} />)}
         {t && !hidden && (
           <text x={tx} y={t.y + t.lineHeight * 0.78} textAnchor={anchor} fill={s.textColor} fontFamily={s.fontFamily} fontSize={s.fontSize}
-            fontWeight={s.fontWeight} fontStyle={s.fontStyle} textDecoration={s.textDecoration}
+            fontWeight={WEIGHTS[s.fontWeight] ?? 400} fontStyle={s.fontStyle} textDecoration={s.textDecoration}
             style={{ userSelect: 'none', whiteSpace: 'pre' }}>
             {t.lines.map((l, i) => <tspan key={i} x={tx} dy={i ? t.lineHeight : 0}>{l}</tspan>)}
           </text>
@@ -115,6 +116,14 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
             <div className="eq" style={{ fontSize: s.fontSize, color: s.textColor, whiteSpace: 'nowrap', padding: '2px 2px 0' }}
               dangerouslySetInnerHTML={{ __html: c.equation.html }} />
           </foreignObject>
+        )}
+        {c.note && (
+          <g className="topic-note">
+            <rect x={c.note.x} y={c.note.y} width={c.note.w} height={c.note.h} rx={6} fill="#fffbe6" stroke="#f0e2a6" />
+            <text x={c.note.x + 8} y={c.note.y + 6 + c.note.lineHeight * 0.78} fontSize={12} fill="#5c5030" fontFamily={s.fontFamily}>
+              {c.note.lines.map((l, i) => <tspan key={i} x={c.note!.x + 8} dy={i ? c.note!.lineHeight : 0}>{l}</tspan>)}
+            </text>
+          </g>
         )}
         {c.labels.map((l, i) => (
           <g key={'l' + i}>

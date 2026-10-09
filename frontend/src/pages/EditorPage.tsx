@@ -12,7 +12,7 @@ import { useEditor } from '../editor/store'
 import { useEditorKeys } from '../editor/useEditorKeys'
 import type { MapDocument } from '../editor/model'
 import Dialogs from '../editor/Dialogs'
-import { CommentsPanel, MarkersPanel, NotesPanel, SheetTabs } from '../editor/SidePanels'
+import { CommentsPanel, Legend, MarkersPanel, NotesPanel, SheetTabs } from '../editor/SidePanels'
 import Outliner from '../editor/Outliner'
 import SearchBar from '../editor/SearchBar'
 import FilterPanel from '../editor/FilterPanel'
@@ -43,15 +43,17 @@ function useModeKeys(enabled: boolean) {
       if (ed.presenting) return
       const mod = e.metaKey || e.ctrlKey
       const k = e.key.toLowerCase()
-      if (mod && !e.shiftKey && !e.altKey && (e.code === 'KeyF' || k === 'f' || k === 'а')) {
-        e.preventDefault(); ed.setSearch({ open: true })
-      } else if (mod && e.shiftKey && (e.code === 'KeyF' || k === 'f' || k === 'а')) {
-        e.preventDefault(); ed.setZen(!ed.zen)
-      } else if (mod && e.altKey && (e.code === 'KeyO' || k === 'o' || k === 'щ')) {
-        e.preventDefault(); ed.setViewMode(ed.viewMode === 'map' ? 'outline' : 'map')
-      } else if (mod && e.altKey && (e.code === 'KeyP' || k === 'p' || k === 'з')) {
-        e.preventDefault(); ed.setPresenting(true)
-      } else if (e.key === 'F6' && !isTyping(e)) {
+      const code = (c: string, ...keys: string[]) => e.code ? e.code === c : keys.includes(k)
+      if (mod && !e.shiftKey && !e.altKey && code('KeyF', 'f', 'а')) { e.preventDefault(); ed.setSearch({ open: true }) }
+      else if (mod && e.altKey && code('KeyF', 'f', 'а', 'ƒ')) { e.preventDefault(); ed.setZen(!ed.zen) }
+      else if (mod && e.altKey && code('KeyG', 'g', 'п', '©')) { e.preventDefault(); ed.setGantt(!ed.gantt) }
+      else if (mod && e.altKey && code('KeyO', 'o', 'щ')) { e.preventDefault(); ed.setViewMode(ed.viewMode === 'map' ? 'outline' : 'map') }
+      else if (mod && e.altKey && code('KeyP', 'p', 'з', 'π')) { e.preventDefault(); ed.setPresenting(true) }
+      else if (mod && e.shiftKey && code('KeyP', 'p', 'з')) { e.preventDefault(); ed.setMapShot(true) }
+      else if (mod && !e.shiftKey && !e.altKey && code('KeyP', 'p', 'з')) { e.preventDefault(); window.print() }
+      else if (mod && !e.shiftKey && code('Semicolon', ';', 'ж')) { e.preventDefault(); if (ed.drillId) ed.drillUp(); else ed.drillDown() }
+      else if (mod && !e.shiftKey && !e.altKey && code('KeyS', 's', 'ы')) { e.preventDefault(); useDoc.getState().flush() }
+      else if (e.key === 'F6' && !isTyping(e)) {
         e.preventDefault(); if (e.shiftKey) ed.drillUp(); else ed.drillDown()
       } else if (e.key === 'Escape' && ed.zen && !isTyping(e) && !ed.editingId) {
         ed.setZen(false)
@@ -128,7 +130,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   if (presenting) return <Presentation sheet={sheet} />
 
   return (
-    <div className={'editor' + (zen ? ' zen' : '')}>
+    <div className={'editor' + (zen ? ' zen' : '') + (!zen && panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly) ? ' has-panel' : '')}>
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
         <SearchBar />
@@ -139,6 +141,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
         <TopRight onShare={role === 'owner' ? () => setShareOpen(true) : undefined}
           more={<MoreMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)} />} />
         <Crumbs sheet={sheet} />
+        <Legend sheet={sheet} readOnly={readOnly} />
         <SheetTabs />
         <BottomRight sheet={sheet} />
         {panel === 'format' && viewMode === 'map' && !readOnly && <FormatPanel sheet={sheet} />}

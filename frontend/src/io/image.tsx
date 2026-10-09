@@ -7,7 +7,7 @@ import { CalloutTail, RelLabel, renderSheet } from '../editor/MapCanvas'
 import { TopicNode, dashOf } from '../editor/TopicView'
 import { edgePath } from '../editor/paths'
 import { relGeometry } from '../editor/relations'
-import { sheetBackground } from '../editor/themes'
+import { isColored, sheetBackground } from '../editor/themes'
 
 const PAD = 40
 const noop = () => {}
@@ -42,11 +42,12 @@ function StaticMap({ sheet, equations }: { sheet: Sheet; equations: Map<string, 
             stroke={d.kind === 'grid' ? rootStyle.borderColor : rootStyle.lineColor} strokeWidth={d.kind === 'grid' ? 1 : Math.max(3, rootStyle.lineWidth + 1)} />)}
         {r.layout.edges.map((e, i) => {
           const from = r.styles.get(e.from)!, to = r.styles.get(e.to)
-          const color = sheet.rainbow && e.from === sheet.rootTopic.id && to ? to.lineColor : from.lineColor
+          const color = isColored(sheet) && to ? to.lineColor : from.lineColor
           const shape = e.kind === 'line' ? 'straight' : from.lineShape
           const { d, filled } = edgePath(e, shape === 'none' && (e.kind === 'brace' || e.kind === 'vbrace') ? 'curve' : shape, from.lineWidth)
           return d ? <path key={i} d={d} fill={filled ? color : 'none'} stroke={filled ? 'none' : color}
-            strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth} strokeLinecap="round" /> : null
+            strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth} strokeLinecap="round"
+            strokeDasharray={filled ? undefined : dashOf(from.lineStyle, from.lineWidth)} /> : null
         })}
         {[...r.layout.boxes.values()].map(bx => {
           const ref = idx.get(bx.id)

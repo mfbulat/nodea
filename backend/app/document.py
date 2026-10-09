@@ -6,13 +6,19 @@ def new_id() -> str:
 
 
 def empty_document(title: str = "Центральная тема") -> dict:
+    """Новая карта как в XMind: центральная тема и 4 основные, структура «по часовой»."""
     return {
         "version": 1,
         "sheets": [
             {
                 "id": new_id(),
-                "title": "Лист 1",
-                "rootTopic": {"id": new_id(), "title": title, "children": []},
+                "title": "Карта 1",
+                "structure": "mindmap-cw",
+                "rootTopic": {
+                    "id": new_id(),
+                    "title": title,
+                    "children": [{"id": new_id(), "title": f"Основная тема {i}", "children": []} for i in range(1, 5)],
+                },
             }
         ],
     }

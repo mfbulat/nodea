@@ -25,7 +25,7 @@ export interface TopicStyle {
   borderStyle?: BorderStyle
   fontFamily?: string
   fontSize?: number
-  fontWeight?: 'normal' | 'bold'
+  fontWeight?: 'normal' | 'medium' | 'bold' | 'extrabold'
   fontStyle?: 'normal' | 'italic'
   textDecoration?: 'none' | 'underline' | 'line-through'
   textColor?: string
@@ -33,7 +33,14 @@ export interface TopicStyle {
   lineShape?: LineShape
   lineWidth?: number
   lineColor?: string
+  /** штрих линии ветки и её окончание */
+  lineStyle?: 'solid' | 'dashed' | 'dotted'
+  lineEnd?: 'none' | 'arrow'
+  /** регистр текста */
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
   maxWidth?: number
+  /** фиксированная ширина темы (вместо «по тексту») */
+  width?: number
 }
 
 export interface Topic {
@@ -57,6 +64,14 @@ export interface Topic {
   /** формула LaTeX */
   equation?: string
   task?: { done: boolean }
+  /** сведения о задаче для диаграммы Ганта */
+  taskInfo?: { start?: string; end?: string; progress?: number; assignee?: string; priority?: number; dependsOn?: string[] }
+  /** аудиозаметка */
+  audio?: { url: string; duration: number }
+  /** свободное положение ветки: смещение блока относительно места по раскладке */
+  offset?: { x: number; y: number }
+  /** настройки слайда в режиме презентации */
+  pitch?: { slide?: 'auto' | 'yes' | 'no'; subSlides?: 'auto' | 'yes' | 'no'; delivery?: 'all' | 'one' | 'drill'; layout?: 'list' | 'bullets' | 'indent' | 'branch' | 'columns' }
   comments?: Comment[]
   boundaries?: Boundary[]
   summaries?: Summary[]
@@ -94,6 +109,24 @@ export interface Sheet {
   structure?: StructureId
   background?: string
   rainbow?: boolean
+  /** id цветовой палитры веток */
+  palette?: string
+  globalFont?: string
+  branchLineWidth?: number
+  /** параметры карты (вкладка «Карта») */
+  balance?: boolean
+  compact?: boolean
+  uniformWidth?: boolean
+  showNotes?: boolean
+  autoColorFloating?: boolean
+  relColorFollowTopic?: boolean
+  freeBranch?: boolean
+  cjkFont?: string
+  pitchTheme?: 'light' | 'dark'
+  pitchRatio?: 'auto' | '16:9' | '4:3'
+  legend?: boolean
+  /** подписи маркеров в легенде */
+  markerNames?: Record<string, string>
   relationships?: Relationship[]
   [k: string]: unknown
 }

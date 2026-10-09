@@ -19,13 +19,13 @@ describe('операции редактора', () => {
   it('подтема, соседняя, удаление, отмена/повтор', () => {
     ed().select(['b']); ed().addChild(); ed().stopEdit()
     ed().select(['a']); ed().addSibling(false); ed().stopEdit()
-    expect(titles(root())).toBe('R[A[A1],Основная тема,B[Подтема]]')
+    expect(titles(root())).toBe('R[A[A1],Основная тема 3,B[Подтема 1]]')
     ed().select(['a']); ed().removeSelected()
-    expect(titles(root())).toBe('R[Основная тема,B[Подтема]]')
+    expect(titles(root())).toBe('R[Основная тема 3,B[Подтема 1]]')
     ed().undo()
-    expect(titles(root())).toBe('R[A[A1],Основная тема,B[Подтема]]')
+    expect(titles(root())).toBe('R[A[A1],Основная тема 3,B[Подтема 1]]')
     ed().redo()
-    expect(titles(root())).toBe('R[Основная тема,B[Подтема]]')
+    expect(titles(root())).toBe('R[Основная тема 3,B[Подтема 1]]')
   })
 
   it('перемещение: в дочерние, перед соседом, запрет на перенос в потомка', () => {

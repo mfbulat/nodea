@@ -1,9 +1,14 @@
-import { ReactNode, useState } from 'react'
+// Панель «Формат» (как в XMind): вкладки «Стиль / Презентация / Карта».
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
-import { indexSheet } from './model'
+import { indexSheet, levelOf } from './model'
 import { STRUCTURES } from './layout'
-import { getTheme, resolveStyle, THEMES } from './themes'
+import { FullStyle, getTheme, isColored, MAP_FONT, PALETTES, resolveStyle, THEMES } from './themes'
+import { shapePath, edgePath } from './paths'
 import { useEditor } from './store'
+import Icon from '../ui/Icon'
+
+// ---------- элементы управления ----------
 
 const SHAPES: [ShapeId, string][] = [['rect', 'Прямоугольник'], ['rounded', 'Скруглённый'], ['capsule', 'Капсула'],
   ['ellipse', 'Эллипс'], ['diamond', 'Ромб'], ['hexagon', 'Шестиугольник'], ['parallelogram', 'Параллелограмм'],
@@ -11,88 +16,269 @@ const SHAPES: [ShapeId, string][] = [['rect', 'Прямоугольник'], ['r
 const LINES: [LineShape, string][] = [['curve', 'Кривая'], ['straight', 'Прямая'], ['elbow', 'Ломаная'],
   ['rounded', 'Ломаная скруглённая'], ['taper', 'Сужающаяся'], ['none', 'Нет']]
 const BORDERS: [BorderStyle, string][] = [['solid', 'Сплошная'], ['dashed', 'Штрих'], ['dotted', 'Точки'], ['none', 'Нет']]
-const FONTS = ['system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', 'Arial, sans-serif', 'Verdana, sans-serif',
+const THICK: [number, string][] = [[0, 'Нет'], [1, 'Тонкая'], [2, 'Средняя'], [3, 'Толстая'], [5, 'Очень толстая']]
+const WEIGHT: [NonNullable<TopicStyle['fontWeight']>, string][] = [['normal', 'Обычный'], ['medium', 'Средний'], ['bold', 'Жирный'], ['extrabold', 'Сверхжирный']]
+const SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 30, 36, 42, 48, 56, 64]
+export const FONTS = [MAP_FONT, 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', 'Arial, sans-serif', 'Verdana, sans-serif',
   '"Trebuchet MS", sans-serif', 'Georgia, serif', '"Times New Roman", serif', '"Courier New", monospace']
-const fontName = (f: string) => f.split(',')[0].replace(/"/g, '').replace('system-ui', 'Системный')
+export const fontName = (f: string) => f.split(',')[0].replace(/"/g, '').replace('system-ui', 'Системный')
+const thickName = (w: number) => (THICK.reduce((a, t) => (Math.abs(t[0] - w) < Math.abs(a[0] - w) ? t : a))[1])
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="fp-section">
+      <div className="fp-head">
+        <button className="group-head" onClick={() => setOpen(o => !o)}>
+          <span className={'caret' + (open ? '' : ' closed')}>▾</span>{title}
+        </button>
+        {right}
+      </div>
+      {open && children}
+    </div>
+  )
+}
+
+export function Row({ label, children }: { label: string; children: ReactNode }) {
   return <div className="fp-row"><span>{label}</span><div className="fp-ctl">{children}</div></div>
 }
 
-function Color({ value, onChange, allowNone }: { value: string; onChange: (v: string | undefined) => void; allowNone?: boolean }) {
+export function Color({ value, onChange, allowNone }: { value: string; onChange: (v: string | undefined) => void; allowNone?: boolean }) {
   const isNone = value === 'transparent' || value === 'none'
   return (
+    <span className="color-well">
+      <span className="swatch" style={{ background: isNone ? 'repeating-linear-gradient(45deg,#fff 0 4px,#ddd 4px 8px)' : value }} />
+      <input type="color" aria-label="Цвет" value={isNone || !/^#[0-9a-f]{6}$/i.test(value) ? '#ffffff' : value} onChange={e => onChange(e.target.value)} />
+      {allowNone && <button className={'mini' + (isNone ? ' on' : '')} onClick={() => onChange('transparent')} title="Без заливки">∅</button>}
+    </span>
+  )
+}
+
+/** Выпадающий список с картинками (фигура, структура, линия ветки) */
+function Picker<T extends string>({ value, options, render, onChange, label, cols = 3 }: {
+  value: T; options: [T, string][]; render: (v: T) => ReactNode; onChange: (v: T) => void; label: string; cols?: number
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [open])
+  return (
+    <div className="picker" ref={ref}>
+      <button className="picker-btn" onClick={() => setOpen(o => !o)} aria-label={label} title={options.find(o => o[0] === value)?.[1] ?? label}>
+        {render(value)}<Icon name="chevron" size={12} />
+      </button>
+      {open && (
+        <div className="picker-pop" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }} role="listbox" aria-label={label}>
+          {options.map(([v, name]) => (
+            <button key={v} role="option" aria-selected={v === value} className={v === value ? 'on' : ''} title={name}
+              onClick={() => { onChange(v); setOpen(false) }}>{render(v)}<span>{name}</span></button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ShapeIcon = ({ s }: { s: ShapeId }) => (
+  <svg width={30} height={18} viewBox="-2 -2 34 22">
+    {s === 'underline' ? <path d="M0,17H30" stroke="currentColor" strokeWidth={1.6} />
+      : s === 'none' ? <path d="M4,9H26" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
+        : <path d={shapePath(s, 30, 18)} fill="none" stroke="currentColor" strokeWidth={1.6} />}
+  </svg>
+)
+
+const LineIcon = ({ s }: { s: LineShape }) => {
+  const e = { from: 'a', to: 'b', kind: 'h' as const, pts: [{ x: 2, y: 2 }, { x: 28, y: 16 }] }
+  const { d, filled } = edgePath(e, s === 'none' ? 'straight' : s, 1.6)
+  return <svg width={30} height={18}>{s !== 'none' && <path d={d} fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'} strokeWidth={1.6} />}</svg>
+}
+
+/** Схематичные значки структур */
+export function StructureIcon({ s }: { s: StructureId | '' }) {
+  const p: Record<string, string> = {
+    'mindmap': 'M13,9h6M13,9C10,9 9,4 6,4M13,9C10,9 9,14 6,14M19,9C22,9 23,4 26,4M19,9C22,9 23,14 26,14',
+    'mindmap-cw': 'M13,9h6M19,9C22,9 23,3 26,3M19,9h7M19,9C22,9 23,15 26,15M13,9C10,9 9,5 6,5M13,9C10,9 9,13 6,13',
+    'mindmap-acw': 'M13,9h6M13,9C10,9 9,3 6,3M13,9h-7M13,9C10,9 9,15 6,15M19,9C22,9 23,5 26,5M19,9C22,9 23,13 26,13',
+    'logic-right': 'M4,9h6M10,9V3h8M10,9h8M10,9v6h8', 'logic-left': 'M28,9h-6M22,9V3h-8M22,9h-8M22,9v6h-8',
+    'brace-right': 'M6,9h3M12,2c-3,0 -3,7 -3,7c0,0 0,7 3,7M15,3h10M15,9h10M15,15h10', 'brace-left': 'M26,9h-3M20,2c3,0 3,7 3,7c0,0 0,7 -3,7M17,3h-10M17,9h-10M17,15h-10',
+    'org-down': 'M16,2v5M6,7h20M6,7v5M16,7v5M26,7v5', 'org-up': 'M16,16v-5M6,11h20M6,11v-5M16,11v-5M26,11v-5',
+    'tree-right': 'M6,2v14M6,6h8M6,11h8M6,16h8', 'tree-left': 'M26,2v14M26,6h-8M26,11h-8M26,16h-8',
+    'timeline-h': 'M2,9h28M8,9v-5M16,9v5M24,9v-5', 'timeline-v': 'M16,1v16M16,5h8M16,9h-8M16,13h8',
+    'fishbone-left': 'M4,9h26M10,9l5,-6M10,9l5,6M20,9l5,-6M20,9l5,6', 'fishbone-right': 'M28,9h-26M22,9l-5,-6M22,9l-5,6M12,9l-5,-6M12,9l-5,6',
+    'tree-table': 'M3,2h26v14h-26zM3,6h26M12,6v10M3,11h26', 'matrix': 'M3,2h26v14h-26zM3,7h26M3,12h26M11,2v14M20,2v14',
+    '': 'M8,9h16M12,5l-4,4 4,4',
+  }
+  return <svg width={32} height={18}><path d={p[s] ?? p['']} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" /></svg>
+}
+
+const STRUCT_OPTS: [StructureId, string][] = STRUCTURES.map(s => [s.id, s.name])
+
+// ---------- вкладка «Стиль» для темы ----------
+
+function StylePreview({ s, label }: { s: FullStyle; label: string }) {
+  return (
+    <div className="style-preview">
+      <div className="sp-topic" style={{
+        background: s.fill === 'transparent' ? 'transparent' : s.fill, color: s.textColor,
+        border: s.borderStyle === 'none' || !s.borderWidth ? '1px solid transparent' : `${Math.min(3, s.borderWidth)}px ${s.borderStyle} ${s.borderColor}`,
+        borderRadius: s.shape === 'capsule' || s.shape === 'ellipse' ? 20 : s.shape === 'rect' ? 2 : 7,
+        fontWeight: ({ normal: 400, medium: 500, bold: 700, extrabold: 800 } as Record<string, number>)[s.fontWeight],
+        fontStyle: s.fontStyle, borderBottom: s.shape === 'underline' ? `2px solid ${s.borderColor}` : undefined,
+      }}>{label}</div>
+    </div>
+  )
+}
+
+const LEVEL_NAME: Record<string, string> = { central: 'Центральная тема', main: 'Основная тема', sub: 'Подтема', floating: 'Плавающая тема', summary: 'Сводка', callout: 'Выноска' }
+
+function TopicStyleTab({ sheet }: { sheet: Sheet }) {
+  const { selection } = useEditor()
+  const ed = useEditor.getState()
+  const idx = indexSheet(sheet)
+  const id = selection[selection.length - 1]
+  const ref = id ? idx.get(id) : undefined
+  if (!ref) return <p className="muted fp-empty">Выберите тему, чтобы изменить её стиль.</p>
+  const s = resolveStyle(sheet, ref)
+  const set = (p: TopicStyle) => ed.setStyle(p)
+  const isRoot = ref.kind === 'root'
+  const level = levelOf(ref)
+  const structure: StructureId | '' = isRoot ? sheet.structure ?? 'mindmap' : (ref.topic.structure ?? '')
+  const B = (on: boolean, label: string, ch: ReactNode, fn: () => void) =>
+    <button className={'seg-btn' + (on ? ' on' : '')} title={label} aria-label={label} onClick={fn}>{ch}</button>
+  return (
     <>
-      <input type="color" value={isNone || !/^#[0-9a-f]{6}$/i.test(value) ? '#ffffff' : value} onChange={e => onChange(e.target.value)} />
-      {allowNone && <button className={'mini' + (isNone ? ' on' : '')} onClick={() => onChange('transparent')}>Нет</button>}
+      {selection.length > 1 && <p className="muted" style={{ margin: '0 0 8px' }}>Выбрано тем: {selection.length}</p>}
+      <StylePreview s={s} label={LEVEL_NAME[level]} />
+
+      <Section title="Фигура" right={<Picker label="Фигура" value={s.shape} options={SHAPES} render={v => <ShapeIcon s={v} />} onChange={v => set({ shape: v })} />}>
+        <Row label="Заливка">
+          <select value={s.fill === 'transparent' ? 'none' : 'solid'} onChange={e => set({ fill: e.target.value === 'none' ? 'transparent' : (s.fill === 'transparent' ? '#eeeeee' : s.fill) })} aria-label="Тип заливки">
+            <option value="solid">Сплошная</option><option value="none">Нет</option>
+          </select>
+          <Color value={s.fill} onChange={v => set({ fill: v })} />
+        </Row>
+        <Row label="Граница">
+          <select value={s.borderStyle} onChange={e => set({ borderStyle: e.target.value as BorderStyle, ...(e.target.value !== 'none' && !s.borderWidth ? { borderWidth: 1 } : {}) })} aria-label="Тип границы">
+            {BORDERS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+          <Color value={s.borderColor} onChange={v => set({ borderColor: v })} />
+        </Row>
+        <select className="wide" value={thickName(s.borderStyle === 'none' ? 0 : s.borderWidth)} aria-label="Толщина границы"
+          onChange={e => { const w = THICK.find(t => t[1] === e.target.value)![0]; set(w ? { borderWidth: w, borderStyle: s.borderStyle === 'none' ? 'solid' : s.borderStyle } : { borderStyle: 'none' }) }}>
+          {THICK.map(([, n]) => <option key={n}>{n}</option>)}
+        </select>
+      </Section>
+
+      <div className="fp-section">
+        <Row label="Длина">
+          <input type="number" min={40} max={1200} placeholder="авто" value={s.width ?? ''} aria-label="Ширина темы, px"
+            onChange={e => set({ width: e.target.value ? +e.target.value : undefined })} /><span className="muted">px</span>
+          <button className={'mini' + (!s.width ? ' on' : '')} onClick={() => set({ width: undefined })}>По тексту</button>
+        </Row>
+      </div>
+
+      <Section title="Текст">
+        <div className="fp-row2">
+          <select value={s.fontFamily} onChange={e => set({ fontFamily: e.target.value })} aria-label="Шрифт">
+            {[...new Set([s.fontFamily, ...FONTS])].map(f => <option key={f} value={f}>{fontName(f)}</option>)}
+          </select>
+          <select value={s.fontSize} onChange={e => set({ fontSize: +e.target.value })} aria-label="Размер шрифта" className="narrow">
+            {[...new Set([s.fontSize, ...SIZES])].sort((a, b) => a - b).map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="fp-row2">
+          <select value={s.fontWeight} onChange={e => set({ fontWeight: e.target.value as TopicStyle['fontWeight'] })} aria-label="Начертание">
+            {WEIGHT.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+          <Color value={s.textColor} onChange={v => set({ textColor: v })} />
+        </div>
+        <div className="seg-group">
+          {B(s.fontWeight === 'bold' || s.fontWeight === 'extrabold', 'Жирный', <b>B</b>, () => set({ fontWeight: s.fontWeight === 'bold' || s.fontWeight === 'extrabold' ? 'normal' : 'bold' }))}
+          {B(s.fontStyle === 'italic', 'Курсив', <i>I</i>, () => set({ fontStyle: s.fontStyle === 'italic' ? 'normal' : 'italic' }))}
+          {B(s.textDecoration === 'line-through', 'Зачёркнутый', <s>S</s>, () => set({ textDecoration: s.textDecoration === 'line-through' ? 'none' : 'line-through' }))}
+          {B(s.textDecoration === 'underline', 'Подчёркнутый', <u>U</u>, () => set({ textDecoration: s.textDecoration === 'underline' ? 'none' : 'underline' }))}
+          <select className="case-select" value={s.textTransform} onChange={e => set({ textTransform: e.target.value as TopicStyle['textTransform'] })} aria-label="Регистр" title="Регистр">
+            <option value="none">Aa</option><option value="uppercase">AA</option><option value="lowercase">aa</option><option value="capitalize">Ab Cd</option>
+          </select>
+        </div>
+        <div className="seg-group">
+          {(['left', 'center', 'right'] as const).map(a => B(s.textAlign === a, a === 'left' ? 'По левому краю' : a === 'center' ? 'По центру' : 'По правому краю',
+            <svg width={16} height={14}><path d={a === 'left' ? 'M2,3h12M2,7h8M2,11h12' : a === 'center' ? 'M2,3h12M4,7h8M2,11h12' : 'M2,3h12M6,7h8M2,11h12'} stroke="currentColor" strokeWidth={1.5} /></svg>,
+            () => set({ textAlign: a })))}
+        </div>
+      </Section>
+
+      <Section title="Структура" right={<Picker label="Структура" cols={3} value={structure as StructureId} options={[...(isRoot ? [] : [['' as StructureId, 'Как у родителя'] as [StructureId, string]]), ...STRUCT_OPTS]}
+        render={v => <StructureIcon s={v} />} onChange={v => ed.setStructure((v || undefined) as StructureId | undefined)} />}>
+        <select className="wide" value={structure} onChange={e => ed.setStructure((e.target.value || undefined) as StructureId | undefined)} aria-label="Структура">
+          {!isRoot && <option value="">Как у родителя</option>}
+          {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+        </select>
+      </Section>
+
+      <Section title="Ветка" right={<Picker label="Форма линии" value={s.lineShape} options={LINES} render={v => <LineIcon s={v} />} onChange={v => set({ lineShape: v })} />}>
+        <div className="fp-labels"><span>Линия</span><span>Конец</span></div>
+        <div className="fp-row2">
+          <select value={s.lineStyle} onChange={e => set({ lineStyle: e.target.value as TopicStyle['lineStyle'] })} aria-label="Штрих линии">
+            <option value="solid">───────</option><option value="dashed">─ ─ ─ ─</option><option value="dotted">· · · · · ·</option>
+          </select>
+          <select className="narrow" value={s.lineEnd} onChange={e => set({ lineEnd: e.target.value as TopicStyle['lineEnd'] })} aria-label="Окончание линии">
+            <option value="none">—</option><option value="arrow">→</option>
+          </select>
+        </div>
+        <div className="fp-row2">
+          <select value={thickName(s.lineWidth)} onChange={e => set({ lineWidth: THICK.find(t => t[1] === e.target.value)![0] || 1 })} aria-label="Толщина линии">
+            {THICK.slice(1).map(([, n]) => <option key={n}>{n}</option>)}
+          </select>
+          <Color value={s.lineColor} onChange={v => set({ lineColor: v })} />
+        </div>
+        {isRoot && <>
+          <label className="fp-toggle"><span>Цветные ветки</span><Toggle on={isColored(sheet)} onChange={v => ed.setSheet({ rainbow: v })} /></label>
+          {isColored(sheet) && <PaletteSelect sheet={sheet} />}
+        </>}
+      </Section>
+
+      <TopicElements topic={ref.topic} />
+      <div className="fp-buttons fp-bottom">
+        <button onClick={() => ed.copyStyle(s)} title="⌥⌘C">Копировать стиль</button>
+        <button onClick={() => ed.pasteStyle()} disabled={!useEditor.getState().styleClipboard} title="⌥⌘V">Вставить стиль</button>
+      </div>
+      <button className="wide reset" onClick={() => ed.clearStyle()} title="⌥⌘0">Сбросить стиль</button>
     </>
   )
 }
 
-function ElementFormat({ sheet }: { sheet: Sheet }) {
-  const { element } = useEditor()
+export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return <button role="switch" aria-checked={on} aria-label={label} className={'toggle-sw' + (on ? ' on' : '')} onClick={() => onChange(!on)}><span /></button>
+}
+
+function PaletteSelect({ sheet }: { sheet: Sheet }) {
   const ed = useEditor.getState()
-  if (element?.kind === 'relationship') {
-    const r = sheet.relationships?.find(x => x.id === element.id)
-    if (!r) return null
-    const up = (p: Partial<Relationship>) => ed.updateRelationship(r.id, p)
-    return (
-      <div className="side-panel format-panel" data-testid="format-panel">
-        <h4>Связь</h4>
-        <Row label="Подпись"><input value={r.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
-        <Row label="Цвет / толщина">
-          <Color value={r.color ?? '#667085'} onChange={v => up({ color: v })} />
-          <input type="number" min={1} max={8} value={r.width ?? 2} onChange={e => up({ width: +e.target.value })} />
-        </Row>
-        <Row label="Линия">
-          <select value={r.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
-            {BORDERS.filter(b => b[0] !== 'none').map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-          </select>
-        </Row>
-        <label className="fp-check"><input type="checkbox" checked={!!r.arrowStart} onChange={e => up({ arrowStart: e.target.checked })} />Стрелка в начале</label>
-        <label className="fp-check"><input type="checkbox" checked={r.arrowEnd !== false} onChange={e => up({ arrowEnd: e.target.checked })} />Стрелка в конце</label>
-        <div className="fp-buttons" style={{ marginTop: 10 }}>
-          <button onClick={() => up({ cp1: undefined, cp2: undefined })}>Сбросить изгиб</button>
-          <button className="danger" onClick={ed.removeElement}>Удалить связь</button>
-        </div>
-        <p className="muted" style={{ fontSize: 12 }}>Изгиб — перетаскиванием белых точек. Двойной щелчок по линии — подпись.</p>
-      </div>
-    )
-  }
-  if (element?.kind === 'boundary') {
-    let b: Boundary | undefined
-    const walk = (t: Topic) => { b ??= t.boundaries?.find(x => x.id === element.id); t.children?.forEach(walk); t.summaries?.forEach(s => walk(s.topic)) }
-    walk(sheet.rootTopic); sheet.floatingTopics?.forEach(walk)
-    if (!b) return null
-    const id = b.id
-    const up = (p: Partial<Boundary>) => ed.updateBoundary(id, p)
-    return (
-      <div className="side-panel format-panel" data-testid="format-panel">
-        <h4>Граница</h4>
-        <Row label="Заголовок"><input value={b.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
-        <Row label="Цвет линии"><Color value={b.color ?? '#667085'} onChange={v => up({ color: v })} /></Row>
-        <Row label="Заливка"><Color value={b.fill ?? 'transparent'} allowNone onChange={v => up({ fill: v === 'transparent' ? undefined : v })} /></Row>
-        <Row label="Линия">
-          <select value={b.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
-            {BORDERS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-          </select>
-        </Row>
-        <div className="fp-buttons" style={{ marginTop: 10 }}><button className="danger" onClick={ed.removeElement}>Удалить границу</button></div>
-      </div>
-    )
-  }
-  return null
+  const cur = sheet.palette ?? 'dawn'
+  return (
+    <div className="palette-list">
+      {PALETTES.map(p => (
+        <button key={p.id} className={'palette' + (cur === p.id ? ' on' : '')} title={p.name} aria-label={'Палитра ' + p.name}
+          onClick={() => ed.setSheet({ palette: p.id, rainbow: true })}>
+          {p.colors.map(c => <span key={c} style={{ background: c }} />)}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function TopicElements({ topic }: { topic: Topic }) {
   const ed = useEditor.getState()
   const set = (p: Partial<Topic>) => ed.setTopic([topic.id], p)
   const img = topic.image
-  const has = img || topic.attachment || topic.href || topic.equation || topic.labels?.length || topic.task || topic.markers?.length
+  const has = img || topic.attachment || topic.href || topic.equation || topic.labels?.length || topic.task || topic.markers?.length || topic.audio
   if (!has) return null
   return (
-    <>
-      <h4>Элементы темы</h4>
+    <Section title="Элементы темы">
       {img && !img.src.startsWith('emoji:') && (
         <Row label="Ширина картинки">
           <input type="number" min={16} max={1200} value={img.width}
@@ -105,144 +291,237 @@ function TopicElements({ topic }: { topic: Topic }) {
         <button className="mini" onClick={() => set({ image: undefined })}>×</button></Row>}
       {topic.attachment && <Row label="Вложение"><a href={topic.attachment.url} target="_blank" rel="noreferrer" className="ellipsis">{topic.attachment.name}</a>
         <button className="mini" onClick={() => set({ attachment: undefined })}>×</button></Row>}
+      {topic.audio && <Row label="Аудиозаметка"><audio controls src={topic.audio.url} style={{ width: 150, height: 28 }} />
+        <button className="mini" onClick={() => set({ audio: undefined })}>×</button></Row>}
       {topic.href && <Row label="Ссылка"><button className="mini" onClick={() => ed.setDialog({ kind: 'link', id: topic.id })}>Изменить</button>
         <button className="mini" onClick={() => set({ href: undefined })}>×</button></Row>}
       {topic.equation && <Row label="Формула"><button className="mini" onClick={() => ed.setDialog({ kind: 'equation', id: topic.id })}>Изменить</button>
         <button className="mini" onClick={() => set({ equation: undefined })}>×</button></Row>}
       {!!topic.labels?.length && <Row label="Метки"><button className="mini" onClick={() => ed.setDialog({ kind: 'labels', id: topic.id })}>Изменить</button>
         <button className="mini" onClick={() => set({ labels: undefined })}>×</button></Row>}
-      {topic.task && <Row label="Задача"><label><input type="checkbox" checked={topic.task.done} onChange={() => ed.toggleTask(topic.id)} /> выполнено</label>
+      {topic.task && <Row label="To-Do"><label><input type="checkbox" checked={topic.task.done} onChange={() => ed.toggleTask(topic.id)} /> выполнено</label>
         <button className="mini" onClick={() => set({ task: undefined })}>×</button></Row>}
       {!!topic.markers?.length && <Row label="Маркеры"><button className="mini" onClick={() => set({ markers: undefined })}>Убрать все</button></Row>}
+    </Section>
+  )
+}
+
+// ---------- вкладка «Карта» ----------
+
+function ThemeCard({ id, on, onClick }: { id: string; on: boolean; onClick: () => void }) {
+  const th = getTheme(id)
+  const lv = th.levels
+  const main = (i: number) => th.colored ? th.rainbow[i] : lv.main.fill
+  return (
+    <button className={'theme-card' + (on ? ' on' : '')} onClick={onClick} title={th.name} aria-label={'Тема ' + th.name}>
+      <svg width="100%" viewBox="0 0 120 60" style={{ background: th.background, borderRadius: 6 }}>
+        {[[20, 14], [20, 46], [100, 14], [100, 46]].map(([x, y], i) => (
+          <g key={i}><path d={`M60,30Q${x < 60 ? 45 : 75},${y} ${x < 60 ? x + 12 : x - 12},${y}`} fill="none" stroke={th.colored ? th.rainbow[i] : lv.main.lineColor} strokeWidth={1.5} />
+            <rect x={x - 12} y={y - 5} width={24} height={10} rx={3} fill={main(i) === 'transparent' ? '#fff' : main(i)} stroke={lv.main.borderStyle === 'none' ? 'none' : lv.main.borderColor} strokeWidth={1} /></g>
+        ))}
+        <rect x={42} y={23} width={36} height={14} rx={4} fill={lv.central.fill === 'transparent' ? th.background : lv.central.fill}
+          stroke={lv.central.borderStyle === 'none' ? 'none' : lv.central.borderColor} />
+        <rect x={50} y={28} width={20} height={4} rx={2} fill={lv.central.textColor} />
+      </svg>
+      <span>{th.name}</span>
+    </button>
+  )
+}
+
+function MapTab({ sheet }: { sheet: Sheet }) {
+  const ed = useEditor.getState()
+  const th = getTheme(sheet.theme)
+  const tog = (label: string, key: keyof Sheet, val?: boolean) => (
+    <label className="fp-toggle"><span>{label}</span><Toggle label={label} on={val ?? !!sheet[key]} onChange={v => ed.setSheet({ [key]: v } as Partial<Sheet>)} /></label>
+  )
+  return (
+    <>
+      <div className="fp-section">
+        <div className="theme-grid">
+          {THEMES.map(t => <ThemeCard key={t.id} id={t.id} on={th.id === t.id} onClick={() => ed.setSheet({ theme: t.id, background: undefined, rainbow: undefined })} />)}
+        </div>
+      </div>
+      <div className="fp-section">
+        <div className="fp-sub">Цветовая тема</div>
+        <PaletteSelect sheet={sheet} />
+      </div>
+      <div className="fp-section">
+        <Row label="Цвет фона"><Color value={sheet.background || th.background} onChange={v => ed.setSheet({ background: v })} />
+          <button className="mini" onClick={() => ed.setSheet({ background: undefined })} title="Как в теме">↺</button></Row>
+      </div>
+      <div className="fp-section">
+        <div className="fp-sub">Шрифт карты</div>
+        <select className="wide" value={sheet.globalFont ?? ''} onChange={e => ed.setSheet({ globalFont: e.target.value || undefined })} aria-label="Шрифт карты">
+          <option value="">По умолчанию</option>
+          {FONTS.map(f => <option key={f} value={f}>{fontName(f)}</option>)}
+        </select>
+        <div className="fp-sub">Толщина линий веток</div>
+        <select className="wide" value={sheet.branchLineWidth ?? ''} onChange={e => ed.setSheet({ branchLineWidth: e.target.value ? +e.target.value : undefined })} aria-label="Толщина линий веток">
+          <option value="">По умолчанию</option>
+          {THICK.slice(1).map(([w, n]) => <option key={w} value={w}>{n}</option>)}
+        </select>
+        {tog('Цветные ветки', 'rainbow', isColored(sheet))}
+      </div>
+      <div className="fp-section">
+        <div className="fp-title">Стиль карты</div>
+        {tog('Баланс карты', 'balance')}
+        {tog('Компактная карта', 'compact')}
+      </div>
+      <div className="fp-section">
+        <div className="fp-title">Отображение тем</div>
+        {tog('Одинаковая длина тем', 'uniformWidth')}
+        {tog('Показывать все заметки', 'showNotes')}
+        {tog('Автоцвет плавающих тем', 'autoColorFloating')}
+      </div>
+      <div className="fp-section">
+        <div className="fp-title">Связи</div>
+        {tog('Цвет линии как у темы', 'relColorFollowTopic')}
+      </div>
+      <div className="fp-section">
+        <div className="fp-title">Дополнительно</div>
+        {tog('Свободное положение веток', 'freeBranch')}
+        {tog('Легенда маркеров', 'legend')}
+        <div className="fp-sub">Шрифт для CJK</div>
+        <select className="wide" value={sheet.cjkFont ?? ''} onChange={e => ed.setSheet({ cjkFont: e.target.value || undefined })} aria-label="Шрифт CJK">
+          <option value="">По умолчанию</option>
+          <option value='"Noto Sans CJK SC", "PingFang SC", sans-serif'>Noto Sans CJK / PingFang</option>
+          <option value='"Hiragino Sans", "Yu Gothic", sans-serif'>Hiragino / Yu Gothic</option>
+          <option value='"Apple SD Gothic Neo", "Malgun Gothic", sans-serif'>Apple SD Gothic / Malgun</option>
+        </select>
+      </div>
     </>
   )
 }
 
-export default function FormatPanel({ sheet }: { sheet: Sheet }) {
-  const { selection, styleClipboard, element } = useEditor()
-  if (element) return <ElementFormat sheet={sheet} />
-  return <TopicFormat sheet={sheet} selection={selection} styleClipboard={styleClipboard} />
+// ---------- вкладка «Презентация» ----------
+
+function PitchTab({ sheet }: { sheet: Sheet }) {
+  const { selection } = useEditor()
+  const ed = useEditor.getState()
+  const id = selection[selection.length - 1]
+  const ref = id ? indexSheet(sheet).get(id) : undefined
+  const p = ref?.topic.pitch ?? {}
+  const setP = (patch: Partial<NonNullable<Topic['pitch']>>) => ref && ed.setTopic(selection, { pitch: { ...p, ...patch } })
+  const dark = (sheet.pitchTheme ?? 'dark') === 'dark'
+  const layouts: [NonNullable<NonNullable<Topic['pitch']>['layout']>, string, string][] = [
+    ['list', 'Список', 'M3,3h3M8,3h9M3,8h3M8,8h9M3,13h3M8,13h9'], ['bullets', 'Маркированный список', 'M4,3h.1M8,3h9M4,8h.1M8,8h9M4,13h.1M8,13h9'],
+    ['indent', 'С отступом', 'M3,3h14M6,8h11M6,13h11'], ['branch', 'Ветка', 'M3,8h4M7,8L12,3h5M7,8h10M7,8L12,13h5'], ['columns', 'Колонки', 'M3,3v10M10,3v10M17,3v10'],
+  ]
+  return (
+    <>
+      <div className="fp-sub">Вид в режиме презентации</div>
+      <div className="pitch-preview" style={{ background: dark ? '#000' : '#fff', color: dark ? '#fff' : '#111', aspectRatio: sheet.pitchRatio === '4:3' ? '4/3' : '16/9' }}>
+        {ref ? <><b>{ref.topic.title}</b>{(ref.topic.children ?? []).slice(0, 4).map(c => <span key={c.id}>{c.title}</span>)}</> : <span className="muted">Выберите тему</span>}
+      </div>
+      <button className="wide" onClick={() => ed.setSheet({ pitchTheme: dark ? 'light' : 'dark' })}>Сменить тему ({dark ? 'тёмная' : 'светлая'})</button>
+      <Row label="Соотношение сторон">
+        <select value={sheet.pitchRatio ?? 'auto'} onChange={e => ed.setSheet({ pitchRatio: e.target.value as Sheet['pitchRatio'] })} aria-label="Соотношение сторон">
+          <option value="auto">Авто</option><option value="16:9">16:9</option><option value="4:3">4:3</option>
+        </select>
+      </Row>
+      {ref && <>
+        <Row label="Тема как слайд">
+          <select value={p.slide ?? 'auto'} onChange={e => setP({ slide: e.target.value as 'auto' })} aria-label="Тема как слайд">
+            <option value="auto">Авто</option><option value="yes">Да</option><option value="no">Нет</option>
+          </select>
+        </Row>
+        <Row label="Подтемы как слайды">
+          <select value={p.subSlides ?? 'auto'} onChange={e => setP({ subSlides: e.target.value as 'auto' })} aria-label="Подтемы как слайды">
+            <option value="auto">Авто</option><option value="yes">Да</option><option value="no">Нет</option>
+          </select>
+        </Row>
+        <div className="fp-sub">Показ</div>
+        <select className="wide" value={p.delivery ?? 'drill'} onChange={e => setP({ delivery: e.target.value as 'drill' })} aria-label="Показ">
+          <option value="drill">По одной — с погружением</option><option value="one">По одной</option><option value="all">Все сразу</option>
+        </select>
+        <div className="fp-sub">Раскладка</div>
+        <div className="seg-group">
+          {layouts.map(([v, n, d]) => (
+            <button key={v} className={'seg-btn' + ((p.layout ?? 'list') === v ? ' on' : '')} title={n} aria-label={n} onClick={() => setP({ layout: v })}>
+              <svg width={20} height={16}><path d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" /></svg>
+            </button>
+          ))}
+        </div>
+      </>}
+    </>
+  )
 }
 
-function TopicFormat({ sheet, selection, styleClipboard }: { sheet: Sheet; selection: string[]; styleClipboard: TopicStyle | null }) {
-  const ed = useEditor.getState()
-  const [tab, setTab] = useState<'topic' | 'map'>(selection.length ? 'topic' : 'map')
-  const idx = indexSheet(sheet)
-  const id = selection[selection.length - 1]
-  const ref = id ? idx.get(id) : undefined
-  const s = ref ? resolveStyle(sheet, ref) : null
-  const set = (p: TopicStyle) => ed.setStyle(p)
-  const isRoot = id === sheet.rootTopic.id
-  const structure: StructureId | '' = isRoot ? sheet.structure ?? 'mindmap' : (ref?.topic.structure ?? '')
+// ---------- связь / граница ----------
 
+function ElementFormat({ sheet }: { sheet: Sheet }) {
+  const { element } = useEditor()
+  const ed = useEditor.getState()
+  if (element?.kind === 'relationship') {
+    const r = sheet.relationships?.find(x => x.id === element.id)
+    if (!r) return null
+    const up = (p: Partial<Relationship>) => ed.updateRelationship(r.id, p)
+    return (
+      <>
+        <div className="fp-title">Связь</div>
+        <Row label="Подпись"><input value={r.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
+        <Row label="Цвет / толщина">
+          <Color value={r.color ?? '#667085'} onChange={v => up({ color: v })} />
+          <input type="number" min={1} max={8} value={r.width ?? 2} onChange={e => up({ width: +e.target.value })} />
+        </Row>
+        <Row label="Линия">
+          <select value={r.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
+            {BORDERS.filter(b => b[0] !== 'none').map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+        </Row>
+        <label className="fp-toggle"><span>Стрелка в начале</span><Toggle on={!!r.arrowStart} onChange={v => up({ arrowStart: v })} /></label>
+        <label className="fp-toggle"><span>Стрелка в конце</span><Toggle on={r.arrowEnd !== false} onChange={v => up({ arrowEnd: v })} /></label>
+        <div className="fp-buttons" style={{ marginTop: 10 }}>
+          <button onClick={() => up({ cp1: undefined, cp2: undefined })}>Сбросить изгиб</button>
+          <button className="danger" onClick={ed.removeElement}>Удалить связь</button>
+        </div>
+        <p className="muted" style={{ fontSize: 12 }}>Изгиб — перетаскиванием белых точек. Двойной щелчок по линии — подпись.</p>
+      </>
+    )
+  }
+  if (element?.kind === 'boundary') {
+    let b: Boundary | undefined
+    const walk = (t: Topic) => { b ??= t.boundaries?.find(x => x.id === element.id); t.children?.forEach(walk); t.summaries?.forEach(s => walk(s.topic)) }
+    walk(sheet.rootTopic); sheet.floatingTopics?.forEach(walk)
+    if (!b) return null
+    const id = b.id
+    const up = (p: Partial<Boundary>) => ed.updateBoundary(id, p)
+    return (
+      <>
+        <div className="fp-title">Граница</div>
+        <Row label="Заголовок"><input value={b.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
+        <Row label="Цвет линии"><Color value={b.color ?? '#667085'} onChange={v => up({ color: v })} /></Row>
+        <Row label="Заливка"><Color value={b.fill ?? 'transparent'} allowNone onChange={v => up({ fill: v === 'transparent' ? undefined : v })} /></Row>
+        <Row label="Линия">
+          <select value={b.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
+            {BORDERS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+        </Row>
+        <div className="fp-buttons" style={{ marginTop: 10 }}><button className="danger" onClick={ed.removeElement}>Удалить границу</button></div>
+      </>
+    )
+  }
+  return null
+}
+
+// ---------- панель ----------
+
+export default function FormatPanel({ sheet }: { sheet: Sheet }) {
+  const { element } = useEditor()
+  const [tab, setTab] = useState<'style' | 'pitch' | 'map'>('style')
   return (
     <div className="side-panel format-panel" data-testid="format-panel">
-      <div className="tabs">
-        <button className={tab === 'topic' ? 'on' : ''} onClick={() => setTab('topic')}>Тема</button>
+      <div className="seg-tabs">
+        <button className={tab === 'style' ? 'on' : ''} onClick={() => setTab('style')}>Стиль</button>
+        <button className={tab === 'pitch' ? 'on' : ''} onClick={() => setTab('pitch')}>Презентация</button>
         <button className={tab === 'map' ? 'on' : ''} onClick={() => setTab('map')}>Карта</button>
       </div>
-      {tab === 'topic' && (!s || !ref ? <p className="muted">Выберите тему.</p> : (
-        <>
-          {selection.length > 1 && <p className="muted">Выбрано тем: {selection.length}</p>}
-          <h4>Структура {isRoot ? 'карты' : 'ветки'}</h4>
-          <select value={structure} onChange={e => ed.setStructure((e.target.value || undefined) as StructureId | undefined)} aria-label="Структура">
-            {!isRoot && <option value="">Как у родителя</option>}
-            {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
-
-          <h4>Форма</h4>
-          <Row label="Форма">
-            <select value={s.shape} onChange={e => set({ shape: e.target.value as ShapeId })}>
-              {SHAPES.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-            </select>
-          </Row>
-          <Row label="Заливка"><Color value={s.fill} allowNone onChange={v => set({ fill: v })} /></Row>
-          <Row label="Рамка">
-            <Color value={s.borderColor} onChange={v => set({ borderColor: v })} />
-            <input type="number" min={0} max={10} value={s.borderWidth} onChange={e => set({ borderWidth: +e.target.value })} />
-          </Row>
-          <Row label="Тип рамки">
-            <select value={s.borderStyle} onChange={e => set({ borderStyle: e.target.value as BorderStyle })}>
-              {BORDERS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-            </select>
-          </Row>
-          <Row label="Ширина текста">
-            <input type="number" min={60} max={1000} step={10} value={s.maxWidth} onChange={e => set({ maxWidth: +e.target.value })} />
-          </Row>
-
-          <h4>Текст</h4>
-          <Row label="Шрифт">
-            <select value={s.fontFamily} onChange={e => set({ fontFamily: e.target.value })}>
-              {[...new Set([s.fontFamily, ...FONTS])].map(f => <option key={f} value={f}>{fontName(f)}</option>)}
-            </select>
-          </Row>
-          <Row label="Размер">
-            <input type="number" min={8} max={96} value={s.fontSize} onChange={e => set({ fontSize: +e.target.value })} />
-            <Color value={s.textColor} onChange={v => set({ textColor: v })} />
-          </Row>
-          <div className="fp-buttons">
-            <button className={'mini' + (s.fontWeight === 'bold' ? ' on' : '')} title="Жирный"
-              onClick={() => set({ fontWeight: s.fontWeight === 'bold' ? 'normal' : 'bold' })}><b>Ж</b></button>
-            <button className={'mini' + (s.fontStyle === 'italic' ? ' on' : '')} title="Курсив"
-              onClick={() => set({ fontStyle: s.fontStyle === 'italic' ? 'normal' : 'italic' })}><i>К</i></button>
-            <button className={'mini' + (s.textDecoration === 'underline' ? ' on' : '')} title="Подчёркнутый"
-              onClick={() => set({ textDecoration: s.textDecoration === 'underline' ? 'none' : 'underline' })}><u>Ч</u></button>
-            <button className={'mini' + (s.textDecoration === 'line-through' ? ' on' : '')} title="Зачёркнутый"
-              onClick={() => set({ textDecoration: s.textDecoration === 'line-through' ? 'none' : 'line-through' })}><s>З</s></button>
-            {(['left', 'center', 'right'] as const).map(a => (
-              <button key={a} className={'mini' + (s.textAlign === a ? ' on' : '')} title="Выравнивание"
-                onClick={() => set({ textAlign: a })}>{a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}</button>
-            ))}
-          </div>
-
-          <h4>Линия ветки</h4>
-          <Row label="Форма">
-            <select value={s.lineShape} onChange={e => set({ lineShape: e.target.value as LineShape })}>
-              {LINES.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-            </select>
-          </Row>
-          <Row label="Толщина / цвет">
-            <input type="number" min={0.5} max={12} step={0.5} value={s.lineWidth} onChange={e => set({ lineWidth: +e.target.value })} />
-            <Color value={s.lineColor} onChange={v => set({ lineColor: v })} />
-          </Row>
-
-          <TopicElements topic={ref.topic} />
-          <h4>Стиль</h4>
-          <div className="fp-buttons">
-            <button onClick={() => ed.copyStyle(s)} title="Ctrl+Alt+C">Копировать стиль</button>
-            <button onClick={() => ed.pasteStyle()} disabled={!styleClipboard} title="Ctrl+Alt+V">Вставить стиль</button>
-            <button onClick={() => ed.clearStyle()}>Сбросить</button>
-          </div>
-        </>
-      ))}
-      {tab === 'map' && (
-        <>
-          <h4>Структура карты</h4>
-          <select value={sheet.structure ?? 'mindmap'} onChange={e => ed.setSheet({ structure: e.target.value as StructureId })} aria-label="Структура карты">
-            {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
-          <h4>Тема оформления</h4>
-          <div className="theme-grid">
-            {THEMES.map(th => (
-              <button key={th.id} className={'theme-card' + (getTheme(sheet.theme).id === th.id ? ' on' : '')}
-                onClick={() => ed.setSheet({ theme: th.id, background: undefined })} style={{ background: th.background }}>
-                <span className="swatch" style={{ background: th.levels.central.fill, borderColor: th.levels.central.borderColor }} />
-                <span className="swatch" style={{ background: th.levels.main.fill, borderColor: th.levels.main.borderColor }} />
-                <span style={{ color: th.levels.sub.textColor }}>{th.name}</span>
-              </button>
-            ))}
-          </div>
-          <h4>Фон</h4>
-          <Row label="Цвет фона">
-            <Color value={sheet.background || getTheme(sheet.theme).background} onChange={v => ed.setSheet({ background: v })} />
-            <button className="mini" onClick={() => ed.setSheet({ background: undefined })}>По теме</button>
-          </Row>
-          <label className="fp-check">
-            <input type="checkbox" checked={!!sheet.rainbow} onChange={e => ed.setSheet({ rainbow: e.target.checked })} />
-            Радужные ветки
-          </label>
-        </>
-      )}
+      <div className="fp-scroll">
+        {tab === 'style' && (element ? <ElementFormat sheet={sheet} /> : <TopicStyleTab sheet={sheet} />)}
+        {tab === 'pitch' && <PitchTab sheet={sheet} />}
+        {tab === 'map' && <MapTab sheet={sheet} />}
+      </div>
     </div>
   )
 }
+

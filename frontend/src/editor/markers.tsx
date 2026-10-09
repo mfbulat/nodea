@@ -11,6 +11,7 @@ const PRIORITY = ['#e5484d', '#f76b15', '#f5a300', '#30a46c', '#12a594', '#0090f
 const colorNames = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray']
 
 export const MARKER_GROUPS: MarkerGroup[] = [
+  { id: 'tag', name: 'Тег', markers: colorNames.map(c => `tag-${c}`) },
   { id: 'priority', name: 'Приоритет', markers: [...Array(9).keys()].map(i => `priority-${i + 1}`) },
   { id: 'task', name: 'Прогресс', markers: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => `task-${i}`) },
   { id: 'flag', name: 'Флажки', markers: colorNames.map(c => `flag-${c}`) },
@@ -32,6 +33,7 @@ export function markerName(id: string): string {
   const [g, v] = id.split('-')
   switch (g) {
     case 'priority': return `Приоритет ${v}`
+    case 'tag': return ({ red: 'Красный', orange: 'Оранжевый', yellow: 'Жёлтый', green: 'Зелёный', blue: 'Синий', purple: 'Фиолетовый', gray: 'Серый' } as Record<string, string>)[v] ?? v
     case 'task': return `Выполнено ${Math.round((+v / 8) * 100)}%`
     case 'month': return MONTHS[+v - 1]
     case 'week': return WEEK[+v - 1]
@@ -60,6 +62,9 @@ export function MarkerIcon({ id, x = 0, y = 0, size = 16 }: { id: string; x?: nu
         {p >= 1 && <path d="M4.5,8.3l2.4,2.4l4.6,-5" stroke="#fff" strokeWidth={1.8} fill="none" strokeLinecap="round" />}</>
       break
     }
+    case 'tag':
+      body = <circle cx={8} cy={8} r={7} fill={c} />
+      break
     case 'flag':
       body = <><path d="M3,1.5V15" stroke="#555" strokeWidth={1.4} strokeLinecap="round" />
         <path d="M3.6,2H13L10.6,5.5L13,9H3.6Z" fill={c} /></>

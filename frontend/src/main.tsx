@@ -5,6 +5,7 @@ import App from './App'
 import '@fontsource/montserrat/400.css'
 import '@fontsource/montserrat/500.css'
 import '@fontsource/montserrat/700.css'
+import '@fontsource/montserrat/800.css'
 import 'katex/dist/katex.min.css'
 import './styles/app.css'
 

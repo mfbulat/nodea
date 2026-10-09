@@ -258,3 +258,81 @@ button.mini { padding: 2px 8px; min-width: 28px; }
 .home .card-row { display: flex; align-items: center; gap: 4px; }
 .home .card-row .title { flex: 1; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .home .map-card .date { font-size: 11px; }
+.add-btn { cursor: pointer; }
+.add-btn:hover circle { filter: brightness(1.1); }
+.mini-toolbar { position: absolute; z-index: 12; padding: 3px; gap: 0; }
+.mini-toolbar .ibtn { min-width: 30px; height: 30px; }
+
+/* ===== Правая панель — пристыкована, как в XMind ===== */
+.editor.has-panel > .canvas { right: 300px; }
+.editor .side-panel { top: 0 !important; right: 0; bottom: 0; width: 300px; border-radius: 0; box-shadow: none; border-left: 1px solid #ececec;
+  display: flex; flex-direction: column; padding: 12px 14px 0; }
+.editor.has-panel .tr-wrap { right: 312px; }
+.editor.has-panel .island.br { right: 312px; }
+.fp-scroll { flex: 1; overflow: auto; margin: 0 -14px; padding: 0 14px 16px; }
+.fp-section { border-bottom: 1px solid #efefef; padding: 6px 0 10px; }
+.fp-head { display: flex; align-items: center; justify-content: space-between; }
+.fp-title { font-weight: 600; font-size: 13px; padding: 10px 0 6px; }
+.fp-sub { font-size: 12px; color: var(--color-text-muted); margin: 8px 0 4px; }
+.fp-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-text-muted); padding-right: 54px; }
+.fp-row2 { display: flex; gap: 6px; margin: 6px 0; }
+.fp-row2 select { flex: 1; }
+.fp-row2 .narrow, .fp-row2 select.narrow { flex: 0 0 72px; }
+.format-panel select, .format-panel input:not([type]), .format-panel input[type=number] { height: 28px; border-radius: 6px; border: 1px solid #e3e3e3; background: #fafafa; font-size: 12px; padding: 0 6px; }
+.format-panel select.wide, .format-panel button.wide { width: 100%; margin-top: 6px; }
+.format-panel .fp-ctl select { width: 110px !important; }
+.color-well { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+.color-well .swatch { width: 54px; height: 26px; border-radius: 6px; border: 1px solid #ddd; display: inline-block; }
+.color-well input[type=color] { position: absolute; left: 0; top: 0; width: 54px; height: 26px; opacity: 0; cursor: pointer; }
+.seg-group { display: flex; background: #f3f3f3; border-radius: 8px; padding: 2px; margin: 6px 0; gap: 2px; }
+.seg-btn { flex: 1; border: none; background: transparent; border-radius: 6px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.seg-btn.on { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.case-select { border: none !important; background: transparent !important; width: 56px; }
+.style-preview { background: #f5f5f5; border-radius: 10px; padding: 14px; display: flex; justify-content: center; margin-bottom: 4px; }
+.sp-topic { padding: 7px 18px; font-size: 15px; min-width: 120px; text-align: center; }
+.picker { position: relative; }
+.picker-btn { display: flex; align-items: center; gap: 2px; border: 1px solid #e3e3e3; background: #fafafa; border-radius: 6px; height: 28px; padding: 0 4px; color: #333; }
+.picker-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; background: #fff; box-shadow: var(--island-shadow); border-radius: 10px; padding: 6px;
+  display: grid; gap: 4px; width: 260px; max-height: 360px; overflow: auto; }
+.picker-pop button { display: flex; flex-direction: column; align-items: center; gap: 2px; border: none; background: transparent; border-radius: 6px; padding: 6px 2px; font-size: 10px; color: #444; }
+.picker-pop button:hover { background: #f1f1f1; }
+.picker-pop button.on { background: #e3efff; color: #1f6fd1; }
+.fp-toggle { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; font-size: 13px; }
+.toggle-sw { width: 34px; height: 20px; border-radius: 10px; border: none; background: #d6d6d6; position: relative; padding: 0; flex: none; }
+.toggle-sw span { position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.toggle-sw.on { background: #3fbf6f; }
+.toggle-sw.on span { left: 16px; }
+.palette-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.palette { display: flex; height: 22px; border-radius: 6px; overflow: hidden; border: 2px solid transparent; padding: 0; }
+.palette span { flex: 1; }
+.palette.on { border-color: var(--color-selection); }
+.format-panel .theme-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+.format-panel .theme-card { flex-direction: column; padding: 4px; border: 2px solid transparent; background: #f6f6f6; border-radius: 8px; gap: 2px; }
+.format-panel .theme-card.on { border-color: var(--color-selection); }
+.fp-bottom { margin-top: 12px; }
+.format-panel .reset { margin: 8px 0 4px; }
+.fp-empty { padding: 20px 4px; }
+.pitch-preview { border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; margin-bottom: 8px; padding: 10px; }
+.pitch-preview b { font-size: 16px; }
+.island.legend { left: 12px; bottom: 64px; flex-direction: column; align-items: stretch; padding: 8px 10px; min-width: 180px; gap: 4px; }
+.legend-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.legend-row { display: flex; align-items: center; gap: 6px; }
+.legend-row input { border: none; background: transparent; font-size: 12px; padding: 2px; flex: 1; }
+.legend-row input:focus { background: #f4f4f4; outline: none; border-radius: 4px; }
+.legend-btn { margin-bottom: 6px; }
+.editor.has-panel .island.tc { left: calc((100% - 300px) / 2); }
+
+/* ===== Структура (outliner) как документ ===== */
+.outliner { background: #f8f9fb; padding: 80px 0 80px; }
+.outliner .ol-row, .outliner .ol-hint { max-width: 680px; margin: 0 auto; box-sizing: border-box; }
+.ol-row { border-radius: 6px; padding-top: 3px; padding-bottom: 3px; }
+.ol-row.on { background: #e8f1fd; }
+.ol-row.root textarea { font-size: 26px; font-weight: 800; color: #111; }
+.ol-row.root .ol-toggle { visibility: hidden; }
+.ol-row.d1 textarea { font-size: 18px; font-weight: 700; color: #111; }
+.ol-row.d2 textarea, .ol-row.d3 textarea, .ol-row.dn textarea { font-size: 14px; color: #555; }
+.ol-row.d1 { margin-top: 10px; }
+.ol-toggle { font-size: 10px; color: #888; }
+.ol-bullet { width: 6px; height: 6px; border-radius: 50%; background: #444; flex: none; margin-top: 11px; }
+.ol-row.d1 .ol-bullet { margin-top: 13px; }
+.ol-row.root .ol-bullet { display: none; }

@@ -1,5 +1,6 @@
 import katex from 'katex'
 import type { FullStyle } from './themes'
+import { WEIGHTS } from './themes'
 import type { Topic } from './model'
 
 let ctx: CanvasRenderingContext2D | null = null
@@ -8,7 +9,7 @@ const cache = new Map<string, TextBox>()
 export interface TextBox { lines: string[]; textW: number; textH: number; lineHeight: number }
 
 export function fontString(s: Pick<FullStyle, 'fontStyle' | 'fontWeight' | 'fontSize' | 'fontFamily'>) {
-  return `${s.fontStyle} ${s.fontWeight} ${s.fontSize}px ${s.fontFamily}`
+  return `${s.fontStyle} ${WEIGHTS[s.fontWeight] ?? 400} ${s.fontSize}px ${s.fontFamily}`
 }
 
 function canvas() {
@@ -90,6 +91,7 @@ export interface Content {
   icons: { kind: IconKind; id?: string; x: number; y: number; size: number }[]
   equation?: { x: number; y: number; w: number; h: number; html: string }
   labels: { text: string; x: number; y: number; w: number; h: number }[]
+  note?: { x: number; y: number; w: number; h: number; lines: string[]; lineHeight: number }
 }
 
 const GAP = 4
@@ -97,10 +99,13 @@ const GAP = 4
 const ICON_GAP = 8
 
 /** Раскладка содержимого темы: изображение / [задача, маркеры, текст, значки] / формула / метки */
-export function layoutContent(t: Topic, s: FullStyle): Content {
+export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Content {
   const icon = Math.round(Math.max(14, s.fontSize * 1.1))
   const hasText = !!t.title || (!t.image && !t.equation)
-  const tb = hasText ? measureText(t.title, s) : null
+  const title = applyCase(t.title, s.textTransform)
+  // фиксированная ширина: текст переносится по ней
+  const fs = s.width ? { ...s, maxWidth: Math.max(20, s.width - 32) } : s
+  const tb = hasText ? measureText(title, fs) : null
   const left: { kind: IconKind; id?: string }[] = []
   if (t.task) left.push({ kind: 'task' })
   for (const m of t.markers ?? []) left.push({ kind: 'marker', id: m })
@@ -141,16 +146,23 @@ export function layoutContent(t: Topic, s: FullStyle): Content {
     case 'none': padX = 4; padY = 6; break
   }
   if (s.fontSize >= 24 && s.shape !== 'underline' && s.shape !== 'none') { padX += 12; padY += 4 }
-  const shapeW = innerW + padX * 2, shapeH = innerH + padY * 2
+  const shapeW = s.width ? Math.max(s.width, innerW + padX * 2) : innerW + padX * 2, shapeH = innerH + padY * 2
   const labelsH = labels.length ? labels[0].h + 4 : 0
-  const w = Math.max(shapeW, labelsW), h = shapeH + labelsH
+  // «показывать все заметки»: текст заметки под темой
+  const noteText = showNotes ? (t.notes?.plain ?? '').trim() : ''
+  let note: Content['note']
+  if (noteText) {
+    const nb = measureText(noteText.length > 400 ? noteText.slice(0, 400) + '…' : noteText, { ...s, fontSize: 12, fontWeight: 'normal', fontStyle: 'normal', maxWidth: Math.max(160, shapeW - 16) })
+    note = { x: 0, y: shapeH + labelsH + 4, w: nb.textW + 16, h: nb.textH + 12, lines: nb.lines, lineHeight: nb.lineHeight }
+  }
+  const w = Math.max(shapeW, labelsW, note?.w ?? 0), h = shapeH + labelsH + (note ? note.h + 4 : 0)
 
-  const out: Content = { w, h, shapeW, shapeH, padX, padY, text: null, icons: [], labels: [] }
+  const out: Content = { w, h, shapeW, shapeH, padX, padY, text: null, icons: [], labels: [], note }
   let y = padY
   if (img) { out.image = { x: (shapeW - img.width) / 2, y, w: img.width, h: img.height, src: img.src }; y += img.height + GAP }
   if (rowH) {
     // ряд центрируется по ширине; выравнивание текста действует внутри текстового блока
-    const extra = innerW - rowW
+    const extra = shapeW - padX * 2 - rowW
     let x = padX + (s.textAlign === 'left' ? 0 : s.textAlign === 'right' ? extra : extra / 2)
     for (const it of left) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + ICON_GAP }
     if (tb) {
@@ -167,4 +179,11 @@ export function layoutContent(t: Topic, s: FullStyle): Content {
     for (const l of labels) { out.labels.push({ ...l, x, y: shapeH + 4 }); x += l.w + GAP }
   }
   return out
+}
+
+export function applyCase(text: string, tt?: string) {
+  if (tt === 'uppercase') return text.toUpperCase()
+  if (tt === 'lowercase') return text.toLowerCase()
+  if (tt === 'capitalize') return text.replace(/(^|\s)(\S)/g, (_, a, b) => a + b.toUpperCase())
+  return text
 }

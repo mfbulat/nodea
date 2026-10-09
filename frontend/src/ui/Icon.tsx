@@ -38,6 +38,16 @@ const P: Record<string, JSX.Element> = {
   users: <><circle cx="8" cy="7.5" r="2.5" /><path d="M3.5 15.5a4.5 4.5 0 019 0M13 5.5a2.3 2.3 0 010 4.4M14.5 15.5a4 4 0 00-1.8-3.4" /></>,
   template: <><rect x="3" y="3.5" width="14" height="13" rx="2" /><path d="M3 8h14M8 8v8.5" /></>,
   upload: <><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5" /><path d="M4 13v3h12v-3" /></>,
+  link: <path d="M8.5 11.5l3-3M9 6l1.4-1.4a3 3 0 014.2 4.2L13.2 10.2M11 14l-1.4 1.4a3 3 0 01-4.2-4.2L6.8 9.8" />,
+  image: <><rect x="3" y="4" width="14" height="12" rx="2" /><circle cx="7.5" cy="8" r="1.3" /><path d="M3.5 14l4-4 3 3 2-2 4 4" /></>,
+  brush: <><path d="M12.5 3.5l4 4-6 6-4-4z" /><path d="M6.5 9.5l-2.6 2.6a2 2 0 000 2.8l1.2 1.2a2 2 0 002.8 0l2.6-2.6" /></>,
+  gantt: <><path d="M3.5 4v12.5H17" /><path d="M6 6.5h5M8 9.5h6M7 12.5h4" strokeWidth={2.2} /></>,
+  mic: <><rect x="7.5" y="3" width="5" height="9" rx="2.5" /><path d="M5 9.5a5 5 0 0010 0M10 14.5V17" /></>,
+  print: <><path d="M6 7V3.5h8V7" /><rect x="3.5" y="7" width="13" height="6.5" rx="1.5" /><path d="M6 11.5h8v5H6z" /></>,
+  camera: <><rect x="3" y="5.5" width="14" height="10.5" rx="2" /><path d="M7 5.5l1.2-2h3.6l1.2 2" /><circle cx="10" cy="10.5" r="2.8" /></>,
+  indent: <path d="M4 5h12M8 8.5h8M8 12h8M4 15.5h12M4 8.5l2.2 1.75L4 12" />,
+  outdent: <path d="M4 5h12M8 8.5h8M8 12h8M4 15.5h12M6.2 8.5L4 10.25 6.2 12" />,
+  nav: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12M4.8 7.5h1.5M4.8 10h1.5M4.8 12.5h1.5" /></>,
   settings: <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" /></>,
 }
 

@@ -31,11 +31,13 @@ export interface LayoutResult {
 export interface SizeInfo { w: number; h: number; underline: boolean; /** высота фигуры без меток */ shapeH?: number }
 type SizeFn = (t: Topic) => SizeInfo
 
-const SIB_GAP = 5
-const H_GAP = 30
-const ROOT_GAP = 50
-const V_GAP = 36
-const MAIN_GAP = 40
+// отступы; «компактная карта» уменьшает их (задаются в layoutSheet)
+let SIB_GAP = 5
+let H_GAP = 30
+let ROOT_GAP = 50
+let V_GAP = 36
+let MAIN_GAP = 40
+let BALANCE = false
 
 export const STRUCTURES: { id: StructureId; name: string }[] = [
   { id: 'mindmap', name: 'Mind Map (сбалансированная)' },
@@ -201,7 +203,16 @@ class Engine {
       kids.forEach((_, i) => { if (i === 0 || (acc < total / 2 && i < n - (n > 1 ? 1 : 0))) { right.push(i); acc += hs[i] } else left.push(i) })
       left.reverse()
     } else {
-      const k = Math.ceil(n / 2)
+      // «баланс карты»: делим по суммарной высоте веток, а не по количеству
+      let k = Math.ceil(n / 2)
+      if (BALANCE && n > 1) {
+        const hs = kids.map(kk => { const c = this.layout(kk, 'logic-right'); return c.maxY - c.minY })
+        const total = hs.reduce((a, c) => a + c, 0)
+        let acc = 0
+        k = 0
+        while (k < n - 1 && acc + hs[k] / 2 < total / 2) { acc += hs[k]; k++ }
+        k = Math.max(1, k)
+      }
       const first = [...Array(k).keys()], second = [...Array(n - k).keys()].map(i => i + k).reverse()
       if (variant === 'mindmap-cw') { right.push(...first); left.push(...second) }
       else { left.push(...first); right.push(...second) }
@@ -215,10 +226,12 @@ class Engine {
         const dx = dir > 0 ? s.w + ROOT_GAP - cb.minX : -ROOT_GAP - cb.maxX
         const dy = y - cb.minY
         merge(b, cb, dx, dy)
-        const inset = Math.min(s.w / 4, 48)
-        b.edges.push({ from: t.id, to: k.id, kind: 'h', fromRoot: true,
-          pts: [{ x: dir > 0 ? s.w - inset : inset, y: s.h / 2 },
-            { x: dir > 0 ? dx : dx + ks.w, y: dy + this.anchorY(k) }] })
+        // ветка выходит там, где луч из центра к теме пересекает рамку центральной темы
+        const end = { x: dir > 0 ? dx : dx + ks.w, y: dy + this.anchorY(k) }
+        const ddx = end.x - s.w / 2, ddy = end.y - s.h / 2
+        const tt = Math.min(Math.abs(ddx) > 0 ? (s.w / 2) / Math.abs(ddx) : Infinity, Math.abs(ddy) > 0 ? (s.h / 2) / Math.abs(ddy) : Infinity)
+        const start = { x: s.w / 2 + ddx * tt, y: s.h / 2 + ddy * tt }
+        b.edges.push({ from: t.id, to: k.id, kind: 'h', fromRoot: true, pts: [start, end] })
         y += cb.maxY - cb.minY + MAIN_GAP
       })
     }
@@ -495,6 +508,9 @@ export function countAll(t: Topic): number {
 
 /** Раскладка листа. Начало координат — центр центральной темы. */
 export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
+  const c = !!sheet.compact
+  SIB_GAP = c ? 2 : 5; H_GAP = c ? 18 : 30; ROOT_GAP = c ? 32 : 50; V_GAP = c ? 22 : 36; MAIN_GAP = c ? 14 : 40
+  BALANCE = !!sheet.balance
   const eng = new Engine(size)
   const root = sheet.rootTopic
   const rs = size(root)
@@ -508,6 +524,23 @@ export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
     const fb = eng.layout(f, 'logic-right')
     const p = f.position ?? { x: 0, y: 0 }
     merge(all, fb, p.x, p.y)
+  }
+  // свободное положение веток: сдвигаем поддерево темы вместе со всем содержимым
+  if (sheet.freeBranch) {
+    const shiftTopic = (t: Topic) => {
+      t.children?.forEach(shiftTopic)
+      if (!t.offset || t === root) return
+      const ids = subtreeIds(t)
+      const { x: ox, y: oy } = t.offset
+      for (const b of all.boxes) if (ids.has(b.id)) { b.x += ox; b.y += oy }
+      for (const e of all.edges) {
+        if (ids.has(e.from)) e.pts = e.pts.map(p => ({ x: p.x + ox, y: p.y + oy }))
+        else if (e.to === t.id) e.pts = e.pts.map((p, i) => (i === e.pts.length - 1 ? { x: p.x + ox, y: p.y + oy } : p))
+      }
+      for (const tg of all.toggles) if (ids.has(tg.id)) { tg.x += ox; tg.y += oy }
+      for (const d of all.decos) if (ids.has(d.owner)) d.pts = d.pts.map(p => ({ x: p.x + ox, y: p.y + oy }))
+    }
+    shiftTopic(root)
   }
   const boxes = new Map(all.boxes.map(b => [b.id, b]))
   for (const b of all.boxes) {

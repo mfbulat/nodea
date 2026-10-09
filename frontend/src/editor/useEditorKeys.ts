@@ -4,12 +4,14 @@ import { currentLayout, useEditor } from './store'
 import { topicsFromText, topicsToText, type Topic } from './model'
 import { resolveStyle } from './themes'
 import { indexSheet } from './model'
+import { pickFile, uploadToTopic } from './actions'
 
 const MIME = 'application/x-mindmap-topics'
 
 // Латинская и русская раскладки; e.code бывает пустым у синтетических событий
 const KEYS: Record<string, string[]> = {
-  KeyA: ['a', 'ф'], KeyL: ['l', 'д'], KeyB: ['b', 'и'], KeyK: ['k', 'л'], KeyN: ['n', 'т'], BracketRight: [']', 'ъ'], KeyC: ['c', 'с'], KeyX: ['x', 'ч'], KeyV: ['v', 'м'], KeyZ: ['z', 'я'], KeyY: ['y', 'н'],
+  KeyA: ['a', 'ф'], KeyL: ['l', 'д'], KeyB: ['b', 'и'], KeyK: ['k', 'л'], KeyN: ['n', 'т'], BracketRight: [']', 'ъ'],
+  KeyR: ['r', 'к'], KeyI: ['i', 'ш'], KeyT: ['t', 'е'], KeyD: ['d', 'в'], KeyG: ['g', 'п'], KeyF: ['f', 'а'], KeyP: ['p', 'з'], Semicolon: [';', 'ж'], KeyO: ['o', 'щ'], KeyH: ['h', 'р'], KeyC: ['c', 'с'], KeyX: ['x', 'ч'], KeyV: ['v', 'м'], KeyZ: ['z', 'я'], KeyY: ['y', 'н'],
   Slash: ['/', '.'], Equal: ['=', '+'], Minus: ['-', '_'], Digit0: ['0', ')'],
 }
 const is = (e: KeyboardEvent, code: string) =>
@@ -53,13 +55,24 @@ export function useEditorKeys(enabled: boolean) {
 
       if (mod && is(e, 'KeyZ')) { handled(); e.shiftKey ? ed().redo() : ed().undo(); return }
       if (mod && is(e, 'KeyY')) { handled(); ed().redo(); return }
+      // сочетания как в XMind (⌘ на macOS, Ctrl в других системах)
+      if (mod && e.altKey && is(e, 'Slash')) { handled(); ed().foldAll(); return }
       if (mod && is(e, 'Slash')) { handled(); ed().toggleCollapse(); return }
       if (mod && is(e, 'KeyA')) { handled(); ed().selectAll(); return }
-      if (mod && is(e, 'KeyL')) { handled(); ed().startRelating(); return }
-      if (mod && is(e, 'KeyB')) { handled(); ed().addBoundary(); return }
-      if (mod && is(e, 'BracketRight')) { handled(); ed().addSummary(); return }
-      if (mod && is(e, 'KeyK') && primary) { handled(); ed().setDialog({ kind: 'link', id: primary }); return }
+      if (mod && e.shiftKey && is(e, 'KeyR')) { handled(); ed().startRelating(); return }
+      if (mod && !e.shiftKey && is(e, 'KeyR')) { handled(); ed().goCentral(); return }
+      if (mod && e.shiftKey && is(e, 'KeyB')) { handled(); ed().addBoundary(); return }
+      if (mod && e.shiftKey && is(e, 'KeyL') && primary) { handled(); ed().setDialog({ kind: 'labels', id: primary }); return }
       if (mod && e.shiftKey && is(e, 'KeyN') && primary) { handled(); ed().setPanel('notes'); return }
+      if (mod && e.shiftKey && is(e, 'KeyI') && primary) { handled(); pickFile('image/*').then(f => f && uploadToTopic(primary, f, 'image')); return }
+      if (mod && e.altKey && is(e, 'KeyT') && primary) { handled(); const t = ed().sheet() && indexSheet(ed().sheet()!).get(primary)?.topic; ed().setTopic(sel, { task: t?.task ? undefined : { done: false } }); return }
+      if (mod && e.altKey && is(e, 'KeyN')) { handled(); ed().addSheet(); return }
+      if (mod && !e.shiftKey && is(e, 'KeyD')) { handled(); ed().duplicate(); return }
+      if (mod && (k === 'Backspace' || k === 'Delete')) { handled(); ed().deleteSingle(); return }
+      if (mod && k === 'Enter') { handled(); ed().addParent(); return }
+      if (mod && is(e, 'BracketRight')) { handled(); ed().setPanel(ed().panel === 'format' ? null : 'format'); return }
+      if (mod && is(e, 'KeyK') && primary) { handled(); ed().setDialog({ kind: 'link', id: primary }); return }
+      if (mod && e.altKey && is(e, 'Digit0')) { handled(); ed().clearStyle(); return }
       // Буфер обмена: копирование — сразу во внутренний буфер (системный заполняется
       // в событии copy/cut); вставка ждёт событие paste, иначе берёт внутренний буфер
       if (mod && !e.altKey && (is(e, 'KeyC') || is(e, 'KeyX'))) {
@@ -76,7 +89,7 @@ export function useEditorKeys(enabled: boolean) {
       if (mod && e.altKey && is(e, 'KeyV')) { handled(); ed().pasteStyle(); return }
       if (mod && (is(e, 'Equal') || e.code === 'NumpadAdd')) { handled(); canvasApi.zoomBy(1.2); return }
       if (mod && (is(e, 'Minus') || e.code === 'NumpadSubtract')) { handled(); canvasApi.zoomBy(1 / 1.2); return }
-      if (mod && is(e, 'Digit0')) { handled(); e.shiftKey ? canvasApi.zoomTo(1) : canvasApi.fit(); return }
+      if (mod && is(e, 'Digit0')) { handled(); e.shiftKey ? canvasApi.fit() : canvasApi.zoomTo(1); return }
       if (mod) return
 
       if (k === 'Escape') { if (!ed().relating) ed().select([]); return }

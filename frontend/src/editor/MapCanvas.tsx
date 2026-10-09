@@ -3,13 +3,14 @@ import type { Sheet, Topic } from './model'
 import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
 import { layoutSheet } from './layout'
-import { FullStyle, resolveStyle, sheetBackground } from './themes'
+import { branchColor, FullStyle, isColored, resolveStyle, sheetBackground, WEIGHTS } from './themes'
 import { Content, IconKind, layoutContent, onFontsChanged } from './measure'
 import { edgePath } from './paths'
 import { currentLayout, setCurrentLayout, topLevel, useEditor } from './store'
 import { boxCenter, relGeometry } from './relations'
 import { dashOf, TopicNode } from './TopicView'
-import { followLink, uploadToTopic } from './actions'
+import { followLink, pickFile, uploadToTopic } from './actions'
+import Icon, { IconName } from '../ui/Icon'
 import { collab, useCollab } from '../collab/session'
 
 export interface Rendered {
@@ -25,8 +26,23 @@ export function renderSheet(sheet: Sheet): Rendered {
   const sizes = new Map<string, { w: number; h: number; shapeH: number; underline: boolean }>()
   for (const [id, ref] of idx) {
     const st = resolveStyle(sheet, ref)
-    const c = layoutContent(ref.topic, st)
+    // автоцвет плавающих тем: цвет из палитры по порядку
+    if (sheet.autoColorFloating && ref.kind === 'floating' && !ref.topic.style?.fill) { st.fill = branchColor(sheet, ref.index + 2); st.textColor = '#000000' }
     styles.set(id, st)
+  }
+  // одинаковая длина тем: ширина по самой широкой теме того же уровня
+  if (sheet.uniformWidth) {
+    const maxW = new Map<string, number>()
+    for (const [id, ref] of idx) {
+      const lv = levelOf(ref)
+      const w = layoutContent(ref.topic, styles.get(id)!).shapeW
+      maxW.set(lv, Math.max(maxW.get(lv) ?? 0, w))
+    }
+    for (const [id, ref] of idx) { const st = styles.get(id)!; if (!st.width) st.width = maxW.get(levelOf(ref)) }
+  }
+  for (const [id, ref] of idx) {
+    const st = styles.get(id)!
+    const c = layoutContent(ref.topic, st, !!sheet.showNotes)
     contents.set(id, c)
     sizes.set(id, { w: c.w, h: c.h, shapeH: c.shapeH, underline: st.shape === 'underline' })
   }
@@ -96,6 +112,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     const kd = (e: KeyboardEvent) => {
       if ((e.code === 'Space' || e.key === ' ') && !isTyping(e)) spaceDown.current = true
       if (e.key === 'Escape' && ed().relating) ed().finishRelating(null)
+      if (e.key === 'Escape' && ed().painting) useEditor.setState({ painting: false })
     }
     const ku = (e: KeyboardEvent) => { if (e.code === 'Space' || e.key === ' ') spaceDown.current = false }
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
@@ -144,6 +161,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     e.stopPropagation()
     wrap.current!.focus()
     if (ed().relating) { ed().finishRelating(id); return }
+    if (ed().painting) { ed().select([id]); ed().pasteStyle(); useEditor.setState({ painting: false }); return }
     if (ed().editingId && ed().editingId !== id) ed().stopEdit()
     if (ed().editingId === id) return
     const sel = ed().selection
@@ -222,6 +240,12 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       return
     }
     if (d.target) { ed().move(ids, d.target.id, d.target.mode); return }
+    // свободное положение веток: перенос на пустое место сдвигает ветку
+    if (sheet.freeBranch && ids.length === 1 && one?.kind === 'child') {
+      const prev = one.topic.offset ?? { x: 0, y: 0 }
+      ed().setTopic([ids[0]], { offset: { x: prev.x + d.cur.x - d.start.x, y: prev.y + d.cur.y - d.start.y } })
+      return
+    }
     // отпущено на пустом месте: плавающая тема двигается, обычная — становится плавающей
     if (ids.length === 1 && one?.kind === 'floating') ed().setPosition(ids[0], pos)
     else ed().detach(ids, pos)
@@ -412,13 +436,17 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           ))}
           {r.layout.edges.map(e => {
             const from = r.styles.get(e.from)!, to = r.styles.get(e.to)
-            const color = sheet.rainbow && e.from === sheet.rootTopic.id && to ? to.lineColor : from.lineColor
+            const color = isColored(sheet) && to ? to.lineColor : from.lineColor
             const shape = e.kind === 'line' ? 'straight' : from.lineShape
             const { d, filled } = edgePath(e, shape === 'none' && (e.kind === 'brace' || e.kind === 'vbrace') ? 'curve' : shape, from.lineWidth)
             if (!d) return null
-            return <path key={e.from + '-' + e.to + e.kind} d={d} fill={filled ? color : 'none'}
-              stroke={filled ? 'none' : color} strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth}
-              strokeLinecap="round" opacity={ghostIds.has(e.to) || isDim(e.to) ? 0.2 : 1} style={{ transition: 'opacity .4s' }} />
+            const end = e.pts[e.pts.length - 1]
+            return <g key={e.from + '-' + e.to + e.kind} opacity={ghostIds.has(e.to) || isDim(e.to) ? 0.2 : 1} style={{ transition: 'opacity .4s' }}>
+              <path d={d} fill={filled ? color : 'none'}
+                stroke={filled ? 'none' : color} strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth}
+                strokeLinecap="round" strokeDasharray={filled ? undefined : dashOf(from.lineStyle, from.lineWidth)} />
+              {from.lineEnd === 'arrow' && (e.kind === 'h' || e.kind === 'v' || e.kind === 'tree') && <ArrowHead at={end} from={e.kind === 'v' ? { x: end.x, y: end.y - Math.sign(end.y - e.pts[0].y) * 10 } : { x: end.x - Math.sign(end.x - e.pts[0].x) * 10, y: end.y }} color={color} w={from.lineWidth} />}
+            </g>
           })}
           {[...r.layout.boxes.values()].map(b => {
             const ref = idx.get(b.id)
@@ -434,7 +462,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           })}
           {relGeoms.map(({ rel, g }) => {
             if (!g) return null
-            const color = rel.color ?? relColor
+            const color = rel.color ?? (sheet.relColorFollowTopic ? r.styles.get(rel.end1)?.lineColor ?? relColor : relColor)
             const w = rel.width ?? 2
             const sel = element?.kind === 'relationship' && element.id === rel.id
             return (
@@ -471,6 +499,25 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
                 : <path d="M-3,0H3" stroke={r.styles.get(t.id)!.lineColor} strokeWidth={1.5} />}
             </g>
           ))}
+          {!readOnly && !drag && !editingId && selection.length === 1 && (() => {
+            const id = selection[0], b = r.layout.boxes.get(id), c = r.contents.get(id), ref = idx.get(id)
+            if (!b || !c || !ref) return null
+            const sw = b.cell ? b.w : c.shapeW, sh = b.cell ? b.h : c.shapeH
+            const parentBox = ref.parent ? r.layout.boxes.get(ref.parent.id) : undefined
+            const left = !!parentBox && b.x + sw / 2 < parentBox.x + parentBox.w / 2
+            const up = left && ref.kind === 'child' && ref.parent?.id === sheet.rootTopic.id
+            const k = 1 / view.zoom
+            const plus = (x: number, y: number, label: string, fn: () => void) => (
+              <g className="add-btn" transform={`translate(${x},${y}) scale(${k})`} onPointerDown={e => { e.stopPropagation(); fn() }}>
+                <title>{label}</title>
+                <circle r={9} fill="var(--color-selection)" />
+                <path d="M-4.5,0H4.5M0,-4.5V4.5" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+              </g>)
+            return <>
+              {plus(left ? b.x - 16 * k : b.x + sw + 16 * k, b.y + sh / 2, 'Подтема', () => ed().addChild())}
+              {ref.kind !== 'root' && ref.kind !== 'callout' && plus(b.x + sw / 2, up ? b.y - 16 * k : b.y + sh + 16 * k, 'Тема', () => ed().addSibling(false))}
+            </>
+          })()}
           {relating && pointer && r.layout.boxes.get(relating) && (
             <line x1={boxCenter(r.layout.boxes.get(relating)!).x} y1={boxCenter(r.layout.boxes.get(relating)!).y}
               x2={pointer.x} y2={pointer.y} stroke={relColor} strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />
@@ -507,6 +554,11 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           <span style={{ background: p.color }}>{p.name}</span>
         </div>
       ))}
+      {!readOnly && !drag && !editingId && selection.length === 1 && r.layout.boxes.get(selection[0]) && (
+        <MiniToolbar id={selection[0]} x={r.layout.boxes.get(selection[0])!.x * view.zoom + view.x}
+          y={r.layout.boxes.get(selection[0])!.y * view.zoom + view.y} />
+      )}
+      {useEditor.getState().painting && <div className="relating-hint">Щёлкните тему, к которой применить стиль. Esc — отмена.</div>}
       {relating && <div className="relating-hint">Щёлкните тему, с которой нужно связать. Esc — отмена.</div>}
       {editingId && r.layout.boxes.get(editingId) && (
         <TitleEditor key={editingId} id={editingId} box={r.layout.boxes.get(editingId)!}
@@ -545,6 +597,36 @@ function HoverTracker({ onHover }: { onHover: (id: string | null) => void }) {
     return () => { window.removeEventListener('pointermove', mv); onHover(null) }
   }, [onHover])
   return null
+}
+
+/** Мини-панель над выделенной темой: связь, ссылка, изображение, заметка, задача, кисть формата */
+function MiniToolbar({ id, x, y }: { id: string; x: number; y: number }) {
+  const ed = useEditor.getState
+  const sheet = ed().sheet()
+  const t = sheet ? indexSheet(sheet).get(id)?.topic : undefined
+  if (!t) return null
+  const btn = (icon: IconName, label: string, fn: () => void, on = false) => (
+    <button className={'ibtn' + (on ? ' on' : '')} aria-label={label} title={label}
+      onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); fn() }}><Icon name={icon} size={18} /></button>)
+  return (
+    <div className="island mini-toolbar" style={{ left: Math.max(8, x), top: Math.max(8, y - 50) }} onPointerDown={e => e.stopPropagation()}>
+      {btn('relationship', 'Связь', () => ed().startRelating())}
+      {btn('link', 'Ссылка', () => ed().setDialog({ kind: 'link', id }), !!t.href)}
+      {btn('image', 'Изображение', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, !!t.image)}
+      {btn('note', 'Заметка', () => ed().setPanel('notes'), !!t.notes)}
+      {btn('task', 'To-Do', () => ed().setTopic([id], { task: t.task ? undefined : { done: false } }), !!t.task)}
+      {btn('brush', 'Копировать формат (кисть)', () => {
+        const ref = indexSheet(ed().sheet()!).get(id)
+        if (ref) { ed().copyStyle(resolveStyle(ed().sheet()!, ref)); useEditor.setState({ painting: true }) }
+      }, useEditor.getState().painting)}
+    </div>
+  )
+}
+
+export function ArrowHead({ at, from, color, w }: { at: Pt; from: Pt; color: string; w: number }) {
+  const a = Math.atan2(at.y - from.y, at.x - from.x), sz = 6 + w * 1.5
+  const p = (d: number) => `${at.x - sz * Math.cos(a + d)},${at.y - sz * Math.sin(a + d)}`
+  return <path d={`M${at.x},${at.y}L${p(0.45)}L${p(-0.45)}Z`} fill={color} />
 }
 
 export function RelLabel({ x, y, text, color, bg }: { x: number; y: number; text: string; color: string; bg: string }) {
@@ -632,7 +714,7 @@ function TitleEditor({ id, box, style: s, content: c, title }: { id: string; box
         left: (box.x + tx - 8) * z + view.x, top: (box.y + ty - 4) * z + view.y,
         width: w * z, height: (Math.max(lines * lh, c.text?.textH ?? lh) + 8) * z,
         padding: `${4 * z}px ${8 * z}px`,
-        font: `${s.fontStyle} ${s.fontWeight} ${s.fontSize * z}px/${lh * z}px ${s.fontFamily}`,
+        font: `${s.fontStyle} ${WEIGHTS[s.fontWeight] ?? 400} ${s.fontSize * z}px/${lh * z}px ${s.fontFamily}`,
         textAlign: s.textAlign, color: s.textColor,
       }} />
   )

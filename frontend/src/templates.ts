@@ -11,14 +11,14 @@ function build(n: Node): Topic {
 }
 
 function doc(root: Node, structure: StructureId = 'mindmap', theme = 'classic', rainbow = false): MapDocument {
-  return { version: 1, sheets: [{ id: uid(), title: 'Лист 1', rootTopic: build(root), structure, theme, rainbow }] }
+  return { version: 1, sheets: [{ id: uid(), title: 'Карта 1', rootTopic: build(root), structure, theme, ...(rainbow ? { rainbow } : {}) }] }
 }
 
 export interface TemplateDef { id: string; title: string; description: string; make: () => MapDocument }
 
 export const TEMPLATES: TemplateDef[] = [
-  { id: 'blank', title: 'Пустая карта', description: 'Центральная тема', make: () => doc('Центральная тема') },
-  { id: 'blank-logic', title: 'Пустая логическая схема', description: 'Logic Chart вправо', make: () => doc('Центральная тема', 'logic-right') },
+  { id: 'blank', title: 'Пустая карта', description: 'Mind Map по часовой', make: () => doc(['Центральная тема', ['Основная тема 1', 'Основная тема 2', 'Основная тема 3', 'Основная тема 4']], 'mindmap-cw') },
+  { id: 'blank-logic', title: 'Логическая схема', description: 'Logic Chart вправо', make: () => doc(['Центральная тема', ['Основная тема 1', 'Основная тема 2', 'Основная тема 3', 'Основная тема 4']], 'logic-right') },
   { id: 'brainstorm', title: 'Мозговой штурм', description: 'Идеи по направлениям', make: () => doc(['Тема штурма', [
     ['Идеи', ['Идея 1', 'Идея 2', 'Идея 3']], ['Вопросы', ['Что мешает?', 'Что поможет?']],
     ['Ресурсы', ['Люди', 'Время', 'Бюджет']], ['Следующие шаги', ['Шаг 1', 'Шаг 2']]]], 'mindmap', 'fresh', true) },

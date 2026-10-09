@@ -122,10 +122,11 @@ export default function Outliner({ sheet: realSheet, readOnly = false }: { sheet
         const t = row.topic
         const n = t.children?.length ?? 0
         return (
-          <div key={t.id} className={'ol-row' + (current === t.id ? ' on' : '') + (row.kind === 'root' ? ' root' : '')}
-            style={{ paddingLeft: 12 + row.depth * 22 }}>
+          <div key={t.id} className={'ol-row' + (current === t.id ? ' on' : '') + (row.kind === 'root' ? ' root' : ` d${Math.min(row.depth, 3)}`)}
+            style={{ paddingLeft: 12 + Math.max(0, row.depth - 1) * 24 }}>
             <button className="ol-toggle" disabled={!n || row.kind === 'root'} onClick={() => { ed().select([t.id]); ed().toggleCollapse() }}
-              aria-label={t.collapsed ? 'Развернуть' : 'Свернуть'}>{n && row.kind !== 'root' ? (t.collapsed ? '▸' : '▾') : '•'}</button>
+              aria-label={t.collapsed ? 'Развернуть' : 'Свернуть'} style={{ visibility: n && row.kind !== 'root' ? 'visible' : 'hidden' }}>{t.collapsed ? '▸' : '▾'}</button>
+            <span className="ol-bullet" />
             {t.task && <input type="checkbox" checked={t.task.done} onChange={() => ed().toggleTask(t.id)} />}
             {t.markers?.map(m => <svg key={m} width={16} height={16} className="ol-marker"><MarkerIcon id={m} size={16} /></svg>)}
             <textarea rows={1} readOnly={readOnly} ref={el => { if (el) inputs.current.set(t.id, el); else inputs.current.delete(t.id) }}

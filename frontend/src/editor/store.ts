@@ -92,6 +92,13 @@ interface EditorState {
   view: View
   clipboard: Topic[] | null
   styleClipboard: TopicStyle | null
+  /** кисть формата: следующий щелчок по теме применит скопированный стиль */
+  painting: boolean
+  /** окно диаграммы Ганта и режим снимка области карты (интерфейс — в работе) */
+  gantt: boolean
+  mapShot: boolean
+  setGantt: (v: boolean) => void
+  setMapShot: (v: boolean) => void
   element: ElementSel
   panel: PanelId
   relating: string | null
@@ -157,6 +164,14 @@ interface EditorState {
   renameSheet: (id: string, title: string) => void
   moveSheet: (id: string, delta: number) => void
   revealTopic: (id: string) => boolean
+  indent: () => void
+  outdent: () => void
+  addParent: () => void
+  duplicate: () => void
+  deleteSingle: () => void
+  foldAll: (collapse?: boolean) => void
+  selectBy: (kind: 'subtopics' | 'siblings' | 'level' | 'floating') => void
+  goCentral: () => void
   setViewMode: (m: 'map' | 'outline') => void
   setZen: (z: boolean) => void
   setPresenting: (p: boolean) => void
@@ -182,11 +197,16 @@ export const useEditor = create<EditorState>((set, get) => {
   const mutate = (fn: (sheet: Sheet, d: MapDocument) => void) => commit(produce(doc(), d => { const sh = current(d); fn(sh, d); prune(sh) }))
   const mutateDoc = (fn: (d: MapDocument) => void) => commit(produce(doc(), fn))
   const newTopic = (title: string): Topic => ({ id: uid(), title, children: [] })
-  const childTitle = (sheet: Sheet, parentId: string) => sheet.rootTopic.id === parentId ? 'Основная тема' : 'Подтема'
+  // как в XMind: новые темы нумеруются («Подтема 3», «Основная тема 5»)
+  const childTitle = (sheet: Sheet, parentId: string) => {
+    const n = (locate(sheet, parentId)?.topic.children?.length ?? 0) + 1
+    return (sheet.rootTopic.id === parentId ? 'Основная тема ' : 'Подтема ') + n
+  }
 
   return {
     sheetId: null, selection: [], editingId: null, editSeed: null, past: [], future: [],
-    view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null,
+    view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false,
+    setGantt: v => set({ gantt: v }), setMapShot: v => set({ mapShot: v }),
     element: null, panel: 'format', relating: null, dialog: null, userName: '',
     viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,
     search: { open: false, query: '', hits: [], index: 0 },
@@ -537,7 +557,8 @@ export const useEditor = create<EditorState>((set, get) => {
       if (sh) set({ sheetId: id, selection: [sh.rootTopic.id], element: null, editingId: null, relating: null, drillId: null })
     },
     addSheet: () => {
-      const sh: Sheet = { id: uid(), title: `Лист ${doc().sheets.length + 1}`, rootTopic: { id: uid(), title: 'Центральная тема', children: [] } }
+      const sh: Sheet = { id: uid(), title: `Карта ${doc().sheets.length + 1}`, structure: 'mindmap-cw',
+        rootTopic: { id: uid(), title: 'Центральная тема', children: [1, 2, 3, 4].map(i => ({ id: uid(), title: `Основная тема ${i}`, children: [] })) } }
       mutateDoc(d => { d.sheets.push(sh) })
       get().setSheetId(sh.id)
     },
@@ -569,6 +590,99 @@ export const useEditor = create<EditorState>((set, get) => {
       const [s] = d.sheets.splice(i, 1)
       d.sheets.splice(j, 0, s)
     }),
+    indent: () => {
+      const sheet = get().sheet()
+      const id = primary()
+      const l = sheet && id ? locate(sheet, id) : null
+      if (!l || l.kind !== 'child' || l.index === 0) return
+      get().move([id], l.siblings[l.index - 1].id, 'child')
+      set({ selection: [id] })
+    },
+    outdent: () => {
+      const sheet = get().sheet()
+      const id = primary()
+      const l = sheet && id ? locate(sheet, id) : null
+      if (!l || l.kind !== 'child' || !l.parent || l.parent.id === sheet!.rootTopic.id) return
+      get().move([id], l.parent.id, 'after')
+      set({ selection: [id] })
+    },
+    addParent: () => {
+      // как «Parent Topic»: новая тема встаёт на место выбранной, выбранная становится её подтемой
+      const sheet = get().sheet()
+      const id = primary()
+      const l = sheet && id ? locate(sheet, id) : null
+      if (!l || (l.kind !== 'child' && l.kind !== 'floating')) return
+      const t = newTopic(l.kind === 'floating' ? 'Плавающая тема' : childTitle(sheet!, l.parent!.id))
+      mutate(sh => {
+        const loc = locate(sh, id)!
+        const [moved] = loc.siblings.splice(loc.index, 1, t)
+        if (loc.kind === 'floating') { t.position = moved.position; delete moved.position }
+        t.children = [moved]
+      })
+      get().startEdit(t.id)
+    },
+    duplicate: () => {
+      const sheet = get().sheet()
+      if (!sheet) return
+      const ids = topLevel(sheet, get().selection).filter(i => { const k = locate(sheet, i)?.kind; return k === 'child' || k === 'floating' })
+      if (!ids.length) return
+      const created: string[] = []
+      mutate(sh => {
+        for (const id of ids) {
+          const l = locate(sh, id)!
+          const c = cloneWithNewIds(structuredClone(l.topic) as Topic)
+          if (l.kind === 'floating') c.position = { x: (l.topic.position?.x ?? 0) + 30, y: (l.topic.position?.y ?? 0) + 30 }
+          l.siblings.splice(l.index + 1, 0, c)
+          created.push(c.id)
+        }
+      })
+      set({ selection: created })
+    },
+    deleteSingle: () => {
+      // удалить только тему: её подтемы поднимаются на её место
+      const sheet = get().sheet()
+      const id = primary()
+      const l = sheet && id ? locate(sheet, id) : null
+      if (!l || (l.kind !== 'child' && l.kind !== 'floating')) return
+      mutate(sh => {
+        const loc = locate(sh, id)!
+        const kids = (loc.topic.children ?? []).map(k => { const c = { ...k }; if (loc.kind === 'floating') c.position = { ...(loc.topic.position ?? { x: 0, y: 0 }) }; return c })
+        loc.siblings.splice(loc.index, 1, ...kids)
+      })
+      set({ selection: [l.parent?.id ?? sheet!.rootTopic.id] })
+    },
+    foldAll: collapse => {
+      // свернуть/развернуть все подветки выбранных тем (или всей карты)
+      const sheet = get().sheet()
+      if (!sheet) return
+      const ids = get().selection.length ? get().selection : [sheet.rootTopic.id]
+      const first = locate(sheet, ids[0])?.topic
+      const target = collapse ?? !(first?.children ?? []).some(c => c.collapsed)
+      mutate(sh => {
+        const walk = (t: Topic, top: boolean) => {
+          if (!top && t.children?.length) t.collapsed = target
+          t.children?.forEach(c => walk(c, false))
+        }
+        for (const id of ids) { const t = locate(sh, id)?.topic; if (t) walk(t, true) }
+      })
+    },
+    selectBy: kind => {
+      const sheet = get().sheet()
+      if (!sheet) return
+      const idx = indexSheet(sheet)
+      const sel = get().selection
+      const out = new Set<string>()
+      if (kind === 'floating') (sheet.floatingTopics ?? []).forEach(f => out.add(f.id))
+      for (const id of sel) {
+        const ref = idx.get(id)
+        if (!ref) continue
+        if (kind === 'subtopics') (ref.topic.children ?? []).forEach(c => out.add(c.id))
+        if (kind === 'siblings') (ref.parent?.children ?? []).forEach(c => out.add(c.id))
+        if (kind === 'level') for (const r of idx.values()) if (r.depth === ref.depth && r.isFloatingTree === ref.isFloatingTree && r.kind === ref.kind) out.add(r.topic.id)
+      }
+      if (out.size) set({ selection: [...out], element: null })
+    },
+    goCentral: () => { const sh = get().sheet(); if (sh) set({ selection: [sh.rootTopic.id], element: null }) },
     setViewMode: m => set({ viewMode: m, editingId: null }),
     setZen: z => set({ zen: z }),
     setPresenting: p => set({ presenting: p, editingId: null, relating: null }),

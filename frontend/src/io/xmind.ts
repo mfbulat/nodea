@@ -78,7 +78,7 @@ function styleToX(s?: TopicStyle): Record<string, string> | undefined {
   if (s.borderWidth != null) p['border-line-width'] = s.borderWidth + 'pt'
   if (s.fontFamily) p['fo:font-family'] = s.fontFamily
   if (s.fontSize) p['fo:font-size'] = s.fontSize + 'pt'
-  if (s.fontWeight) p['fo:font-weight'] = s.fontWeight
+  if (s.fontWeight) p['fo:font-weight'] = ({ normal: '400', medium: '500', bold: '700', extrabold: '800' } as Record<string, string>)[s.fontWeight] ?? '400'
   if (s.fontStyle) p['fo:font-style'] = s.fontStyle
   if (s.textColor) p['fo:color'] = s.textColor
   if (s.textAlign) p['fo:text-align'] = s.textAlign
@@ -101,7 +101,10 @@ function styleFromX(p?: Record<string, string>): TopicStyle | undefined {
   if (p['border-line-width']) s.borderWidth = num(p['border-line-width'])
   if (p['fo:font-family'] && p['fo:font-family'] !== 'NeverMind') s.fontFamily = p['fo:font-family']
   if (p['fo:font-size']) s.fontSize = num(p['fo:font-size'])
-  if (p['fo:font-weight']) s.fontWeight = /bold|[6-9]00/.test(p['fo:font-weight']) ? 'bold' : 'normal'
+  if (p['fo:font-weight']) {
+    const w = p['fo:font-weight'], n = /^\d+$/.test(w) ? +w : /bold/.test(w) ? 700 : 400
+    s.fontWeight = n >= 800 ? 'extrabold' : n >= 600 ? 'bold' : n >= 500 ? 'medium' : 'normal'
+  }
   if (p['fo:font-style']) s.fontStyle = p['fo:font-style'] === 'italic' ? 'italic' : 'normal'
   if (p['fo:color']) s.textColor = p['fo:color']
   if (p['fo:text-align']) s.textAlign = p['fo:text-align'] as TopicStyle['textAlign']
