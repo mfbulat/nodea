@@ -52,10 +52,12 @@ function Icon({ kind, x, y, size, color, topic, onIcon }: {
   )
 }
 
-export function TopicNode({ box, topic, style: s, content: c, selected, dim, hidden, central, relTarget,
+export function TopicNode({ box, topic, style: s, content: c, selected, dim, hidden, central, relTarget, equationImage,
   onPointerDown, onDoubleClick, onIcon, onMarker }: {
   box: Box; topic: Topic; style: FullStyle; content: Content
   selected: boolean; dim: boolean; hidden: boolean; central: boolean; relTarget?: boolean
+  /** для экспорта: формула, заранее отрисованная в картинку */
+  equationImage?: string
   onPointerDown: (e: React.PointerEvent) => void; onDoubleClick: (e: React.MouseEvent) => void
   onIcon: (kind: IconKind, e: React.MouseEvent) => void; onMarker: (id: string) => void
 }) {
@@ -100,7 +102,10 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
             {t.lines.map((l, i) => <tspan key={i} x={tx} dy={i ? t.lineHeight : 0}>{l}</tspan>)}
           </text>
         )}
-        {c.equation && (
+        {c.equation && equationImage && (
+          <image href={equationImage} x={c.equation.x} y={c.equation.y} width={c.equation.w} height={c.equation.h} />
+        )}
+        {c.equation && !equationImage && (
           <foreignObject x={c.equation.x} y={c.equation.y} width={c.equation.w} height={c.equation.h} style={{ overflow: 'visible' }}>
             <div className="eq" style={{ fontSize: s.fontSize, color: s.textColor, whiteSpace: 'nowrap', padding: '2px 2px 0' }}
               dangerouslySetInnerHTML={{ __html: c.equation.html }} />

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { MapFull, MapSummary } from '../api/types'
 import TopBar from './TopBar'
+import { importAsNewMap } from '../editor/FileMenu'
 
 export default function MapsPage() {
   const [maps, setMaps] = useState<MapSummary[] | null>(null)
@@ -37,7 +38,9 @@ export default function MapsPage() {
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ margin: 0 }}>Мои карты</h2>
           <div className="spacer" />
-          <button className="primary" onClick={create}>+ Новая карта</button>
+          <button onClick={() => guard(async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}
+            title=".xmind, Markdown, OPML, FreeMind">Импорт…</button>
+          <button className="primary" onClick={create} style={{ marginLeft: 8 }}>+ Новая карта</button>
         </div>
         {error && <p className="error">{error}</p>}
         {maps === null ? <p className="muted">Загрузка…</p> : maps.length === 0 ? <p className="muted">Карт пока нет.</p> : (

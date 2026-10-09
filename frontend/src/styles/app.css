@@ -111,3 +111,4 @@ button.mini { padding: 2px 8px; min-width: 28px; }
 .ellipsis { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
 .eq .katex { font-size: 1em; }
 .fp-row input:not([type]) { width: 150px; }
+.menu-hint { font-size: 11px; color: var(--color-text-muted); padding: 2px 10px; text-transform: uppercase; }

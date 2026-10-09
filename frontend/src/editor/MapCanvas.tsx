@@ -472,7 +472,7 @@ function HoverTracker({ onHover }: { onHover: (id: string | null) => void }) {
   return null
 }
 
-function RelLabel({ x, y, text, color, bg }: { x: number; y: number; text: string; color: string; bg: string }) {
+export function RelLabel({ x, y, text, color, bg }: { x: number; y: number; text: string; color: string; bg: string }) {
   const w = text.length * 7 + 14
   return <g>
     <rect x={x - w / 2} y={y - 11} width={w} height={22} rx={6} fill={bg} stroke={color} strokeWidth={1} />
@@ -480,7 +480,7 @@ function RelLabel({ x, y, text, color, bg }: { x: number; y: number; text: strin
   </g>
 }
 
-function CalloutTail({ from, to, style }: { from: Pt; to: Pt; style: FullStyle }) {
+export function CalloutTail({ from, to, style }: { from: Pt; to: Pt; style: FullStyle }) {
   const dx = to.x - from.x, dy = to.y - from.y
   const len = Math.hypot(dx, dy) || 1
   const nx = -dy / len * 7, ny = dx / len * 7

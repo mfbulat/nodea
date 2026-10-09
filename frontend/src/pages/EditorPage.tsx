@@ -14,6 +14,7 @@ import { CommentsPanel, MarkersPanel, NotesPanel, SheetTabs } from '../editor/Si
 import { useAuth } from '../store/auth'
 import type { MapDocument } from '../editor/model'
 import TopBar from './TopBar'
+import FileMenu from '../editor/FileMenu'
 
 const SAVE_LABEL: Record<SaveState, string> = {
   saved: 'Сохранено', dirty: 'Есть изменения…', saving: 'Сохранение…',
@@ -50,6 +51,7 @@ export default function EditorPage() {
       <TopBar>
         <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Название карты" />
         <span className="save-state" title={saveError}>{SAVE_LABEL[saveState]}</span>
+        <FileMenu />
         <button onClick={() => setPanel(panel === 'versions' ? null : 'versions')}>История</button>
       </TopBar>
       <Toolbar />
