@@ -7,7 +7,7 @@ import type { Sheet, StructureId, Topic } from './model'
 export interface Pt { x: number; y: number }
 export interface Box { id: string; x: number; y: number; w: number; h: number; cell?: boolean }
 export type EdgeKind = 'h' | 'v' | 'tree' | 'brace' | 'vbrace' | 'line'
-export interface Edge { from: string; to: string; kind: EdgeKind; pts: Pt[] }
+export interface Edge { from: string; to: string; kind: EdgeKind; pts: Pt[]; /** ветка от центральной темы — выходит из-под неё */ fromRoot?: boolean }
 export interface Deco { kind: 'grid' | 'spine' | 'callout'; pts: Pt[]; owner: string }
 export interface BoundaryGeom { id: string; owner: string; x: number; y: number; w: number; h: number; title?: string; color?: string; lineStyle?: string; fill?: string }
 export interface Toggle { id: string; x: number; y: number; collapsed: boolean; count: number }
@@ -28,13 +28,14 @@ export interface LayoutResult {
   childAxis: Map<string, 'x' | 'y'>
 }
 
-export interface SizeInfo { w: number; h: number; underline: boolean }
+export interface SizeInfo { w: number; h: number; underline: boolean; /** высота фигуры без меток */ shapeH?: number }
 type SizeFn = (t: Topic) => SizeInfo
 
-const SIB_GAP = 14
-const H_GAP = 36
-const ROOT_GAP = 56
+const SIB_GAP = 5
+const H_GAP = 30
+const ROOT_GAP = 50
 const V_GAP = 36
+const MAIN_GAP = 40
 
 export const STRUCTURES: { id: StructureId; name: string }[] = [
   { id: 'mindmap', name: 'Mind Map (сбалансированная)' },
@@ -71,7 +72,7 @@ class Engine {
   }
 
   /** точка крепления линии по горизонтали (у «подчёркнутых» тем — нижняя линия) */
-  anchorY(t: Topic) { const s = this.size(t); return s.underline ? s.h : s.h / 2 }
+  anchorY(t: Topic) { const s = this.size(t); const sh = s.shapeH ?? s.h; return s.underline ? sh : sh / 2 }
 
   layout(t: Topic, st: Internal): Block {
     const b = this.layoutStructure(t, st)
@@ -207,17 +208,18 @@ class Engine {
     }
     const side = (idx: number[], dir: 1 | -1) => {
       const blocks = idx.map(i => this.layout(kids[i], dir > 0 ? 'logic-right' : 'logic-left'))
-      const total = blocks.reduce((a, c) => a + (c.maxY - c.minY), 0) + (SIB_GAP + 6) * (blocks.length - 1)
+      const total = blocks.reduce((a, c) => a + (c.maxY - c.minY), 0) + MAIN_GAP * (blocks.length - 1)
       let y = s.h / 2 - total / 2
       blocks.forEach((cb, j) => {
         const k = kids[idx[j]], ks = this.size(k)
         const dx = dir > 0 ? s.w + ROOT_GAP - cb.minX : -ROOT_GAP - cb.maxX
         const dy = y - cb.minY
         merge(b, cb, dx, dy)
-        b.edges.push({ from: t.id, to: k.id, kind: 'h',
-          pts: [{ x: dir > 0 ? s.w - Math.min(12, s.w / 4) : Math.min(12, s.w / 4), y: s.h / 2 },
+        const inset = Math.min(s.w / 4, 48)
+        b.edges.push({ from: t.id, to: k.id, kind: 'h', fromRoot: true,
+          pts: [{ x: dir > 0 ? s.w - inset : inset, y: s.h / 2 },
             { x: dir > 0 ? dx : dx + ks.w, y: dy + this.anchorY(k) }] })
-        y += cb.maxY - cb.minY + SIB_GAP + 6
+        y += cb.maxY - cb.minY + MAIN_GAP
       })
     }
     side(right, 1)

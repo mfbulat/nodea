@@ -29,8 +29,7 @@ function Icon({ kind, x, y, size, color, topic, onIcon }: {
           stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
       break
     case 'note':
-      body = <><rect x={2.5} y={1.5} width={11} height={13} rx={1.5} fill="#fff8db" stroke="#c9a227" strokeWidth={1.2} />
-        <path d="M5,5H11M5,8H11M5,11H9" stroke="#c9a227" strokeWidth={1.2} /></>
+      body = <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke={color} strokeWidth={1.4} strokeLinecap="round" fill="none" opacity={0.75} />
       break
     case 'attachment':
       body = <path d="M10.5,4.5L5.2,9.8A1.6,1.6 0 0 0 7.5,12.1L12.6,7A3,3 0 0 0 8.4,2.8L3.4,7.8A4.4,4.4 0 0 0 9.6,14"
@@ -68,26 +67,29 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
   const stroke = s.borderStyle === 'none' ? 'none' : s.borderColor
   const fill = s.fill === 'transparent' ? 'rgba(0,0,0,0)' : s.fill
   // в ячейках таблицы контент центрируется в растянутом боксе
-  const ox = (box.w - c.w) / 2, oy = (box.h - c.h) / 2
+  // ячейки таблицы растягиваются — содержимое центрируется; обычная тема рисуется по своей фигуре
+  const sw = box.cell ? box.w : c.shapeW, sh = box.cell ? box.h : c.shapeH
+  const ox = box.cell ? (box.w - c.shapeW) / 2 : 0, oy = box.cell ? (box.h - c.shapeH) / 2 : 0
+  const r = Math.min(8, sh / 2) + 4
   const t = c.text
   const tx = t ? (s.textAlign === 'left' ? t.x : s.textAlign === 'right' ? t.x + t.textW : t.x + t.textW / 2) : 0
   const anchor = s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle'
   return (
     <g className="topic" data-id={topic.id} data-central={central || undefined} transform={`translate(${box.x},${box.y})`}
       opacity={dim ? 0.2 : 1} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} style={{ cursor: 'pointer', transition: 'opacity .4s' }}>
-      {highlight && <rect x={-6} y={-6} width={box.w + 12} height={box.h + 12} rx={10} fill={current ? '#ffd24d' : '#fff1b8'} opacity={0.9} />}
-      {(selected || relTarget) && <rect x={-4} y={-4} width={box.w + 8} height={box.h + 8} rx={8} fill="none"
+      {highlight && <rect x={-6} y={-6} width={sw + 12} height={sh + 12} rx={r + 2} fill={current ? '#ffd24d' : '#fff1b8'} opacity={0.9} />}
+      {(selected || relTarget) && <rect x={-4} y={-4} width={sw + 8} height={sh + 8} rx={r} fill="none"
         stroke="var(--color-selection)" strokeWidth={2} strokeDasharray={relTarget ? '4 3' : undefined} />}
       {shape === 'underline' ? (
         <>
-          <rect width={box.w} height={box.h} fill={fill} />
-          <line x1={0} x2={box.w} y1={box.h} y2={box.h} stroke={stroke === 'none' ? s.lineColor : stroke}
+          <rect width={sw} height={sh} fill={fill} />
+          <line x1={0} x2={sw} y1={sh} y2={sh} stroke={stroke === 'none' ? s.lineColor : stroke}
             strokeWidth={Math.max(s.borderWidth, s.lineWidth)} strokeDasharray={dash} />
         </>
       ) : shape === 'none' ? (
-        <rect width={box.w} height={box.h} fill={fill} />
+        <rect width={sw} height={sh} fill={fill} />
       ) : (
-        <path d={shapePath(shape, box.w, box.h)} fill={fill} stroke={stroke} strokeWidth={s.borderWidth} strokeDasharray={dash} />
+        <path d={shapePath(shape, sw, sh)} fill={fill} stroke={stroke} strokeWidth={s.borderWidth} strokeDasharray={dash} />
       )}
       <g transform={`translate(${ox},${oy})`}>
         {c.image && (c.image.src.startsWith('emoji:')
@@ -116,8 +118,8 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
         )}
         {c.labels.map((l, i) => (
           <g key={'l' + i}>
-            <rect x={l.x} y={l.y} width={l.w} height={l.h} rx={l.h / 2} fill="#eef0f3" stroke="#c9ced6" strokeWidth={0.8} />
-            <text x={l.x + l.w / 2} y={l.y + l.h - 5} textAnchor="middle" fontSize={11} fill="#4a5160" fontFamily={s.fontFamily}>{l.text}</text>
+            <rect x={l.x} y={l.y} width={l.w} height={l.h} rx={l.h / 2} fill="#ffffff" stroke="#d6d6d6" strokeWidth={1} />
+            <text x={l.x + l.w / 2} y={l.y + l.h - 5} textAnchor="middle" fontSize={11} fill="#8a8a8a" fontFamily={s.fontFamily}>{l.text}</text>
           </g>
         ))}
       </g>

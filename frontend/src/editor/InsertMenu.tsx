@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEditor } from './store'
+import Icon from '../ui/Icon'
 import { pickFile, uploadToTopic } from './actions'
 import { indexSheet } from './model'
 
@@ -45,9 +46,10 @@ export default function InsertMenu() {
 
   return (
     <div className="menu-wrap" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} className={open ? 'on' : ''}>Вставить ▾</button>
+      <button onClick={() => setOpen(o => !o)} className={'ibtn' + (open ? ' on' : '')} aria-label="Вставить" title="Вставить">
+        <Icon name="plus" /><Icon name="chevron" size={12} /></button>
       {open && (
-        <div className="menu" role="menu">
+        <div className="menu right" role="menu">
           {items.map((it, i) => it === '-' ? <div key={i} className="menu-sep" /> : (
             <button key={i} role="menuitem" disabled={it.disabled} onClick={() => { setOpen(false); it.run() }}>
               <span>{it.label}</span>{it.hint && <kbd>{it.hint}</kbd>}

@@ -6,6 +6,7 @@ import { useDoc } from '../store/doc'
 import { useEditor } from './store'
 import { EXPORTS, ExportFormat, exportMap, IMPORT_ACCEPT, importFile } from '../io'
 import { pickFile } from './actions'
+import Icon from '../ui/Icon'
 
 /** Открыть файл как новую карту (общая логика для списка карт и редактора) */
 export async function importAsNewMap(): Promise<string | null> {
@@ -44,7 +45,8 @@ export default function FileMenu() {
 
   return (
     <div className="menu-wrap" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} className={open ? 'on' : ''} disabled={!!busy}>{busy ? busy + '…' : 'Файл ▾'}</button>
+      <button onClick={() => setOpen(o => !o)} className={'ibtn' + (open ? ' on' : '')} disabled={!!busy}
+        aria-label="Файл" title="Файл">{busy ? <span className="muted">{busy}…</span> : <Icon name="chevron" size={16} />}</button>
       {open && (
         <div className="menu" role="menu">
           <button role="menuitem" onClick={() => run('Импорт', async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}>

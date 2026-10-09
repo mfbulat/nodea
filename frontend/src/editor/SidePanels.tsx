@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEditor } from './store'
 import { indexSheet, type Sheet } from './model'
-import { MARKER_GROUPS, MarkerIcon, markerName } from './markers'
+import { MARKER_GROUPS, MarkerIcon, markerName, STICKERS } from './markers'
 import { useDoc } from '../store/doc'
 
 function Header({ title }: { title: string }) {
@@ -16,25 +16,36 @@ function Header({ title }: { title: string }) {
 export function MarkersPanel({ sheet }: { sheet: Sheet }) {
   const { selection } = useEditor()
   const ed = useEditor.getState()
+  const [tab, setTab] = useState<'markers' | 'stickers'>('markers')
+  const [closed, setClosed] = useState<Set<string>>(new Set())
   const id = selection[selection.length - 1]
   const current = new Set(id ? indexSheet(sheet).get(id)?.topic.markers ?? [] : [])
+  const toggleGroup = (g: string) => setClosed(c => { const n = new Set(c); if (n.has(g)) n.delete(g); else n.add(g); return n })
   return (
-    <div className="side-panel" data-testid="markers-panel">
-      <Header title="Маркеры" />
+    <div className="side-panel markers-panel" data-testid="markers-panel">
+      <div className="seg-tabs">
+        <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Маркеры</button>
+        <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Стикеры</button>
+      </div>
       {!id && <p className="muted">Выберите тему.</p>}
-      {MARKER_GROUPS.map(g => (
+      {tab === 'markers' && MARKER_GROUPS.map(g => (
         <div key={g.id}>
-          <h4 className="panel-sub">{g.name}</h4>
-          <div className="marker-grid">
+          <button className="group-head" onClick={() => toggleGroup(g.id)}>
+            <span className={'caret' + (closed.has(g.id) ? ' closed' : '')}>▾</span>{g.name}
+          </button>
+          {!closed.has(g.id) && <div className="marker-grid">
             {g.markers.map(m => (
-              <button key={m} className={'marker-btn' + (current.has(m) ? ' on' : '')} title={markerName(m)} disabled={!id}
+              <button key={m} className={'marker-btn' + (current.has(m) ? ' on' : '')} title={markerName(m)} aria-label={markerName(m)} disabled={!id}
                 onClick={() => ed.toggleMarker(m)}>
-                <svg width={20} height={20}><MarkerIcon id={m} x={2} y={2} size={16} /></svg>
+                <svg width={22} height={22}><MarkerIcon id={m} x={1} y={1} size={20} /></svg>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       ))}
+      {tab === 'stickers' && <div className="sticker-grid panel">
+        {STICKERS.map(st => <button key={st} disabled={!id} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
+      </div>}
     </div>
   )
 }

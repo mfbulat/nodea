@@ -11,7 +11,8 @@ export interface Theme {
   levels: Record<Level, FullStyle>
 }
 
-const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+export const MAP_FONT = '"Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+const FONT = MAP_FONT
 
 function base(o: Partial<FullStyle>): FullStyle {
   return {
@@ -41,10 +42,15 @@ function theme(id: string, name: string, background: string, rainbow: string[],
 const RAINBOW = ['#e05a47', '#f0a33a', '#d6c12f', '#4fae5b', '#3a9bd8', '#5a63d6', '#a35bd0', '#d4568f']
 
 export const THEMES: Theme[] = [
+  // тема по умолчанию: тёмные рамки и линии 2px, синяя центральная, серые основные, подчёркнутые подтемы
   theme('classic', 'Классика', '#ffffff', RAINBOW,
-    { fill: '#2f4a7a', borderColor: '#2f4a7a', textColor: '#ffffff', shape: 'rounded' },
-    { fill: '#e8eef8', borderColor: '#2f4a7a', lineColor: '#2f4a7a' },
-    { shape: 'underline', fill: 'transparent', borderColor: '#2f4a7a', lineColor: '#2f4a7a', lineWidth: 1.5 }),
+    { fill: '#3d4aa8', borderColor: '#141414', borderWidth: 2, textColor: '#ffffff', fontSize: 30, fontWeight: 'bold', maxWidth: 480,
+      lineColor: '#141414', lineWidth: 2, lineShape: 'curve' },
+    { fill: '#eeeeee', borderColor: '#141414', borderWidth: 2, textColor: '#333333', fontSize: 18,
+      lineColor: '#141414', lineWidth: 2, lineShape: 'rounded' },
+    { shape: 'underline', fill: 'transparent', borderColor: '#141414', borderWidth: 2, textColor: '#141414', fontSize: 14,
+      lineColor: '#141414', lineWidth: 2, lineShape: 'rounded' },
+    { fill: '#2f7d74', borderColor: '#141414', borderWidth: 2, textColor: '#ffffff', fontSize: 14, lineColor: '#141414', lineWidth: 2, lineShape: 'rounded' }),
   theme('fresh', 'Свежая', '#f7fbf8', RAINBOW,
     { fill: '#2e8b6a', borderColor: '#2e8b6a', textColor: '#ffffff', shape: 'capsule' },
     { fill: '#d8f0e6', borderColor: '#2e8b6a', lineColor: '#2e8b6a', shape: 'capsule' },

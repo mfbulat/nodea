@@ -22,13 +22,13 @@ export function renderSheet(sheet: Sheet): Rendered {
   const idx = indexSheet(sheet)
   const styles = new Map<string, FullStyle>()
   const contents = new Map<string, Content>()
-  const sizes = new Map<string, { w: number; h: number; underline: boolean }>()
+  const sizes = new Map<string, { w: number; h: number; shapeH: number; underline: boolean }>()
   for (const [id, ref] of idx) {
     const st = resolveStyle(sheet, ref)
     const c = layoutContent(ref.topic, st)
     styles.set(id, st)
     contents.set(id, c)
-    sizes.set(id, { w: c.w, h: c.h, underline: st.shape === 'underline' })
+    sizes.set(id, { w: c.w, h: c.h, shapeH: c.shapeH, underline: st.shape === 'underline' })
   }
   const layout = layoutSheet(sheet, (t: Topic) => sizes.get(t.id)!)
   return { layout, styles, contents }

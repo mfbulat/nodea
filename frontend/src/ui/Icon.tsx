@@ -1,0 +1,53 @@
+// Собственный набор линейных иконок 20×20 (stroke = currentColor).
+const P: Record<string, JSX.Element> = {
+  home: <path d="M3.5 9.5L10 4l6.5 5.5M5.5 8v8h9V8" />,
+  undo: <path d="M7 5L3.5 8.5 7 12M4 8.5h7.5a4 4 0 010 8H9" />,
+  redo: <path d="M13 5l3.5 3.5L13 12M16 8.5H8.5a4 4 0 000 8H11" />,
+  topic: <><rect x="3" y="6" width="14" height="8" rx="2.5" /></>,
+  subtopic: <><rect x="2.5" y="7.5" width="7" height="5" rx="1.5" /><path d="M9.5 10h2.5v-4h5M12 10v4h5" /></>,
+  relationship: <><path d="M4 15C4 7 12 4 16 7" strokeDasharray="2.2 2" /><path d="M13.5 5.2L16.3 7l-2.2 2.4" /></>,
+  summary: <><path d="M4 4.5h2a1.5 1.5 0 011.5 1.5v2.5L9 10l-1.5 1.5V14A1.5 1.5 0 016 15.5H4" /><rect x="11" y="8" width="6" height="4" rx="1" /></>,
+  boundary: <rect x="3" y="4.5" width="14" height="11" rx="3" strokeDasharray="2.4 2" />,
+  note: <><rect x="4" y="3.5" width="12" height="13" rx="2" /><path d="M7 7.5h6M7 10h6M7 12.5h4" /></>,
+  label: <><path d="M3.5 10.2V4.5a1 1 0 011-1h5.7l6.3 6.3-6.7 6.7z" /><circle cx="7" cy="7" r="1.1" /></>,
+  task: <><rect x="3.5" y="3.5" width="13" height="13" rx="2.5" /><path d="M7 10.2l2.2 2.2L13.5 8" /></>,
+  plus: <path d="M10 4v12M4 10h12" />,
+  chevron: <path d="M6 8l4 4 4-4" />,
+  share: <><path d="M10 12.5V3.5M6.5 7L10 3.5 13.5 7" /><path d="M5 10.5v5h10v-5" /></>,
+  marker: <><circle cx="10" cy="10" r="6.5" /><path d="M7.5 11.5a3 3 0 005 0" /><circle cx="8" cy="8.5" r=".6" /><circle cx="12" cy="8.5" r=".6" /></>,
+  panel: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M12 4v12" /></>,
+  more: <><circle cx="5" cy="10" r="1" /><circle cx="10" cy="10" r="1" /><circle cx="15" cy="10" r="1" /></>,
+  outline: <path d="M4 5.5h1.5M8 5.5h8M4 10h1.5M8 10h8M4 14.5h1.5M8 14.5h8" />,
+  map: <><rect x="7.5" y="8" width="5" height="4" rx="1" /><path d="M7.5 10H4M12.5 10H16M4 6v8M16 6v8" /></>,
+  zen: <path d="M4 7.5V4h3.5M12.5 4H16v3.5M16 12.5V16h-3.5M7.5 16H4v-3.5" />,
+  present: <><rect x="3" y="4" width="14" height="9.5" rx="1.5" /><path d="M10 13.5V16M7 16h6M8.7 6.8l3.3 2-3.3 2z" /></>,
+  search: <><circle cx="9" cy="9" r="5" /><path d="M13 13l3.5 3.5" /></>,
+  filter: <path d="M3.5 5h13l-5 6v4.5l-3-1.5v-3z" />,
+  branch: <><rect x="3" y="8" width="5" height="4" rx="1" /><path d="M8 10h3M11 6v8M11 6h2M11 14h2" /><rect x="13" y="4.5" width="4" height="3" rx=".8" /><rect x="13" y="12.5" width="4" height="3" rx=".8" /></>,
+  history: <><path d="M4 10a6 6 0 106-6 6 6 0 00-4.5 2M4 3.5V6.5h3" /><path d="M10 7v3.5l2.5 1.5" /></>,
+  keyboard: <><rect x="2.5" y="5.5" width="15" height="9" rx="1.5" /><path d="M5.5 8.5h.01M8.5 8.5h.01M11.5 8.5h.01M14.5 8.5h.01M7 11.5h6" /></>,
+  comment: <path d="M4 5.5A1.5 1.5 0 015.5 4h9A1.5 1.5 0 0116 5.5v6a1.5 1.5 0 01-1.5 1.5H9L6 16v-3h-.5A1.5 1.5 0 014 11.5z" />,
+  file: <><path d="M5 3.5h6.5L15 7v9.5H5z" /><path d="M11.5 3.5V7H15" /></>,
+  close: <path d="M5 5l10 10M15 5L5 15" />,
+  floating: <><rect x="3" y="7" width="9" height="6" rx="2" /><path d="M14 5h3M15.5 3.5v3" /></>,
+  collapse: <><circle cx="10" cy="10" r="6.5" /><path d="M7 10h6" /></>,
+  trash: <path d="M4.5 6h11M8 6V4.5h4V6M6 6l.8 10h6.4L14 6" />,
+  star: <path d="M10 3.5l2 4.2 4.5.6-3.3 3.1.8 4.5-4-2.2-4 2.2.8-4.5-3.3-3.1 4.5-.6z" />,
+  folder: <path d="M3 6a1.5 1.5 0 011.5-1.5h3.2l1.6 1.7h6.2A1.5 1.5 0 0117 7.7v7A1.5 1.5 0 0115.5 16.2h-11A1.5 1.5 0 013 14.7z" />,
+  clock: <><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5V10l2.5 1.5" /></>,
+  users: <><circle cx="8" cy="7.5" r="2.5" /><path d="M3.5 15.5a4.5 4.5 0 019 0M13 5.5a2.3 2.3 0 010 4.4M14.5 15.5a4 4 0 00-1.8-3.4" /></>,
+  template: <><rect x="3" y="3.5" width="14" height="13" rx="2" /><path d="M3 8h14M8 8v8.5" /></>,
+  upload: <><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5" /><path d="M4 13v3h12v-3" /></>,
+  settings: <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" /></>,
+}
+
+export type IconName = keyof typeof P
+
+export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="icon">
+      {P[name]}
+    </svg>
+  )
+}

@@ -46,7 +46,7 @@ test('перетаскивание меняет родителя', async ({ page
 test('раскладки и стиль через панель формата', async ({ page }) => {
   const id = await newMap(page)
   await topic(page, 'Центральная тема').click()
-  await page.getByLabel('Структура').selectOption('org-down')
+  await page.getByTestId('format-panel').getByLabel('Структура').selectOption('org-down')
   await page.getByRole('button', { name: 'Карта', exact: true }).last().click()
   await page.locator('.theme-card', { hasText: 'Тёмная' }).click()
   await page.getByLabel('Радужные ветки').check()
@@ -75,11 +75,11 @@ test('структура (outliner) и поиск', async ({ page }) => {
 
 test('экспорт и импорт .xmind через меню', async ({ page }) => {
   await newMap(page, { version: 1, sheets: [{ id: 's', title: 'Л', rootTopic: { id: 'r', title: 'Экспорт', children: [{ id: 'a', title: 'Ветка', markers: ['priority-1'] }] } }] })
-  await page.getByRole('button', { name: 'Файл ▾' }).click()
+  await page.getByRole('button', { name: 'Файл', exact: true }).click()
   const dl = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: 'XMind (.xmind)' }).click()
   const file = await (await dl).path()
-  await page.getByRole('button', { name: 'Файл ▾' }).click()
+  await page.getByRole('button', { name: 'Файл', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /Открыть файл/ }).click()
   await (await chooser).setFiles({ name: 'копия.xmind', mimeType: 'application/zip', buffer: readFileSync(file!) })

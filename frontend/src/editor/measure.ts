@@ -83,7 +83,8 @@ export function measureEquation(tex: string, fontSize: number) {
 
 export type IconKind = 'task' | 'marker' | 'link' | 'note' | 'attachment' | 'comments'
 export interface Content {
-  w: number; h: number; padX: number; padY: number
+  /** w/h — габарит с метками; shapeW/shapeH — сама фигура темы */
+  w: number; h: number; shapeW: number; shapeH: number; padX: number; padY: number
   text: (TextBox & { x: number; y: number; w: number }) | null
   image?: { x: number; y: number; w: number; h: number; src: string }
   icons: { kind: IconKind; id?: string; x: number; y: number; size: number }[]
@@ -92,6 +93,8 @@ export interface Content {
 }
 
 const GAP = 4
+/** отступ между значками/маркерами и текстом */
+const ICON_GAP = 8
 
 /** Раскладка содержимого темы: изображение / [задача, маркеры, текст, значки] / формула / метки */
 export function layoutContent(t: Topic, s: FullStyle): Content {
@@ -107,7 +110,7 @@ export function layoutContent(t: Topic, s: FullStyle): Content {
   if (t.attachment) right.push({ kind: 'attachment' })
   if (t.comments?.length) right.push({ kind: 'comments' })
 
-  const rowItemsW = (left.length + right.length) * (icon + GAP)
+  const rowItemsW = (left.length + right.length) * (icon + ICON_GAP)
   const rowH = Math.max(tb?.textH ?? 0, left.length + right.length ? icon : 0)
   const rowW = (tb?.textW ?? 0) + rowItemsW - (tb ? 0 : GAP)
   const eq = t.equation ? measureEquation(t.equation, s.fontSize) : null
@@ -118,48 +121,50 @@ export function layoutContent(t: Topic, s: FullStyle): Content {
   const labels = (t.labels ?? []).map(l => ({ text: l, w: Math.ceil(c.measureText(l).width) + 12, h: labelFont + 6 }))
   const labelsW = labels.reduce((a, l) => a + l.w + GAP, 0) - (labels.length ? GAP : 0)
 
-  const innerW = Math.max(rowW, img?.width ?? 0, eq?.w ?? 0, labelsW, 8)
+  // метки рисуются под фигурой темы, а не внутри неё
+  const innerW = Math.max(rowW, img?.width ?? 0, eq?.w ?? 0, 8)
   const parts: number[] = []
   if (img) parts.push(img.height)
   if (rowH) parts.push(rowH)
   if (eq) parts.push(eq.h)
-  if (labels.length) parts.push(labels[0].h)
   const innerH = parts.reduce((a, p) => a + p, 0) + GAP * Math.max(0, parts.length - 1)
 
   // поля зависят от формы
-  let padX = 14, padY = 8
+  let padX = 16, padY = 9
   switch (s.shape) {
     case 'capsule': padX = 10 + (innerH + 16) / 2; break
     case 'ellipse': padX = innerW * 0.22 + 16; padY = innerH * 0.3 + 10; break
     case 'diamond': padX = innerW * 0.5 + 16; padY = innerH * 0.5 + 12; break
     case 'hexagon': padX = 26; break
     case 'parallelogram': padX = 26; break
-    case 'underline': padX = 6; padY = 5; break
-    case 'none': padX = 6; padY = 5; break
+    case 'underline': padX = 4; padY = 6; break
+    case 'none': padX = 4; padY = 6; break
   }
-  if (s.fontSize >= 20) { padX += 6; padY += 4 }
-  const w = innerW + padX * 2, h = innerH + padY * 2
+  if (s.fontSize >= 24 && s.shape !== 'underline' && s.shape !== 'none') { padX += 12; padY += 4 }
+  const shapeW = innerW + padX * 2, shapeH = innerH + padY * 2
+  const labelsH = labels.length ? labels[0].h + 4 : 0
+  const w = Math.max(shapeW, labelsW), h = shapeH + labelsH
 
-  const out: Content = { w, h, padX, padY, text: null, icons: [], labels: [] }
+  const out: Content = { w, h, shapeW, shapeH, padX, padY, text: null, icons: [], labels: [] }
   let y = padY
-  if (img) { out.image = { x: (w - img.width) / 2, y, w: img.width, h: img.height, src: img.src }; y += img.height + GAP }
+  if (img) { out.image = { x: (shapeW - img.width) / 2, y, w: img.width, h: img.height, src: img.src }; y += img.height + GAP }
   if (rowH) {
     // ряд центрируется по ширине; выравнивание текста действует внутри текстового блока
     const extra = innerW - rowW
     let x = padX + (s.textAlign === 'left' ? 0 : s.textAlign === 'right' ? extra : extra / 2)
-    for (const it of left) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + GAP }
+    for (const it of left) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + ICON_GAP }
     if (tb) {
       const tw = s.textAlign === 'center' ? tb.textW : tb.textW
       out.text = { ...tb, x, y: y + (rowH - tb.textH) / 2, w: tw }
-      x += tb.textW + GAP
+      x += tb.textW + ICON_GAP
     }
-    for (const it of right) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + GAP }
+    for (const it of right) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + ICON_GAP }
     y += rowH + GAP
   }
-  if (eq) { out.equation = { x: (w - eq.w) / 2, y, w: eq.w, h: eq.h, html: eq.html }; y += eq.h + GAP }
+  if (eq) { out.equation = { x: (shapeW - eq.w) / 2, y, w: eq.w, h: eq.h, html: eq.html }; y += eq.h + GAP }
   if (labels.length) {
-    let x = (w - labelsW) / 2
-    for (const l of labels) { out.labels.push({ ...l, x, y }); x += l.w + GAP }
+    let x = 0
+    for (const l of labels) { out.labels.push({ ...l, x, y: shapeH + 4 }); x += l.w + GAP }
   }
   return out
 }
