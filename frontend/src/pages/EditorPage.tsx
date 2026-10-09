@@ -8,6 +8,7 @@ import { BottomRight, Crumbs, MainMenu, OutlineCenter, TopCenter, TopLeft, TopRi
 import { exportMap, ExportFormat } from '../io'
 import { importAsNewMap } from '../editor/FileMenu'
 import HelpDialog from '../editor/HelpDialog'
+import Gantt, { TaskDialog } from '../editor/Gantt'
 import FormatPanel from '../editor/FormatPanel'
 import VersionsPanel from '../editor/VersionsPanel'
 import { useEditor } from '../editor/store'
@@ -87,7 +88,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const sheetId = useEditor(s => s.sheetId)
   const panel = useEditor(s => s.panel)
   const setPanel = useEditor(s => s.setPanel)
-  const { viewMode, zen, presenting } = useEditor()
+  const { viewMode, zen, presenting, gantt } = useEditor()
   const email = useAuth(s => s.user?.email ?? '')
   const [error, setError] = useState('')
   const readOnly = role === 'view'
@@ -150,11 +151,12 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
     const name = prompt('Название шаблона', tt)?.trim()
     if (name && dd) { await api('/api/templates', { method: 'POST', json: { title: name, document: dd } }); alert('Шаблон сохранён') }
   })
-  const hasPanel = !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
+  const embed = new URLSearchParams(location.search).get('embed') === '1'
+  const hasPanel = !embed && !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
 
   return (
-    <div className={'editor' + (zen ? ' zen' : '') + (hasPanel ? ' has-panel' : '')}>
-      {!zen && <div className="topbar-x">
+    <div className={'editor' + (zen || embed ? ' zen' : '') + (hasPanel ? ' has-panel' : '')}>
+      {!zen && !embed && <div className="topbar-x">
         <TopLeft guest={!user} mapId={id} mainMenu={<MainMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)}
           onShare={role === 'owner' ? () => setShareOpen(true) : undefined} onExport={doExport} onImport={doImport} onSaveTemplate={saveTemplate} />} />
         {!readOnly && (viewMode === 'map' ? <TopCenter /> : <OutlineCenter />)}
@@ -163,12 +165,12 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
         <SearchBar />
-        {zen && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
+        {zen && !embed && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
         {!zen && <Crumbs sheet={sheet} />}
         {!zen && <Legend sheet={sheet} readOnly={readOnly} />}
         {busy && <div className="busy-toast">{busy}…</div>}
       </div>
-      {!zen && <div className="bottombar-x">
+      {!zen && !embed && <div className="bottombar-x">
         <SheetTabs />
         <BottomRight sheet={sheet} />
       </div>}
@@ -182,8 +184,10 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
           onRestored={() => useEditor.getState().reset()} />}
       </>}
       <Dialogs />
+      {gantt && !zen && <Gantt sheet={sheet} />}
+      <TaskDialog key={useEditor.getState().taskDialog ?? 'none'} sheet={sheet} />
       {help && <HelpDialog onClose={() => setHelp(false)} />}
-      {shareOpen && id && <ShareDialog mapId={id} onClose={() => setShareOpen(false)} />}
+      {shareOpen && id && <ShareDialog mapId={id} onClose={() => setShareOpen(false)} onExport={doExport} />}
     </div>
   )
 }

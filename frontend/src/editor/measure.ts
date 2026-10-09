@@ -82,7 +82,7 @@ export function measureEquation(tex: string, fontSize: number) {
   return out
 }
 
-export type IconKind = 'task' | 'marker' | 'link' | 'note' | 'attachment' | 'comments'
+export type IconKind = 'task' | 'marker' | 'link' | 'note' | 'attachment' | 'comments' | 'audio'
 export interface Content {
   /** w/h — габарит с метками; shapeW/shapeH — сама фигура темы */
   w: number; h: number; shapeW: number; shapeH: number; padX: number; padY: number
@@ -113,6 +113,7 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   if (t.href) right.push({ kind: 'link' })
   if (t.notes?.plain?.trim() || t.notes?.html) right.push({ kind: 'note' })
   if (t.attachment) right.push({ kind: 'attachment' })
+  if (t.audio) right.push({ kind: 'audio' })
   if (t.comments?.length) right.push({ kind: 'comments' })
 
   const rowItemsW = (left.length + right.length) * (icon + ICON_GAP)
@@ -123,8 +124,7 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   const labelFont = 11
   const c = canvas()
   c.font = `normal ${labelFont}px ${s.fontFamily}`
-  const labels = (t.labels ?? []).map(l => ({ text: l, w: Math.ceil(c.measureText(l).width) + 12, h: labelFont + 6 }))
-  const labelsW = labels.reduce((a, l) => a + l.w + GAP, 0) - (labels.length ? GAP : 0)
+  const labels: { text: string; w: number; h: number }[] = (t.labels ?? []).map(l => ({ text: l, w: Math.ceil(c.measureText(l).width) + 12, h: labelFont + 6 }))
 
   // метки рисуются под фигурой темы, а не внутри неё
   const innerW = Math.max(rowW, img?.width ?? 0, eq?.w ?? 0, 8)
@@ -147,6 +147,11 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
     case 'none': padX = 4; padY = 6; break
   }
   const shapeW = s.width ? Math.max(s.width, innerW + padX * 2) : innerW + padX * 2, shapeH = innerH + padY * 2
+  // сведения о задаче — строка под темой
+  const ti = t.taskInfo
+  const fmt = (d?: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''
+  const taskText = ti?.start ? [`${fmt(ti.start)} – ${fmt(ti.end ?? ti.start)}`, `${ti.progress ?? 0}%`, ti.assignee].filter(Boolean).join(' · ') : ''
+  if (taskText) { c.font = `normal 11px ${s.fontFamily}`; labels.push({ text: '\u{1F4C5} ' + taskText, w: Math.ceil(c.measureText('📅 ' + taskText).width) + 12, h: 17 }) }
   const labelsH = labels.length ? labels[0].h + 4 : 0
   // «показывать все заметки»: текст заметки под темой
   const noteText = showNotes ? (t.notes?.plain ?? '').trim() : ''
@@ -155,7 +160,8 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
     const nb = measureText(noteText.length > 400 ? noteText.slice(0, 400) + '…' : noteText, { ...s, fontSize: 12, fontWeight: 'normal', fontStyle: 'normal', maxWidth: Math.max(160, shapeW - 16) })
     note = { x: 0, y: shapeH + labelsH + 4, w: nb.textW + 16, h: nb.textH + 12, lines: nb.lines, lineHeight: nb.lineHeight }
   }
-  const w = Math.max(shapeW, labelsW, note?.w ?? 0), h = shapeH + labelsH + (note ? note.h + 4 : 0)
+  const allLabelsW = labels.reduce((a, l) => a + l.w + GAP, 0) - (labels.length ? GAP : 0)
+  const w = Math.max(shapeW, allLabelsW, note?.w ?? 0), h = shapeH + labelsH + (note ? note.h + 4 : 0)
 
   const out: Content = { w, h, shapeW, shapeH, padX, padY, text: null, icons: [], labels: [], note }
   let y = padY

@@ -96,6 +96,10 @@ interface EditorState {
   painting: boolean
   /** окно диаграммы Ганта и режим снимка области карты (интерфейс — в работе) */
   gantt: boolean
+  markerTab: 'markers' | 'stickers' | 'illustrations'
+  taskDialog: string | null
+  setMarkerTab: (t: EditorState['markerTab']) => void
+  setTaskDialog: (id: string | null) => void
   mapShot: boolean
   setGantt: (v: boolean) => void
   setMapShot: (v: boolean) => void
@@ -205,7 +209,8 @@ export const useEditor = create<EditorState>((set, get) => {
 
   return {
     sheetId: null, selection: [], editingId: null, editSeed: null, past: [], future: [],
-    view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false,
+    view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false, markerTab: 'markers', taskDialog: null,
+    setMarkerTab: t => set({ markerTab: t }), setTaskDialog: id => set({ taskDialog: id }),
     setGantt: v => set({ gantt: v }), setMapShot: v => set({ mapShot: v }),
     element: null, panel: 'format', relating: null, dialog: null, userName: '',
     viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,

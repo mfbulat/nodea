@@ -36,6 +36,9 @@ function Icon({ kind, x, y, size, color, topic, onIcon }: {
       body = <path d="M10.5,4.5L5.2,9.8A1.6,1.6 0 0 0 7.5,12.1L12.6,7A3,3 0 0 0 8.4,2.8L3.4,7.8A4.4,4.4 0 0 0 9.6,14"
         stroke={color} strokeWidth={1.5} fill="none" strokeLinecap="round" />
       break
+    case 'audio':
+      body = <><path d="M3 6.5h3l4-3v13l-4-3H3z" fill={color} opacity={0.85} /><path d="M12.5 6a3.5 3.5 0 010 4M14 4a6 6 0 010 8" stroke={color} strokeWidth={1.3} fill="none" strokeLinecap="round" /></>
+      break
     case 'comments':
       body = <><path d="M2,3.5A1.5,1.5 0 0 1 3.5,2H12.5A1.5,1.5 0 0 1 14,3.5V10A1.5,1.5 0 0 1 12.5,11.5H7L4,14V11.5H3.5A1.5,1.5 0 0 1 2,10Z" fill="#e8f1ff" stroke="#3e63dd" strokeWidth={1.2} />
         <text x={8} y={9.4} textAnchor="middle" fontSize={7} fontWeight={700} fill="#3e63dd" fontFamily="system-ui">{topic.comments?.length}</text></>

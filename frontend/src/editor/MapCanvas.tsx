@@ -363,6 +363,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     else if (kind === 'note') ed().setPanel('notes')
     else if (kind === 'comments') ed().setPanel('comments')
     else if (kind === 'attachment' && t.attachment) window.open(t.attachment.url, '_blank')
+    else if (kind === 'audio' && t.audio) new Audio(t.audio.url).play().catch(() => window.open(t.audio!.url, '_blank'))
   }
 
   // файлы, перетащенные на тему: изображения — в картинку, остальное — во вложение

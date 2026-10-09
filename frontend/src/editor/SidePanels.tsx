@@ -3,6 +3,7 @@ import { useEditor } from './store'
 import { indexSheet, type Sheet } from './model'
 import { MARKER_GROUPS, MarkerIcon, markerName, STICKERS } from './markers'
 import { useDoc } from '../store/doc'
+import { ILLUSTRATIONS, illustrationSrc } from './illustrations'
 
 function Header({ title }: { title: string }) {
   return (
@@ -16,7 +17,8 @@ function Header({ title }: { title: string }) {
 export function MarkersPanel({ sheet }: { sheet: Sheet }) {
   const { selection } = useEditor()
   const ed = useEditor.getState()
-  const [tab, setTab] = useState<'markers' | 'stickers'>('markers')
+  const tab = useEditor(st => st.markerTab)
+  const setTab = useEditor.getState().setMarkerTab
   const [closed, setClosed] = useState<Set<string>>(new Set())
   const id = selection[selection.length - 1]
   const current = new Set(id ? indexSheet(sheet).get(id)?.topic.markers ?? [] : [])
@@ -24,8 +26,9 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
   return (
     <div className="side-panel markers-panel" data-testid="markers-panel">
       <div className="seg-tabs">
-        <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Маркеры</button>
-        <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Стикеры</button>
+        <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Маркер</button>
+        <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Стикер</button>
+        <button className={tab === 'illustrations' ? 'on' : ''} onClick={() => setTab('illustrations')}>Иллюстрация</button>
       </div>
       {tab === 'markers' && <button className="wide legend-btn" onClick={() => ed.setSheet({ legend: !sheet.legend })}>
         {sheet.legend ? 'Скрыть легенду' : 'Показать легенду'}</button>}
@@ -45,6 +48,11 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
           </div>}
         </div>
       ))}
+      {tab === 'illustrations' && <div className="illus-grid">
+        {ILLUSTRATIONS.map(il => <button key={il.id} disabled={!id} title={il.name} aria-label={'Иллюстрация ' + il.name}
+          onClick={() => ed.setTopic(selection, { image: { src: illustrationSrc(il.svg), width: 120, height: 90 } })}>
+          <img src={illustrationSrc(il.svg)} alt="" /></button>)}
+      </div>}
       {tab === 'stickers' && <div className="sticker-grid panel">
         {STICKERS.map(st => <button key={st} disabled={!id} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
       </div>}

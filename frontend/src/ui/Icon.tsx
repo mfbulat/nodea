@@ -58,6 +58,11 @@ const P: Record<string, JSX.Element> = {
   restore: <path d="M4 10a6 6 0 106-6 6 6 0 00-4.5 2M4 3.5V6.5h3" />,
   chevronRight: <path d="M8 5l5 5-5 5" />,
   hamburger: <path d="M4 6h12M4 10h12M4 14h12" />,
+  callout: <><path d="M3.5 5a1.5 1.5 0 011.5-1.5h10A1.5 1.5 0 0116.5 5v6.5A1.5 1.5 0 0115 13H9l-3.5 3v-3H5a1.5 1.5 0 01-1.5-1.5z" /></>,
+  attach: <path d="M12.5 6.5L7.2 11.8a1.6 1.6 0 002.3 2.3l5.6-5.6a3 3 0 00-4.2-4.2L5.2 9.9a4.4 4.4 0 006.2 6.2L16 11.5" />,
+  sticker: <><path d="M4 4h12v7l-5 5H4z" /><path d="M11 16v-5h5" /></>,
+  illustration: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M3.5 13.5l3.5-3.5 2.5 2.5 3-4 4 5" /><circle cx="13.5" cy="7.5" r="1.2" /></>,
+  equation: <path d="M14.5 4.5H6.5l4 5.5-4 5.5h8M14.5 15.5" />,
   settings: <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" /></>,
 }
 

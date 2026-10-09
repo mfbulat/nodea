@@ -1,62 +1,53 @@
-import { useEffect, useRef, useState } from 'react'
+// Меню «Вставить» (как в веб-версии): сводка, зона | заметка, метка, выноска, комментарий,
+// to-do, задача, ссылка ▸ | вложение, аудиозаметка | стикер, иллюстрация, изображение, формула.
 import { useEditor } from './store'
-import Icon from '../ui/Icon'
+import Icon, { IconName } from '../ui/Icon'
 import { pickFile, uploadToTopic } from './actions'
 import { indexSheet } from './model'
-
-interface Item { label: string; hint?: string; run: () => void; disabled?: boolean }
+import { Dropdown, MenuItem, SubMenu, Tip } from './Chrome'
+import { recordAudio } from './audio'
 
 export default function InsertMenu() {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
   const { selection } = useEditor()
   const ed = useEditor.getState()
   const id = selection[selection.length - 1]
   const none = !id
   const sheet = ed.sheet()
-  const kind = id && sheet ? indexSheet(sheet).get(id)?.kind : undefined
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
-    window.addEventListener('pointerdown', close)
-    return () => window.removeEventListener('pointerdown', close)
-  }, [open])
-
-  const items: (Item | '-')[] = [
-    { label: 'Связь', hint: 'Ctrl+L', run: ed.startRelating, disabled: none },
-    { label: 'Граница', hint: 'Ctrl+B', run: ed.addBoundary, disabled: none },
-    { label: 'Сводка', hint: 'Ctrl+]', run: ed.addSummary, disabled: none || kind !== 'child' },
-    { label: 'Выноска', run: ed.addCallout, disabled: none },
-    '-',
-    { label: 'Маркер…', run: () => ed.setPanel('markers'), disabled: none },
-    { label: 'Стикер…', run: () => ed.setDialog({ kind: 'sticker', id }), disabled: none },
-    { label: 'Метки…', run: () => ed.setDialog({ kind: 'labels', id }), disabled: none },
-    { label: 'Заметка', hint: 'Ctrl+Shift+N', run: () => ed.setPanel('notes'), disabled: none },
-    { label: 'Ссылка…', hint: 'Ctrl+K', run: () => ed.setDialog({ kind: 'link', id }), disabled: none },
-    { label: 'Изображение…', run: async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, disabled: none },
-    { label: 'Вложение…', run: async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') }, disabled: none },
-    { label: 'Формула…', run: () => ed.setDialog({ kind: 'equation', id }), disabled: none },
-    { label: 'Задача (чекбокс)', run: () => {
-      const t = sheet && indexSheet(sheet).get(id)?.topic
-      ed.setTopic(selection, { task: t?.task ? undefined : { done: false } })
-    }, disabled: none },
-    { label: 'Комментарий', run: () => ed.setPanel('comments'), disabled: none },
-  ]
+  const ref = id && sheet ? indexSheet(sheet).get(id) : undefined
+  const isChild = ref?.kind === 'child'
+  const item = (icon: IconName, label: string, fn: () => void, disabled = none, hint?: string) =>
+    (close: () => void) => <MenuItem key={label} icon={icon} label={label} hint={hint} disabled={disabled} onClick={() => { close(); fn() }} />
 
   return (
-    <div className="menu-wrap" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} className={'ibtn' + (open ? ' on' : '')} aria-label="Вставить" title="Вставить">
-        <Icon name="plus" /><Icon name="chevron" size={12} /></button>
-      {open && (
-        <div className="menu right" role="menu">
-          {items.map((it, i) => it === '-' ? <div key={i} className="menu-sep" /> : (
-            <button key={i} role="menuitem" disabled={it.disabled} onClick={() => { setOpen(false); it.run() }}>
-              <span>{it.label}</span>{it.hint && <kbd>{it.hint}</kbd>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Dropdown align="left" trigger={(open, toggle) => (
+      <Tip title="Вставить" desc="Добавить другие элементы к выбранным темам.">
+        <button onClick={toggle} className={'ibtn insert-btn' + (open ? ' on' : '')} aria-label="Вставить">
+          <Icon name="plus" /><Icon name="chevron" size={12} /></button>
+      </Tip>
+    )}>
+      {close => <>
+        {item('summary', 'Сводка', ed.addSummary, none || !isChild)(close)}
+        {item('boundary', 'Зона', ed.addBoundary, none, '⌘ ⇧ B')(close)}
+        <div className="menu-sep" />
+        {item('note', 'Заметка', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
+        {item('label', 'Метка', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}
+        {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'root')(close)}
+        {item('comment', 'Комментарий', () => ed.setPanel('comments'))(close)}
+        {item('task', 'To-Do', () => ed.setTopic(selection, { task: ref?.topic.task ? undefined : { done: false } }), none, '⌥ ⌘ T')(close)}
+        {item('gantt', 'Задача', () => { ed.setTaskDialog(id) })(close)}
+        <SubMenu icon="link" label="Ссылка">
+          <MenuItem icon="link" label="Веб-ссылка" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
+          <MenuItem icon="topic" label="Ссылка на тему" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
+        </SubMenu>
+        <div className="menu-sep" />
+        {item('attach', 'Вложение', async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') })(close)}
+        {item('mic', 'Аудиозаметка', () => recordAudio(id))(close)}
+        <div className="menu-sep" />
+        {item('sticker', 'Стикер', () => { ed.setPanel('markers'); ed.setMarkerTab('stickers') })(close)}
+        {item('illustration', 'Иллюстрация', () => { ed.setPanel('markers'); ed.setMarkerTab('illustrations') })(close)}
+        {item('image', 'Изображение', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, none, '⌘ ⇧ I')(close)}
+        {item('equation', 'Формула', () => ed.setDialog({ kind: 'equation', id }))(close)}
+      </>}
+    </Dropdown>
   )
 }
