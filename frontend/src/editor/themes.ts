@@ -15,7 +15,7 @@ export interface Theme {
 
 /** Цветовые палитры веток (выбираются отдельно от темы) */
 export const PALETTES: { id: string; name: string; colors: string[] }[] = [
-  { id: 'dawn', name: 'Заря', colors: ['#ff6b6b', '#ff9f69', '#97d3b6', '#88e2d7', '#6fd0f9', '#e18ef0'] },
+  { id: 'dawn', name: 'Заря', colors: ['#ff6b6b', '#ff9f69', '#97d3b6', '#88e2d7', '#6fd0f9', '#e18bee'] },
   { id: 'ocean', name: 'Океан', colors: ['#5b8def', '#4cc3d9', '#7bd4a8', '#3f6fb5', '#8fa7f5', '#5fb8c9'] },
   { id: 'forest', name: 'Лес', colors: ['#7cb66a', '#c7d36a', '#4f9a7d', '#a6c48a', '#e2b55e', '#6e9f5b'] },
   { id: 'candy', name: 'Карамель', colors: ['#ff8fab', '#ffc46b', '#9be08e', '#8ecbff', '#c9a0ff', '#ff9e80'] },
