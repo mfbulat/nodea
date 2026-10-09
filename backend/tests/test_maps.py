@@ -41,11 +41,11 @@ def test_versions_restore(client, user):
 
 def test_other_user_has_no_access(client, user):
     m = client.post("/api/maps", json={"title": "Чужая"}).json()
-    with TestClient(app) as other:
-        register(other)
-        assert other.get(f"/api/maps/{m['id']}").status_code == 404
-        assert other.patch(f"/api/maps/{m['id']}", json={"title": "x"}).status_code == 404
-        assert other.delete(f"/api/maps/{m['id']}").status_code == 404
+    other = TestClient(app)  # второй пользователь со своими cookie
+    register(other)
+    assert other.get(f"/api/maps/{m['id']}").status_code == 404
+    assert other.patch(f"/api/maps/{m['id']}", json={"title": "x"}).status_code == 404
+    assert other.delete(f"/api/maps/{m['id']}").status_code == 404
 
 
 def test_requires_auth(client):

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { MapFull } from '../api/types'
 import { hasPendingChanges, SaveState, useDoc } from '../store/doc'
@@ -20,6 +20,19 @@ import Presentation from '../editor/Presentation'
 import { useAuth } from '../store/auth'
 import TopBar from './TopBar'
 import FileMenu from '../editor/FileMenu'
+import { collab, startCollab, stopCollab, useCollab } from '../collab/session'
+import ShareDialog, { Presence } from '../collab/ShareDialog'
+
+function GuestBar({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="topbar">
+      <span className="brand">MindMap</span>
+      {children}
+      <div className="spacer" />
+      <Link to="/login">Войти</Link>
+    </div>
+  )
+}
 
 const SAVE_LABEL: Record<SaveState, string> = {
   saved: 'Сохранено', dirty: 'Есть изменения…', saving: 'Сохранение…',
@@ -54,30 +67,64 @@ function useModeKeys(enabled: boolean) {
   }, [enabled])
 }
 
-export default function EditorPage() {
-  const { id } = useParams()
-  const { doc, title, saveState, saveError, open, close, setTitle, flush } = useDoc()
+interface Shared { map: MapFull; role: 'owner' | 'edit' | 'view' }
+
+/** /map/:id — карта владельца; /s/:token — карта по ссылке (вход не обязателен) */
+export default function EditorPage({ shared = false }: { shared?: boolean }) {
+  const params = useParams()
+  const share = shared ? params.token! : null
+  const [mapId, setMapId] = useState<string | null>(shared ? null : params.id!)
+  const id = mapId ?? undefined
+  const { doc, title, saveState, saveError, open, close, setTitle, flush, role } = useDoc()
+  const collabState = useCollab()
+  const [shareOpen, setShareOpen] = useState(false)
+  const user = useAuth(s => s.user)
   const sheetId = useEditor(s => s.sheetId)
   const panel = useEditor(s => s.panel)
   const setPanel = useEditor(s => s.setPanel)
   const { viewMode, zen, presenting, drillId, filter } = useEditor()
   const email = useAuth(s => s.user?.email ?? '')
   const [error, setError] = useState('')
-  useEditorKeys(!!doc && viewMode === 'map' && !presenting)
+  const readOnly = role === 'view'
+  useEditorKeys(!!doc && viewMode === 'map' && !presenting && !readOnly)
   useModeKeys(!!doc)
   useEffect(() => { useEditor.setState({ userName: email }) }, [email])
 
   useEffect(() => {
-    api<MapFull>(`/api/maps/${id}`).then(m => { open(m); useEditor.getState().reset() }).catch(e => setError(e.message))
+    const load = share
+      ? api<Shared>(`/api/shared/${share}`).then(r => ({ m: r.map, role: r.role }))
+      : api<MapFull>(`/api/maps/${params.id}`).then(m => ({ m, role: 'owner' as const }))
+    load.then(({ m, role }) => {
+      open(m, role)
+      setMapId(m.id)
+      useEditor.getState().reset()
+      // совместная работа: документ синхронизирует комната на сервере
+      startCollab(m.id, share, useAuth.getState().user?.email ?? '', d => {
+        const first = !useCollab.getState().synced
+        useDoc.getState().setRemoteDoc(d)
+        if (first) useEditor.getState().reset()
+      })
+    }).catch(e => setError(e.message))
     const onUnload = (e: BeforeUnloadEvent) => {
       if (hasPendingChanges()) { flush(); e.preventDefault() }
     }
     window.addEventListener('beforeunload', onUnload)
-    return () => { window.removeEventListener('beforeunload', onUnload); flush().then(close); useEditor.setState({ zen: false, presenting: false, viewMode: 'map' }) }
-  }, [id])
+    return () => {
+      window.removeEventListener('beforeunload', onUnload)
+      stopCollab()
+      flush().then(close)
+      useEditor.setState({ zen: false, presenting: false, viewMode: 'map' })
+    }
+  }, [params.id, share])
 
-  if (error) return <><TopBar /><p className="page error">{error}</p></>
-  if (!doc) return <><TopBar /><p className="page muted">Загрузка…</p></>
+  // присутствие: лист и выделение видны остальным участникам
+  const selection = useEditor(s => s.selection)
+  useEffect(() => { collab()?.setPresence({ sheetId: sheetId ?? undefined, selection }) }, [sheetId, selection, collabState.synced])
+
+  const Bar = user ? TopBar : GuestBar
+  if (error) return <><Bar /><p className="page error">{error}</p></>
+  if (!doc || !collabState.synced && collabState.status !== 'offline') return <><Bar /><p className="page muted">
+    {collabState.status === 'connecting' ? 'Подключение к карте…' : 'Загрузка…'}</p></>
   const d = doc as unknown as MapDocument
   const sheet = d.sheets.find(s => s.id === sheetId) ?? d.sheets[0]
   const ed = useEditor.getState()
@@ -95,12 +142,19 @@ export default function EditorPage() {
 
   return (
     <div className={'editor' + (zen ? ' zen' : '')}>
-      {!zen && <TopBar>
-        <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Название карты" />
-        <span className="save-state" title={saveError}>{SAVE_LABEL[saveState]}</span>
-        <FileMenu />
-        <button onClick={() => setPanel(panel === 'versions' ? null : 'versions')}>История</button>
-      </TopBar>}
+      {!zen && <Bar>
+        <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Название карты" readOnly={role !== 'owner'} />
+        <span className="save-state" title={saveError} data-testid="save-state">
+          {collabState.status === 'online' ? (role === 'owner' ? SAVE_LABEL[saveState] : 'Синхронизировано')
+            : collabState.status === 'offline' ? 'Нет связи — изменения отправятся при подключении' : 'Подключение…'}
+        </span>
+        {role === 'view' && <span className="badge">Только просмотр</span>}
+        {role === 'edit' && <span className="badge">Редактирование по ссылке</span>}
+        <Presence />
+        {user && <FileMenu />}
+        {role === 'owner' && <button onClick={() => setShareOpen(true)}>Поделиться</button>}
+        {role === 'owner' && <button onClick={() => setPanel(panel === 'versions' ? null : 'versions')}>История</button>}
+      </Bar>}
       {!zen && (
         <div className="modebar">
           <div className="seg">
@@ -124,14 +178,14 @@ export default function EditorPage() {
           )}
         </div>
       )}
-      {!zen && viewMode === 'map' && <Toolbar />}
+      {!zen && viewMode === 'map' && !readOnly && <Toolbar />}
       <div className="editor-body">
         <div className="canvas">
-          {viewMode === 'map' ? <MapCanvas sheet={sheet} /> : <Outliner sheet={sheet} />}
+          {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
           <SearchBar />
           {zen && <button className="zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
         </div>
-        {!zen && panel === 'format' && viewMode === 'map' && <FormatPanel sheet={sheet} />}
+        {!zen && panel === 'format' && viewMode === 'map' && !readOnly && <FormatPanel sheet={sheet} />}
         {!zen && panel === 'markers' && <MarkersPanel sheet={sheet} />}
         {!zen && panel === 'notes' && <NotesPanel sheet={sheet} />}
         {!zen && panel === 'comments' && <CommentsPanel sheet={sheet} />}
@@ -141,6 +195,7 @@ export default function EditorPage() {
       </div>
       {!zen && <SheetTabs />}
       <Dialogs />
+      {shareOpen && id && <ShareDialog mapId={id} onClose={() => setShareOpen(false)} />}
     </div>
   )
 }

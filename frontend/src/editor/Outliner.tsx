@@ -20,7 +20,7 @@ function rows(sheet: Sheet): Row[] {
   return out
 }
 
-export default function Outliner({ sheet: realSheet }: { sheet: Sheet }) {
+export default function Outliner({ sheet: realSheet, readOnly = false }: { sheet: Sheet; readOnly?: boolean }) {
   const { selection, drillId } = useEditor()
   const ed = useEditor.getState
   const sheet = useMemo(() => displaySheet(realSheet, drillId), [realSheet, drillId])
@@ -47,6 +47,12 @@ export default function Outliner({ sheet: realSheet }: { sheet: Sheet }) {
 
   function onKey(e: React.KeyboardEvent<HTMLTextAreaElement>, row: Row) {
     e.stopPropagation()
+    if (readOnly) {
+      const i = indexOf(row.topic.id)
+      if (e.key === 'ArrowUp' && list[i - 1]) { e.preventDefault(); focus(list[i - 1].topic.id) }
+      if (e.key === 'ArrowDown' && list[i + 1]) { e.preventDefault(); focus(list[i + 1].topic.id) }
+      return
+    }
     const id = row.topic.id
     const el = e.currentTarget
     const mod = e.metaKey || e.ctrlKey
@@ -122,7 +128,7 @@ export default function Outliner({ sheet: realSheet }: { sheet: Sheet }) {
               aria-label={t.collapsed ? 'Развернуть' : 'Свернуть'}>{n && row.kind !== 'root' ? (t.collapsed ? '▸' : '▾') : '•'}</button>
             {t.task && <input type="checkbox" checked={t.task.done} onChange={() => ed().toggleTask(t.id)} />}
             {t.markers?.map(m => <svg key={m} width={16} height={16} className="ol-marker"><MarkerIcon id={m} size={16} /></svg>)}
-            <textarea rows={1} ref={el => { if (el) inputs.current.set(t.id, el); else inputs.current.delete(t.id) }}
+            <textarea rows={1} readOnly={readOnly} ref={el => { if (el) inputs.current.set(t.id, el); else inputs.current.delete(t.id) }}
               defaultValue={t.title} key={t.id + '|' + t.title} spellCheck={false}
               placeholder={row.kind === 'root' ? 'Центральная тема' : ''}
               onFocus={() => { if (current !== t.id) ed().select([t.id]) }}

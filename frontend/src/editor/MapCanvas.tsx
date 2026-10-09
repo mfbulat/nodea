@@ -10,6 +10,7 @@ import { currentLayout, setCurrentLayout, topLevel, useEditor } from './store'
 import { boxCenter, relGeometry } from './relations'
 import { dashOf, TopicNode } from './TopicView'
 import { followLink, uploadToTopic } from './actions'
+import { collab, useCollab } from '../collab/session'
 
 export interface Rendered {
   layout: LayoutResult
@@ -157,8 +158,11 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     updateDrag({ kind: 'topic', ids, start: p, cur: p, active: false, grab: { x: p.x - box.x, y: p.y - box.y }, target: null })
   }
 
+  const lastCursor = useRef(0)
   function onPointerMove(e: React.PointerEvent) {
     if (ed().relating) setPointer(toWorld(e.clientX, e.clientY))
+    const now = performance.now()
+    if (collab() && now - lastCursor.current > 50) { lastCursor.current = now; collab()!.setPresence({ cursor: toWorld(e.clientX, e.clientY) }) }
     const d = dragRef.current
     if (!d) return
     if (d.kind === 'pan') {
@@ -353,6 +357,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
   const ghostIds = new Set<string>()
   if (dragIds.length) for (const [id] of idx) if (dragIds.some(m => m === id || isAncestor(idx, m, id))) ghostIds.add(id)
 
+  const peers = useCollab(s => s.peers).filter(p => p.sheetId === realSheet.id)
   const bg = sheetBackground(sheet)
   const rootStyle = r.styles.get(sheet.rootTopic.id)!
   const relColor = rootStyle.lineColor
@@ -483,6 +488,11 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
                 axis={(() => { const p = idx.get(drag.target!.id)?.parent; return p ? r.layout.childAxis.get(p.id) ?? 'y' : 'y' })()} />}
             </>
           )}
+          {peers.flatMap(p => (p.selection ?? []).map(id => {
+            const b = r.layout.boxes.get(id)
+            return b ? <rect key={'ps' + p.clientId + id} className="peer-sel" x={b.x - 5} y={b.y - 5} width={b.w + 10} height={b.h + 10} rx={9}
+              fill="none" stroke={p.color} strokeWidth={2} strokeDasharray="6 3" pointerEvents="none" /> : null
+          }))}
           {drag?.kind === 'marquee' && (
             <rect x={Math.min(drag.a.x, drag.b.x)} y={Math.min(drag.a.y, drag.b.y)}
               width={Math.abs(drag.a.x - drag.b.x)} height={Math.abs(drag.a.y - drag.b.y)}
@@ -490,6 +500,13 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           )}
         </g>
       </svg>
+      {peers.filter(p => p.cursor).map(p => (
+        <div key={'pc' + p.clientId} className="peer-cursor" data-testid="peer-cursor"
+          style={{ left: p.cursor!.x * view.zoom + view.x, top: p.cursor!.y * view.zoom + view.y, color: p.color }}>
+          <svg width={16} height={16} viewBox="0 0 16 16"><path d="M1,1L14,7L8,8.5L6,14Z" fill={p.color} stroke="#fff" strokeWidth={1} /></svg>
+          <span style={{ background: p.color }}>{p.name}</span>
+        </div>
+      ))}
       {relating && <div className="relating-hint">Щёлкните тему, с которой нужно связать. Esc — отмена.</div>}
       {editingId && r.layout.boxes.get(editingId) && (
         <TitleEditor key={editingId} id={editingId} box={r.layout.boxes.get(editingId)!}

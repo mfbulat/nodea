@@ -12,6 +12,7 @@ from ..document import empty_document
 from ..models import Map, MapVersion, User
 from ..schemas import (MapCreate, MapOut, MapSummary, MapUpdate, VersionOut,
                        VersionSummary)
+from ..collab import rooms
 from ..security import current_user
 
 router = APIRouter(prefix="/api/maps", tags=["maps"])
@@ -26,6 +27,17 @@ def _own_map(map_id: uuid.UUID, user: User, db: Session) -> Map:
 
 def _snapshot(m: Map, db: Session) -> None:
     db.add(MapVersion(map_id=m.id, title=m.title, document=copy.deepcopy(m.document)))
+
+
+def save_document(m: Map, document: dict, db: Session) -> None:
+    """Новая ревизия документа + автоснимок истории не чаще version_interval_seconds."""
+    m.document = document
+    m.revision += 1
+    last = db.scalar(select(MapVersion.created_at).where(MapVersion.map_id == m.id)
+                     .order_by(MapVersion.created_at.desc()).limit(1))
+    now = datetime.now(timezone.utc)
+    if last is None or (now - last).total_seconds() >= settings.version_interval_seconds:
+        _snapshot(m, db)
 
 
 @router.get("", response_model=list[MapSummary])
@@ -57,14 +69,7 @@ def update_map(map_id: uuid.UUID, data: MapUpdate, user: User = Depends(current_
     if data.title is not None:
         m.title = data.title
     if data.document is not None:
-        m.document = data.document
-        m.revision += 1
-        # Автоснимок истории: не чаще version_interval_seconds
-        last = db.scalar(select(MapVersion.created_at).where(MapVersion.map_id == m.id)
-                         .order_by(MapVersion.created_at.desc()).limit(1))
-        now = datetime.now(timezone.utc)
-        if last is None or (now - last).total_seconds() >= settings.version_interval_seconds:
-            _snapshot(m, db)
+        save_document(m, data.document, db)
     db.commit()
     db.refresh(m)
     return m
@@ -115,7 +120,7 @@ def get_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(c
 
 
 @router.post("/{map_id}/versions/{version_id}/restore", response_model=MapOut)
-def restore_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(current_user),
+async def restore_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(current_user),
                     db: Session = Depends(get_db)):
     m = _own_map(map_id, user, db)
     v = db.get(MapVersion, version_id)
@@ -127,4 +132,5 @@ def restore_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depen
     m.revision += 1
     db.commit()
     db.refresh(m)
+    await rooms.reset(m.id, m.document)
     return m

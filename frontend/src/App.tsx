@@ -13,6 +13,7 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/s/:token" element={<EditorPage shared />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="*" element={<AuthPage mode="login" />} />
       </Routes>
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/" element={<MapsPage />} />
       <Route path="/account" element={<AccountPage />} />
       <Route path="/map/:id" element={<EditorPage />} />
+      <Route path="/s/:token" element={<EditorPage shared />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

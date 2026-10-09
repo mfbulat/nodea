@@ -4,6 +4,7 @@ import { useDoc } from '../store/doc'
 import type { Boundary, MapDocument, Relationship, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { cloneWithNewIds, indexSheet, isAncestor, uid } from './model'
 import { markerGroup } from './markers'
+import { collab } from '../collab/session'
 import type { LayoutResult } from './layout'
 
 const HISTORY_LIMIT = 200
@@ -173,7 +174,9 @@ export const useEditor = create<EditorState>((set, get) => {
   const commit = (next: MapDocument) => {
     const prev = doc()
     if (next === prev) return
-    set(st => ({ past: [...st.past.slice(-HISTORY_LIMIT + 1), prev], future: [] }))
+    if (useDoc.getState().role === 'view') return
+    // в совместном режиме историю ведёт Y.UndoManager (только свои правки)
+    if (!collab()) set(st => ({ past: [...st.past.slice(-HISTORY_LIMIT + 1), prev], future: [] }))
     useDoc.getState().setDoc(next)
   }
   const mutate = (fn: (sheet: Sheet, d: MapDocument) => void) => commit(produce(doc(), d => { const sh = current(d); fn(sh, d); prune(sh) }))
@@ -384,6 +387,8 @@ export const useEditor = create<EditorState>((set, get) => {
     setSheet: patch => mutate(sh => { Object.assign(sh, patch) }),
 
     undo: () => {
+      const c = collab()
+      if (c) { c.undo.undo(); set({ editingId: null }); keepValidSelection(); return }
       const { past } = get()
       if (!past.length) return
       const prev = past[past.length - 1]
@@ -392,6 +397,8 @@ export const useEditor = create<EditorState>((set, get) => {
       keepValidSelection()
     },
     redo: () => {
+      const c = collab()
+      if (c) { c.undo.redo(); set({ editingId: null }); keepValidSelection(); return }
       const { future } = get()
       if (!future.length) return
       const next = future[0]

@@ -18,9 +18,12 @@ export async function newMap(page: Page, document?: object, title = 'Центр�
 export const topic = (page: Page, title: string) => page.locator('.topic', { hasText: title }).first()
 
 export async function docOf(page: Page, id: string) {
-  // ждём автосохранение и читаем карту с сервера
-  await expect(page.locator('.save-state')).toHaveText('Сохранено', { timeout: 10_000 })
   return (await (await page.request.get(`/api/maps/${id}`)).json()).document
+}
+
+/** Документ сохраняет сервер комнаты (раз в секунду) — ждём, пока в базе появится ожидаемое дерево */
+export async function expectTree(page: Page, id: string, expected: string) {
+  await expect.poll(async () => titles((await docOf(page, id)).sheets[0].rootTopic), { timeout: 10_000 }).toBe(expected)
 }
 
 export const titles = (t: { title: string; children?: unknown[] }): string =>

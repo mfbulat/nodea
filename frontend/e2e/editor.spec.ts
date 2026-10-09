@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { expect, test } from '@playwright/test'
-import { docOf, newMap, signUp, titles, topic } from './helpers'
+import { docOf, expectTree, newMap, signUp, topic } from './helpers'
 
 test.beforeEach(async ({ page }) => { await signUp(page) })
 
@@ -19,8 +19,7 @@ test('клавиши: Tab, Enter, Shift+Enter, правка, удаление, �
   await page.keyboard.press('Tab')
   await page.keyboard.type('Вложенная')
   await page.keyboard.press('Enter')
-  let d = await docOf(page, id)
-  expect(titles(d.sheets[0].rootTopic)).toBe('Центральная тема[Альфа,Бета[Вложенная],Гамма]')
+  await expectTree(page, id, 'Центральная тема[Альфа,Бета[Вложенная],Гамма]')
   await topic(page, 'Гамма').click()
   await page.keyboard.press('Delete')
   await page.keyboard.press('ControlOrMeta+z')
@@ -29,8 +28,7 @@ test('клавиши: Tab, Enter, Shift+Enter, правка, удаление, �
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type('Альфа 2')
   await page.keyboard.press('Enter')
-  d = await docOf(page, id)
-  expect(titles(d.sheets[0].rootTopic)).toBe('Центральная тема[Альфа 2,Бета[Вложенная],Гамма]')
+  await expectTree(page, id, 'Центральная тема[Альфа 2,Бета[Вложенная],Гамма]')
 })
 
 test('перетаскивание меняет родителя', async ({ page }) => {
@@ -42,8 +40,7 @@ test('перетаскивание меняет родителя', async ({ page
   await page.mouse.down()
   await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 8 })
   await page.mouse.up()
-  const d = await docOf(page, id)
-  expect(titles(d.sheets[0].rootTopic)).toBe('Корень[Первая,Вторая[Лист]]')
+  await expectTree(page, id, 'Корень[Первая,Вторая[Лист]]')
 })
 
 test('раскладки и стиль через панель формата', async ({ page }) => {
@@ -53,8 +50,8 @@ test('раскладки и стиль через панель формата', 
   await page.getByRole('button', { name: 'Карта', exact: true }).last().click()
   await page.locator('.theme-card', { hasText: 'Тёмная' }).click()
   await page.getByLabel('Радужные ветки').check()
-  const d = await docOf(page, id)
-  expect(d.sheets[0]).toMatchObject({ structure: 'org-down', theme: 'dark', rainbow: true })
+  await expect.poll(async () => (await docOf(page, id)).sheets[0], { timeout: 10_000 })
+    .toMatchObject({ structure: 'org-down', theme: 'dark', rainbow: true })
 })
 
 test('структура (outliner) и поиск', async ({ page }) => {
@@ -69,8 +66,7 @@ test('структура (outliner) и поиск', async ({ page }) => {
   await page.keyboard.type('Подпункт')
   await page.keyboard.press('Tab')
   await page.locator('body').click({ position: { x: 5, y: 890 } })
-  const d = await docOf(page, id)
-  expect(titles(d.sheets[0].rootTopic)).toBe('Центральная тема[Пункт[Подпункт]]')
+  await expectTree(page, id, 'Центральная тема[Пункт[Подпункт]]')
   await page.getByRole('button', { name: 'Карта', exact: true }).first().click()
   await page.keyboard.press('ControlOrMeta+f')
   await page.getByPlaceholder('Поиск по темам, заметкам и меткам').fill('пункт')

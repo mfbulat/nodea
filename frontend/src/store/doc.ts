@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
 import type { MapDocument, MapFull } from '../api/types'
+import { collab } from '../collab/session'
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict'
 
@@ -11,7 +12,11 @@ interface DocState {
   revision: number
   saveState: SaveState
   saveError: string
-  open: (m: MapFull) => void
+  /** owner | edit | view; при совместной работе документ синхронизируется через Yjs */
+  role: 'owner' | 'edit' | 'view'
+  open: (m: MapFull, role?: 'owner' | 'edit' | 'view') => void
+  /** документ пришёл от других участников — без сохранения и без истории */
+  setRemoteDoc: (doc: MapDocument) => void
   close: () => void
   setDoc: (doc: MapDocument) => void
   setTitle: (title: string) => void
@@ -29,14 +34,23 @@ export const useDoc = create<DocState>((set, get) => {
     timer = setTimeout(() => { get().flush() }, SAVE_DELAY)
   }
   return {
-    mapId: null, title: '', doc: null, revision: 0, saveState: 'saved', saveError: '',
-    open: m => {
+    mapId: null, title: '', doc: null, revision: 0, saveState: 'saved', saveError: '', role: 'owner',
+    open: (m, role = 'owner') => {
       pendingDoc = pendingTitle = false
-      set({ mapId: m.id, title: m.title, doc: m.document, revision: m.revision, saveState: 'saved', saveError: '' })
+      set({ mapId: m.id, title: m.title, doc: m.document, revision: m.revision, saveState: 'saved', saveError: '', role })
     },
+    setRemoteDoc: doc => set({ doc }),
     close: () => set({ mapId: null, doc: null }),
-    setDoc: doc => { pendingDoc = true; set({ doc, saveState: 'dirty' }); schedule() },
-    setTitle: title => { pendingTitle = true; set({ title, saveState: 'dirty' }); schedule() },
+    setDoc: doc => {
+      const c = collab()
+      // при совместной работе документ сохраняет сервер комнаты
+      if (c) { set({ doc }); c.push(doc); return }
+      pendingDoc = true; set({ doc, saveState: 'dirty' }); schedule()
+    },
+    setTitle: title => {
+      if (get().role !== 'owner') return
+      pendingTitle = true; set({ title, saveState: 'dirty' }); schedule()
+    },
     flush: async () => {
       if (timer) { clearTimeout(timer); timer = null }
       const { mapId, doc, title, revision, saveState } = get()

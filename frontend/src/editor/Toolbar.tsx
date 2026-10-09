@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useEditor } from './store'
 import { canvasApi } from './MapCanvas'
 import InsertMenu from './InsertMenu'
+import { collab, useCollab } from '../collab/session'
 
 const SHORTCUTS: [string, string][] = [
   ['Tab', 'Подтема'], ['Enter', 'Соседняя тема ниже'], ['Shift+Enter', 'Соседняя тема выше'],
@@ -18,13 +19,16 @@ const SHORTCUTS: [string, string][] = [
 
 export default function Toolbar() {
   const { past, future, view, selection, panel } = useEditor()
+  const cu = useCollab()
+  const canUndo = collab() ? cu.canUndo : past.length > 0
+  const canRedo = collab() ? cu.canRedo : future.length > 0
   const ed = useEditor.getState()
   const [help, setHelp] = useState(false)
   const none = !selection.length
   return (
     <div className="toolbar">
-      <button onClick={ed.undo} disabled={!past.length} title="Отменить (Ctrl+Z)">↶</button>
-      <button onClick={ed.redo} disabled={!future.length} title="Повторить (Ctrl+Shift+Z)">↷</button>
+      <button onClick={ed.undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">↶</button>
+      <button onClick={ed.redo} disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)">↷</button>
       <span className="sep" />
       <button onClick={() => ed.addSibling(false)} disabled={none} title="Тема (Enter)">Тема</button>
       <button onClick={ed.addChild} disabled={none} title="Подтема (Tab)">Подтема</button>
