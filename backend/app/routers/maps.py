@@ -1,0 +1,130 @@
+import copy
+import uuid
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..config import settings
+from ..db import get_db
+from ..document import empty_document
+from ..models import Map, MapVersion, User
+from ..schemas import (MapCreate, MapOut, MapSummary, MapUpdate, VersionOut,
+                       VersionSummary)
+from ..security import current_user
+
+router = APIRouter(prefix="/api/maps", tags=["maps"])
+
+
+def _own_map(map_id: uuid.UUID, user: User, db: Session) -> Map:
+    m = db.get(Map, map_id)
+    if not m or m.owner_id != user.id:
+        raise HTTPException(404, "Карта не найдена")
+    return m
+
+
+def _snapshot(m: Map, db: Session) -> None:
+    db.add(MapVersion(map_id=m.id, title=m.title, document=copy.deepcopy(m.document)))
+
+
+@router.get("", response_model=list[MapSummary])
+def list_maps(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return db.scalars(select(Map).where(Map.owner_id == user.id).order_by(Map.updated_at.desc())).all()
+
+
+@router.post("", response_model=MapOut)
+def create_map(data: MapCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    m = Map(owner_id=user.id, title=data.title, document=data.document or empty_document(data.title))
+    db.add(m)
+    db.flush()
+    _snapshot(m, db)
+    db.commit()
+    return m
+
+
+@router.get("/{map_id}", response_model=MapOut)
+def get_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return _own_map(map_id, user, db)
+
+
+@router.patch("/{map_id}", response_model=MapOut)
+def update_map(map_id: uuid.UUID, data: MapUpdate, user: User = Depends(current_user),
+               db: Session = Depends(get_db)):
+    m = _own_map(map_id, user, db)
+    if data.base_revision is not None and data.base_revision != m.revision:
+        raise HTTPException(409, "Карта изменена в другом окне")
+    if data.title is not None:
+        m.title = data.title
+    if data.document is not None:
+        m.document = data.document
+        m.revision += 1
+        # Автоснимок истории: не чаще version_interval_seconds
+        last = db.scalar(select(MapVersion.created_at).where(MapVersion.map_id == m.id)
+                         .order_by(MapVersion.created_at.desc()).limit(1))
+        now = datetime.now(timezone.utc)
+        if last is None or (now - last).total_seconds() >= settings.version_interval_seconds:
+            _snapshot(m, db)
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+@router.delete("/{map_id}")
+def delete_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    db.delete(_own_map(map_id, user, db))
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{map_id}/duplicate", response_model=MapOut)
+def duplicate_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    src = _own_map(map_id, user, db)
+    m = Map(owner_id=user.id, title=f"{src.title} (копия)", document=copy.deepcopy(src.document))
+    db.add(m)
+    db.flush()
+    _snapshot(m, db)
+    db.commit()
+    return m
+
+
+@router.get("/{map_id}/versions", response_model=list[VersionSummary])
+def list_versions(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _own_map(map_id, user, db)
+    return db.scalars(select(MapVersion).where(MapVersion.map_id == map_id)
+                      .order_by(MapVersion.created_at.desc())).all()
+
+
+@router.post("/{map_id}/versions", response_model=VersionSummary)
+def save_version(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    m = _own_map(map_id, user, db)
+    v = MapVersion(map_id=m.id, title=m.title, document=copy.deepcopy(m.document))
+    db.add(v)
+    db.commit()
+    return v
+
+
+@router.get("/{map_id}/versions/{version_id}", response_model=VersionOut)
+def get_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(current_user),
+                db: Session = Depends(get_db)):
+    _own_map(map_id, user, db)
+    v = db.get(MapVersion, version_id)
+    if not v or v.map_id != map_id:
+        raise HTTPException(404, "Версия не найдена")
+    return v
+
+
+@router.post("/{map_id}/versions/{version_id}/restore", response_model=MapOut)
+def restore_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(current_user),
+                    db: Session = Depends(get_db)):
+    m = _own_map(map_id, user, db)
+    v = db.get(MapVersion, version_id)
+    if not v or v.map_id != map_id:
+        raise HTTPException(404, "Версия не найдена")
+    _snapshot(m, db)  # сохраняем текущее состояние перед откатом
+    m.document = copy.deepcopy(v.document)
+    m.title = v.title
+    m.revision += 1
+    db.commit()
+    db.refresh(m)
+    return m
