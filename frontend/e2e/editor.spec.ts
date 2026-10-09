@@ -147,4 +147,7 @@ test('задача: панель слева, карточка в теме, ди�
   await expect(page.locator('.topic-task')).toHaveCount(0)
   await panel.getByRole('button', { name: 'Удалить' }).click()
   await expect(g.locator('.gc-bar')).toHaveCount(0)
+  await expect(panel).toContainText('В этой теме нет задачи')
+  await panel.getByRole('button', { name: 'Вставить' }).click()
+  await expect(g.locator('.gt-row:not(.head)')).toHaveCount(1)
 })

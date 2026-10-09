@@ -6,6 +6,7 @@ import { pickFile, uploadToTopic } from './actions'
 import { indexSheet } from './model'
 import { Dropdown, MenuItem, SubMenu, Tip } from './Chrome'
 import { recordAudio } from './audio'
+import { insertTask } from './Gantt'
 
 export default function InsertMenu() {
   const { selection } = useEditor()
@@ -34,7 +35,7 @@ export default function InsertMenu() {
         {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'root')(close)}
         {item('comment', 'Комментарий', () => { ed.setPanel('comments'); ed.setThread({ id }) })(close)}
         {item('task', 'To-Do', () => ed.setTopic(selection, { task: ref?.topic.task ? undefined : { done: false } }), none, '⌥ ⌘ T')(close)}
-        {item('gantt', 'Задача', () => { ed.setTaskDialog(id) })(close)}
+        {item('gantt', 'Задача', () => insertTask(id))(close)}
         <SubMenu icon="link" label="Ссылка">
           <MenuItem icon="link" label="Веб-ссылка" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
           <MenuItem icon="topic" label="Ссылка на тему" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />

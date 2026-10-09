@@ -58,17 +58,34 @@ function Links({ label, ids, options, onAdd, onRemove }: { label: string; ids: s
   )
 }
 
-/** Панель «Задача» (слева), открывается из «Вставить → Задача» и двойным щелчком по задаче в Ганте. */
+/** Новая задача у темы (как «Вставить → Задача» в веб-версии): создаётся сразу и открывает панель. */
+export function insertTask(id: string) {
+  const ed = useEditor.getState(), t = ed.sheet() && indexSheet(ed.sheet()!).get(id)?.topic
+  if (t && !t.taskInfo) ed.setTopic([id], { taskInfo: { progress: 0, creator: ed.userName, durationMode: 'fixed' } })
+  ed.setTaskDialog(id)
+}
+
+/** Панель «Задача» (слева): показывает задачу выделенной темы; без задачи — «Вставить». */
 export function TaskPanel({ sheet }: { sheet: Sheet }) {
-  const { taskDialog, userName } = useEditor()
+  const { taskDialog: opened, userName, selection } = useEditor()
   const ed = useEditor.getState()
   const idx = indexSheet(sheet)
-  const ref = taskDialog ? idx.get(taskDialog) : undefined
-  // новая задача создаётся сразу, как в веб-версии
-  useEffect(() => {
-    if (taskDialog && ref && !ref.topic.taskInfo) ed.setTopic([taskDialog], { taskInfo: { progress: 0, creator: userName, durationMode: 'fixed' } })
-  }, [taskDialog, !!ref])
-  if (!taskDialog || !ref) return null
+  if (!opened) return null
+  const taskDialog = selection.length ? selection[selection.length - 1] : opened
+  const ref = idx.get(taskDialog)
+  if (!ref?.topic.taskInfo) {
+    return (
+      <div className="task-panel" data-testid="task-panel">
+        <div className="tk-head"><b>Задача</b><div className="spacer" /><button className="tk-x" aria-label="Закрыть" onClick={() => ed.setTaskDialog(null)}><Icon name="close" size={12} /></button></div>
+        <div className="tk-empty">
+          <svg width={40} height={36} viewBox="0 0 40 36" fill="none" stroke="#878c92" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+            <rect x={2} y={4} width={28} height={22} rx={3} /><path d="M2 10h28M8 16h10M8 21h6" /><circle cx={30} cy={26} r={7} fill="#fafbfc" /><path d="M27 26l2 2 4-4" /></svg>
+          <span>В этой теме нет задачи.</span>
+          {ref && <button className="tk-insert" onClick={() => insertTask(taskDialog)}>Вставить</button>}
+        </div>
+      </div>
+    )
+  }
   const info: Info = ref.topic.taskInfo ?? { progress: 0 }
   const set = (patch: Partial<Info>) => ed.setTopic([taskDialog], { taskInfo: { ...info, ...patch } })
   const close = () => ed.setTaskDialog(null)
@@ -128,7 +145,7 @@ export function TaskPanel({ sheet }: { sheet: Sheet }) {
             <Toggle label="Пропускать выходные" on={!!sheet.taskSkipWeekends} onChange={v => ed.setSheet({ taskSkipWeekends: v })} /></div>
         </div>
       </div>
-      <div className="tk-foot"><button className="tk-remove" onClick={() => { ed.setTopic([taskDialog], { taskInfo: undefined }); close() }}>Удалить</button></div>
+      <div className="tk-foot"><button className="tk-remove" onClick={() => ed.setTopic([taskDialog], { taskInfo: undefined })}>Удалить</button></div>
     </div>
   )
 }
