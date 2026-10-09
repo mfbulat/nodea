@@ -8,7 +8,7 @@ import { BottomRight, Crumbs, MainMenu, OutlineCenter, TopCenter, TopLeft, TopRi
 import { exportMap, ExportFormat } from '../io'
 import { importAsNewMap } from '../editor/FileMenu'
 import HelpDialog from '../editor/HelpDialog'
-import Gantt, { TaskDialog } from '../editor/Gantt'
+import Gantt, { TaskPanel } from '../editor/Gantt'
 import FormatPanel from '../editor/FormatPanel'
 import VersionsPanel from '../editor/VersionsPanel'
 import { useEditor } from '../editor/store'
@@ -89,7 +89,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const sheetId = useEditor(s => s.sheetId)
   const panel = useEditor(s => s.panel)
   const setPanel = useEditor(s => s.setPanel)
-  const { viewMode, zen, presenting, gantt } = useEditor()
+  const { viewMode, zen, presenting, gantt, taskDialog } = useEditor()
   const email = useAuth(s => s.user?.email ?? '')
   const [error, setError] = useState('')
   const readOnly = role === 'view'
@@ -156,7 +156,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const hasPanel = !embed && !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
 
   return (
-    <div className={'editor' + (zen || embed ? ' zen' : '') + (hasPanel ? ' has-panel' : '')}>
+    <div className={'editor' + (zen || embed ? ' zen' : '') + (hasPanel ? ' has-panel' : '') + (taskDialog && !zen && !embed ? ' has-task' : '')}>
       {!zen && !embed && <div className="topbar-x">
         <TopLeft guest={!user} mapId={id} mainMenu={<MainMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)}
           onShare={role === 'owner' ? () => setShareOpen(true) : undefined} onExport={doExport} onImport={doImport} onSaveTemplate={saveTemplate} />} />
@@ -186,7 +186,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       </>}
       <Dialogs />
       {gantt && !zen && <Gantt sheet={sheet} />}
-      <TaskDialog key={useEditor.getState().taskDialog ?? 'none'} sheet={sheet} />
+      {!zen && !embed && <TaskPanel sheet={sheet} />}
       {help && <HelpDialog onClose={() => setHelp(false)} />}
       {shareOpen && id && <ShareDialog mapId={id} onClose={() => setShareOpen(false)} onExport={doExport} />}
     </div>

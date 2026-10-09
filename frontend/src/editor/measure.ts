@@ -92,14 +92,32 @@ export interface Content {
   equation?: { x: number; y: number; w: number; h: number; html: string }
   labels: { text: string; x: number; y: number; w: number; h: number }[]
   note?: { x: number; y: number; w: number; h: number; lines: string[]; lineHeight: number }
+  /** сведения о задаче внутри темы: прогресс, даты, длительность */
+  task?: { x: number; y: number; w: number; fs: number; progress: number; pctText: string; pctW: number; dates: string; daysText: string; daysW: number; assignee: string }
 }
+
+const DAY = 86400000
+const dayOf = (iso: string) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / DAY)
+/** длительность задачи в днях (включительно), при skipWeekends — только рабочие дни */
+export function taskDays(start: string, end: string, skipWeekends = false) {
+  const a = dayOf(start), b = Math.max(a, dayOf(end))
+  if (!skipWeekends) return b - a + 1
+  let n = 0
+  for (let d = a; d <= b; d++) { const wd = new Date(d * DAY).getUTCDay(); if (wd !== 0 && wd !== 6) n++ }
+  return n
+}
+export const pluralDays = (n: number) => {
+  const m10 = n % 10, m100 = n % 100
+  return `${n} ${m10 === 1 && m100 !== 11 ? 'день' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'дня' : 'дней'}`
+}
+const longDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '')
 
 const GAP = 4
 /** отступ между значками/маркерами и текстом */
 const ICON_GAP = 8
 
 /** Раскладка содержимого темы: изображение / [задача, маркеры, текст, значки] / формула / метки */
-export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Content {
+export function layoutContent(t: Topic, s: FullStyle, showNotes = false, opts: { taskInTopic?: boolean; skipWeekends?: boolean } = {}): Content {
   const icon = Math.round(Math.max(14, s.fontSize * 1.1))
   const hasText = !!t.title || (!t.image && !t.equation)
   const title = applyCase(t.title, s.textTransform)
@@ -126,13 +144,30 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   c.font = `normal ${labelFont}px ${s.fontFamily}`
   const labels: { text: string; w: number; h: number }[] = (t.labels ?? []).map(l => ({ text: l, w: Math.ceil(c.measureText(l).width) + 12, h: labelFont + 6 }))
 
+  // задача внутри темы (как в веб-версии): полоса прогресса, разделитель, даты и длительность
+  const ti = opts.taskInTopic !== false ? t.taskInfo : undefined
+  let task: Omit<NonNullable<Content['task']>, 'x' | 'y' | 'w'> | null = null, taskW = 0, taskH = 0
+  if (ti) {
+    const tfs = Math.max(10, Math.round(s.fontSize * 7) / 10)
+    c.font = `normal ${tfs}px ${s.fontFamily}`
+    const pctText = `${ti.progress ?? 0}%`
+    const dates = ti.start ? `${longDate(ti.start)} – ${longDate(ti.end ?? ti.start)}` : ''
+    const daysText = ti.start ? pluralDays(taskDays(ti.start, ti.end ?? ti.start, opts.skipWeekends)) : ''
+    const pctW = Math.ceil(c.measureText(pctText).width), daysW = daysText ? Math.ceil(c.measureText(daysText).width) + 12 : 0
+    const assignee = ti.assignee?.trim() ?? ''
+    const datesW = dates ? Math.ceil(c.measureText(dates).width) + (daysW ? 10 + daysW : 0) + (assignee ? 8 + tfs * 1.7 : 0) : 0
+    task = { fs: tfs, progress: Math.max(0, Math.min(100, ti.progress ?? 0)), pctText, pctW, dates, daysText, daysW, assignee }
+    taskW = Math.max(datesW, 160)
+    taskH = 14 + 15 + (dates ? 21 + 15 : 0)
+  }
+
   // метки рисуются под фигурой темы, а не внутри неё
-  const innerW = Math.max(rowW, img?.width ?? 0, eq?.w ?? 0, 8)
+  const innerW = Math.max(rowW, img?.width ?? 0, eq?.w ?? 0, taskW, 8)
   const parts: number[] = []
   if (img) parts.push(img.height)
   if (rowH) parts.push(rowH)
   if (eq) parts.push(eq.h)
-  const innerH = parts.reduce((a, p) => a + p, 0) + GAP * Math.max(0, parts.length - 1)
+  const innerH = parts.reduce((a, p) => a + p, 0) + GAP * Math.max(0, parts.length - 1) + taskH
 
   // поля зависят от формы
   // поля как в веб-версии: основные 18×10, подтемы 6×6, центральная 29×15
@@ -147,11 +182,6 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
     case 'none': padX = 4; padY = 6; break
   }
   const shapeW = s.width ? Math.max(s.width, innerW + padX * 2) : innerW + padX * 2, shapeH = innerH + padY * 2
-  // сведения о задаче — строка под темой
-  const ti = t.taskInfo
-  const fmt = (d?: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''
-  const taskText = ti?.start ? [`${fmt(ti.start)} – ${fmt(ti.end ?? ti.start)}`, `${ti.progress ?? 0}%`, ti.assignee].filter(Boolean).join(' · ') : ''
-  if (taskText) { c.font = `normal 11px ${s.fontFamily}`; labels.push({ text: '\u{1F4C5} ' + taskText, w: Math.ceil(c.measureText('📅 ' + taskText).width) + 12, h: 17 }) }
   const labelsH = labels.length ? labels[0].h + 4 : 0
   // «показывать все заметки»: текст заметки под темой
   const noteText = showNotes ? (t.notes?.plain ?? '').trim() : ''
@@ -169,7 +199,8 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   if (rowH) {
     // ряд центрируется по ширине; выравнивание текста действует внутри текстового блока
     const extra = shapeW - padX * 2 - rowW
-    let x = padX + (s.textAlign === 'left' ? 0 : s.textAlign === 'right' ? extra : extra / 2)
+    // с задачей заголовок прижат влево, как в веб-версии
+    let x = padX + (task || s.textAlign === 'left' ? 0 : s.textAlign === 'right' ? extra : extra / 2)
     for (const it of left) { out.icons.push({ ...it, x, y: y + (rowH - icon) / 2, size: icon }); x += icon + ICON_GAP }
     if (tb) {
       const tw = s.textAlign === 'center' ? tb.textW : tb.textW
@@ -180,6 +211,7 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
     y += rowH + GAP
   }
   if (eq) { out.equation = { x: (shapeW - eq.w) / 2, y, w: eq.w, h: eq.h, html: eq.html }; y += eq.h + GAP }
+  if (task) out.task = { ...task, x: padX, y: y - GAP, w: shapeW - padX * 2 }
   if (labels.length) {
     let x = 0
     for (const l of labels) { out.labels.push({ ...l, x, y: shapeH + 4 }); x += l.w + GAP }

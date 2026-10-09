@@ -166,7 +166,7 @@ export function TopRight({ onShare, isOwner, outline }: { onShare?: () => void; 
       <Presence />
       {onShare && <button className="share-btn" onClick={onShare}>Поделиться</button>}
       <div className="bar-icons">
-        {!outline && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
+        {!outline && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта в отдельном окне." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
         <IconButton icon="present" label="Презентация" keys="⌥ ⌘ P" desc="Перейти в режим презентации." onClick={() => ed.setPresenting(true)} />
         {!outline && <IconButton icon="comment" label="Комментарии" desc="Открыть панель комментариев." onClick={() => toggle('comments')} active={panel === 'comments'} />}
         {isOwner !== undefined && <IconButton icon="marker" label="Маркеры" desc="Добавить маркер к выбранным темам." onClick={() => toggle('markers')} active={panel === 'markers'} />}

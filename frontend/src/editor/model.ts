@@ -65,7 +65,7 @@ export interface Topic {
   equation?: string
   task?: { done: boolean }
   /** сведения о задаче для диаграммы Ганта */
-  taskInfo?: { start?: string; end?: string; progress?: number; assignee?: string; priority?: number; dependsOn?: string[] }
+  taskInfo?: { start?: string; end?: string; progress?: number; assignee?: string; priority?: number; dependsOn?: string[]; creator?: string; durationMode?: 'fixed' | 'auto' }
   /** аудиозаметка */
   audio?: { url: string; duration: number }
   /** свободное положение ветки: смещение блока относительно места по раскладке */
@@ -128,6 +128,10 @@ export interface Sheet {
   pitchTheme?: 'light' | 'dark'
   pitchRatio?: 'auto' | '16:9' | '4:3' | '9:16' | '3:4'
   pitchAnimation?: boolean
+  /** глобальные настройки задач: показывать в теме, скрывать автора, пропускать выходные */
+  taskInTopic?: boolean
+  taskHideCreator?: boolean
+  taskSkipWeekends?: boolean
   legend?: boolean
   /** подписи маркеров в легенде */
   markerNames?: Record<string, string>

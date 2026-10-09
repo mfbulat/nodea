@@ -8,14 +8,13 @@ import { indexSheet, type Comment, type Sheet, type Topic } from './model'
 import { canvasApi } from './MapCanvas'
 import { Dropdown, MenuItem, Tip } from './Chrome'
 import Icon from '../ui/Icon'
+import { avatarColor } from '../ui/avatar'
 
 interface Box { id: string; x: number; y: number; w: number; h: number }
 type Pt = { x: number; y: number }
 
 export const useCommentFilter = create<{ resolved: boolean; mine: boolean }>(() => ({ resolved: false, mine: false }))
 
-const COLORS = ['#ff6b6b', '#ff9f69', '#f5c242', '#5cc98d', '#4fc3e8', '#6f8cf6', '#b07cf0', '#f07cb4']
-export const avatarColor = (name: string) => COLORS[[...(name || '?')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % COLORS.length]
 export function Avatar({ name, size = 20 }: { name: string; size?: number }) {
   return <span className="cm-ava" style={{ width: size, height: size, fontSize: size * 0.5, background: avatarColor(name) }}>{(name || '?').trim()[0]?.toUpperCase()}</span>
 }

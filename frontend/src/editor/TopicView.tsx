@@ -1,4 +1,5 @@
 import type { Box } from './layout'
+import { avatarColor } from '../ui/avatar'
 import type { Topic } from './model'
 import type { FullStyle } from './themes'
 import { WEIGHTS } from './themes'
@@ -128,6 +129,29 @@ export function TopicNode({ box, topic, style: s, content: c, selected, dim, hid
             </text>
           </g>
         )}
+        {c.task && (() => {
+          const k = c.task, trackW = Math.max(20, k.w - k.pctW - 9), ty = k.y + 14
+          return (
+            <g className="topic-task" fontFamily={s.fontFamily} fontSize={k.fs} fill={s.textColor} style={{ userSelect: 'none' }}>
+              <rect x={k.x} y={ty + 4.5} width={trackW} height={6} rx={3} fill="rgba(0,0,0,.05)" />
+              {k.progress > 0 && <rect x={k.x} y={ty + 4.5} width={trackW * k.progress / 100} height={6} rx={3} fill="rgba(0,0,0,.4)" />}
+              <text x={k.x + k.w} y={ty + 7.5 + k.fs * 0.36} textAnchor="end">{k.pctText}</text>
+              {k.dates && <>
+                <line x1={k.x} x2={k.x + k.w} y1={ty + 25.5} y2={ty + 25.5} stroke="rgba(0,0,0,.1)" />
+                <text x={k.x} y={ty + 36 + 7.5 + k.fs * 0.36}>{k.dates}</text>
+                {k.daysText && <g transform={`translate(${k.x + k.w - k.daysW - (k.assignee ? k.fs * 1.7 + 8 : 0)},${ty + 36})`}>
+                  <rect width={k.daysW} height={15} rx={4} fill="rgba(0,0,0,.06)" />
+                  <text x={k.daysW / 2} y={7.5 + k.fs * 0.36} textAnchor="middle">{k.daysText}</text>
+                </g>}
+                {k.assignee && <g transform={`translate(${k.x + k.w - k.fs * 1.7},${ty + 36 + 7.5})`}>
+                  <title>{k.assignee}</title>
+                  <circle cx={k.fs * 0.85} r={k.fs * 0.85} fill={avatarColor(k.assignee)} />
+                  <text x={k.fs * 0.85} y={k.fs * 0.3} textAnchor="middle" fill="#fff" fontSize={k.fs * 0.8} fontWeight={700}>{k.assignee.trim()[0]?.toUpperCase()}</text>
+                </g>}
+              </>}
+            </g>
+          )
+        })()}
         {c.labels.map((l, i) => (
           <g key={'l' + i}>
             <rect x={l.x} y={l.y} width={l.w} height={l.h} rx={l.h / 2} fill="#ffffff" stroke="#d6d6d6" strokeWidth={1} />

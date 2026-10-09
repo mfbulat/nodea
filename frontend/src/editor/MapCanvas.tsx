@@ -38,14 +38,14 @@ export function renderSheet(sheet: Sheet): Rendered {
     const maxW = new Map<string, number>()
     for (const [id, ref] of idx) {
       const lv = levelOf(ref)
-      const w = layoutContent(ref.topic, styles.get(id)!).shapeW
+      const w = layoutContent(ref.topic, styles.get(id)!, false, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends }).shapeW
       maxW.set(lv, Math.max(maxW.get(lv) ?? 0, w))
     }
     for (const [id, ref] of idx) { const st = styles.get(id)!; if (!st.width) st.width = maxW.get(levelOf(ref)) }
   }
   for (const [id, ref] of idx) {
     const st = styles.get(id)!
-    const c = layoutContent(ref.topic, st, !!sheet.showNotes)
+    const c = layoutContent(ref.topic, st, !!sheet.showNotes, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends })
     contents.set(id, c)
     sizes.set(id, { w: c.w, h: c.h, shapeH: c.shapeH, underline: st.shape === 'underline' })
   }
