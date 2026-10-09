@@ -36,7 +36,7 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
       {tab === 'markers' && MARKER_GROUPS.map(g => (
         <div key={g.id}>
           <button className="group-head" onClick={() => toggleGroup(g.id)}>
-            <span className={'caret' + (closed.has(g.id) ? ' closed' : '')}>▾</span>{g.name}
+            <span className={'caret' + (closed.has(g.id) ? ' closed' : '')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{g.name}
           </button>
           {!closed.has(g.id) && <div className="marker-grid">
             {g.markers.map(m => (

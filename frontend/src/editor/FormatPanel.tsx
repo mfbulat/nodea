@@ -30,7 +30,7 @@ function Section({ title, children, right }: { title: string; children: ReactNod
     <div className="fp-section">
       <div className="fp-head">
         <button className="group-head" onClick={() => setOpen(o => !o)}>
-          <span className={'caret' + (open ? '' : ' closed')}>▾</span>{title}
+          <span className={'caret' + (open ? '' : ' closed')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{title}
         </button>
         {right}
       </div>
@@ -410,13 +410,13 @@ function PitchTab({ sheet }: { sheet: Sheet }) {
   return (
     <>
       <div className="fp-sub">Вид в режиме презентации</div>
-      <div className="pitch-preview" style={{ background: dark ? '#000' : '#fff', color: dark ? '#fff' : '#111', aspectRatio: sheet.pitchRatio === '4:3' ? '4/3' : '16/9' }}>
+      <div className="pitch-preview" style={{ background: dark ? '#000' : '#fff', color: dark ? '#fff' : '#111', aspectRatio: (sheet.pitchRatio ?? 'auto') === 'auto' ? '16/9' : sheet.pitchRatio!.replace(':', '/') }}>
         {ref ? <><b>{ref.topic.title}</b>{(ref.topic.children ?? []).slice(0, 4).map(c => <span key={c.id}>{c.title}</span>)}</> : <span className="muted">Выберите тему</span>}
       </div>
       <button className="wide" onClick={() => ed.setSheet({ pitchTheme: dark ? 'light' : 'dark' })}>Сменить тему ({dark ? 'тёмная' : 'светлая'})</button>
       <Row label="Соотношение сторон">
         <select value={sheet.pitchRatio ?? 'auto'} onChange={e => ed.setSheet({ pitchRatio: e.target.value as Sheet['pitchRatio'] })} aria-label="Соотношение сторон">
-          <option value="auto">Авто</option><option value="16:9">16:9</option><option value="4:3">4:3</option>
+          <option value="auto">Авто</option><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="9:16">9:16</option><option value="3:4">3:4</option>
         </select>
       </Row>
       {ref && <>

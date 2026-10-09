@@ -140,12 +140,63 @@ button.mini { padding: 2px 8px; min-width: 28px; }
 .editor.zen .canvas { background: var(--color-canvas); }
 .zen-exit { position: absolute; top: 10px; right: 12px; z-index: 10; opacity: .4; }
 .zen-exit:hover { opacity: 1; }
-.presentation { position: fixed; inset: 0; background: #fff; z-index: 100; }
-.presentation .map-canvas { cursor: pointer !important; }
-.pres-controls { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
-  background: rgba(20, 24, 32, .75); color: #fff; padding: 6px 10px; border-radius: 20px; font-size: 13px; opacity: .25; transition: opacity .2s; }
-.pres-controls:hover { opacity: 1; }
-.pres-controls button { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); padding: 2px 10px; }
+.pitch { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  font-family: var(--font-ui); cursor: default; user-select: none; --pf: #fff; --pb: #000; --pu: rgba(255,255,255,.08); --pu-h: rgba(255,255,255,.16); --pt: rgba(255,255,255,.85); }
+.pitch.dark { background: #000; }
+.pitch.light { background: #fff; --pf: #111418; --pb: #fff; --pu: rgba(0,0,0,.05); --pu-h: rgba(0,0,0,.1); --pt: rgba(0,0,0,.75); }
+.pitch-stage { position: relative; background: var(--pb); color: var(--pf); overflow: hidden; }
+.pitch-slide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.pitch-slide.anim { animation: pitch-in .45s cubic-bezier(.2,.7,.2,1); }
+@keyframes pitch-in { from { opacity: 0; transform: scale(.97); } }
+.pitch-title { font-weight: 700; line-height: 1.15; text-align: center; max-width: 84%; overflow-wrap: break-word; letter-spacing: -.01em; }
+.pitch-crumbs { position: absolute; left: 3.7%; top: 3.5%; font-weight: 400; line-height: 1.2; white-space: nowrap; max-width: 80%; overflow: hidden; text-overflow: ellipsis; }
+.pitch-crumbs i { display: block; width: 40px; height: 3px; background: currentColor; margin-top: .45em; border-radius: 1px; }
+.pitch-head { font-weight: 700; line-height: 1.15; overflow-wrap: break-word; }
+.pitch-head.side { position: absolute; top: 50%; transform: translateY(-50%); text-align: center; }
+.ov-side.anim .pitch-head.side { animation: pitch-slide-left .5s cubic-bezier(.2,.7,.2,1); }
+@keyframes pitch-slide-left { from { left: 33%; opacity: .4; } }
+.pitch-lines { position: absolute; inset: 0; pointer-events: none; }
+.pitch-lines path { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; }
+.pitch-item { line-height: 1.2; font-weight: 400; overflow-wrap: break-word; }
+.pitch-item.side { position: absolute; transform: translateY(-50%); white-space: normal; }
+.pitch-item.anim { animation: pitch-item-in .4s cubic-bezier(.2,.7,.2,1) both; }
+.pitch-item.side.anim { animation-name: pitch-item-side; }
+@keyframes pitch-item-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes pitch-item-side { from { opacity: 0; transform: translate(-12px, -50%); } }
+.ov-bullets, .ov-indent, .ov-columns { align-items: stretch; justify-content: flex-start; }
+.ov-bullets .pitch-head, .ov-indent .pitch-head, .ov-columns .pitch-head { margin-bottom: .6em; }
+.pitch-items { display: flex; flex-direction: column; }
+.ov-bullets .pitch-item { padding-left: 1em; position: relative; }
+.ov-bullets .pitch-item::before { content: ''; position: absolute; left: .15em; top: .5em; width: .28em; height: .28em; border-radius: 50%; background: currentColor; }
+.ov-indent .pitch-items { border-left: 3px solid currentColor; padding-left: 1.2em; margin-left: .4em; }
+.ov-columns .pitch-items { flex-direction: row; flex-wrap: wrap; }
+.ov-columns .pitch-item { flex: 1 1 22%; min-width: 0; border-top: 3px solid currentColor; padding-top: .4em; }
+.pitch-ui { position: absolute; z-index: 2; color: var(--pt); opacity: .35; transition: opacity .2s; }
+.pitch-ui:hover, .pitch-ui:focus-within { opacity: 1; }
+.pitch-top { top: 18px; right: 18px; display: flex; gap: 8px; align-items: flex-start; }
+.pitch-group, .pitch-nav { display: flex; align-items: center; background: var(--pu); border-radius: 6px; }
+.pitch-nav { bottom: 18px; left: 50%; transform: translateX(-50%); }
+.pitch-nav i, .pitch-group i { width: 1px; height: 16px; background: var(--pu-h); }
+.pitch-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 32px; height: 24px; padding: 0 8px;
+  border: 0; border-radius: 6px; background: transparent; color: inherit; font: 500 12px var(--font-ui); cursor: pointer; }
+.pitch-top > .pitch-btn { background: var(--pu); }
+.pitch-btn:hover:not(:disabled), .pitch-btn.on { background: var(--pu-h); }
+.pitch-btn:disabled { opacity: .35; cursor: default; }
+.pitch-pop { position: absolute; top: 34px; right: 0; width: 230px; padding: 14px 12px; border-radius: 8px; background: #26282c; color: #e4e7eb;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 10px; font-size: 12px; opacity: 1; }
+.pitch.light .pitch-pop { background: #fff; color: #1f2326; box-shadow: 0 8px 24px rgba(0,0,0,.16); }
+.pitch-pop b { font-size: 15px; font-weight: 700; }
+.pitch-pop.viewers { width: 200px; gap: 6px; }
+.pv-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.pv-dot { width: 18px; height: 18px; border-radius: 50%; }
+.pitch-wide { height: 26px; border: 0; border-radius: 5px; background: rgba(255,255,255,.12); color: inherit; font: 600 12px var(--font-ui); cursor: pointer; }
+.pitch.light .pitch-wide { background: #edf0f2; }
+.pitch-wide:hover { background: rgba(255,255,255,.2); }
+.pitch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pitch-row select { height: 24px; padding: 0 4px; border-radius: 5px; background: transparent; color: inherit; border: 1px solid rgba(128,128,128,.5); font: 12px var(--font-ui); }
+.pitch-row select option { color: #1f2326; }
+.pitch-check { display: flex; align-items: center; gap: 8px; }
+.pitch-check input { accent-color: #6b7280; margin: 0; }
 .gallery { max-width: 760px; }
 .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .tpl-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; border: 1px solid var(--color-border);

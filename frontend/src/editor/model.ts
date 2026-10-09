@@ -123,7 +123,8 @@ export interface Sheet {
   freeBranch?: boolean
   cjkFont?: string
   pitchTheme?: 'light' | 'dark'
-  pitchRatio?: 'auto' | '16:9' | '4:3'
+  pitchRatio?: 'auto' | '16:9' | '4:3' | '9:16' | '3:4'
+  pitchAnimation?: boolean
   legend?: boolean
   /** подписи маркеров в легенде */
   markerNames?: Record<string, string>
