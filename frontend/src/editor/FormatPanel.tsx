@@ -1,4 +1,5 @@
 // Панель «Формат» (как в XMind): вкладки «Стиль / Презентация / Карта».
+import { SlideView, type Slide } from './Presentation'
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { indexSheet, levelOf } from './model'
@@ -403,45 +404,58 @@ function PitchTab({ sheet }: { sheet: Sheet }) {
   const p = ref?.topic.pitch ?? {}
   const setP = (patch: Partial<NonNullable<Topic['pitch']>>) => ref && ed.setTopic(selection, { pitch: { ...p, ...patch } })
   const dark = (sheet.pitchTheme ?? 'dark') === 'dark'
+  const ratio = sheet.pitchRatio ?? 'auto'
+  const kids = ref?.topic.children ?? []
   const layouts: [NonNullable<NonNullable<Topic['pitch']>['layout']>, string, string][] = [
-    ['list', 'Список', 'M3,3h3M8,3h9M3,8h3M8,8h9M3,13h3M8,13h9'], ['bullets', 'Маркированный список', 'M4,3h.1M8,3h9M4,8h.1M8,8h9M4,13h.1M8,13h9'],
-    ['indent', 'С отступом', 'M3,3h14M6,8h11M6,13h11'], ['branch', 'Ветка', 'M3,8h4M7,8L12,3h5M7,8h10M7,8L12,13h5'], ['columns', 'Колонки', 'M3,3v10M10,3v10M17,3v10'],
+    ['list', 'Скобка', 'M7,3Q5,3 5,5V7Q5,8 3.5,8Q5,8 5,9V11Q5,13 7,13M10,4h6M10,8h6M10,12h6'], ['bullets', 'Маркированный список', 'M4,4h.1M8,4h8M4,8h.1M8,8h8M4,12h.1M8,12h8'],
+    ['indent', 'С отступом', 'M3,4h13M7,8h9M7,12h9M4.5,6v6'], ['branch', 'Ветка', 'M3,8h3M6,8Q8,8 9,4.5h7M6,8h10M6,8Q8,8 9,11.5h7'], ['columns', 'Колонки', 'M3,4h14M5,7v6M10,7v6M15,7v6'],
   ]
+  const W = 232, H = Math.round(W / (ratio === 'auto' || ratio === '16:9' ? 16 / 9 : ratio === '4:3' ? 4 / 3 : ratio === '9:16' ? 9 / 16 : 3 / 4))
+  const slide: Slide | null = ref ? (kids.length && p.subSlides !== 'no'
+    ? { kind: 'overview', topic: ref.topic, items: kids, crumbs: [], layout: p.layout ?? 'list', reveal: false, root: ref.kind === 'root' }
+    : { kind: 'title', topic: ref.topic, crumbs: [] }) : null
+  const vis = (v: string | undefined) => v === 'yes' ? 'yes' : v === 'no' ? 'no' : 'auto'
   return (
     <>
-      <div className="fp-sub">Вид в режиме презентации</div>
-      <div className="pitch-preview" style={{ background: dark ? '#000' : '#fff', color: dark ? '#fff' : '#111', aspectRatio: (sheet.pitchRatio ?? 'auto') === 'auto' ? '16/9' : sheet.pitchRatio!.replace(':', '/') }}>
-        {ref ? <><b>{ref.topic.title}</b>{(ref.topic.children ?? []).slice(0, 4).map(c => <span key={c.id}>{c.title}</span>)}</> : <span className="muted">Выберите тему</span>}
+      <div className="fp-sub strong">Вид в режиме презентации</div>
+      <div className="pitch-preview" style={{ height: Math.min(H, 232) }}>
+        {slide ? <div className={'pitch ' + (dark ? 'dark' : 'light')} style={{ position: 'relative', inset: 'auto', width: W, height: Math.min(H, 232), zIndex: 0 }}>
+          <div className="pitch-stage" style={{ width: W, height: Math.min(H, 232) }}><SlideView slide={slide} step={0} W={W} H={Math.min(H, 232)} anim={false} /></div>
+        </div> : <span className="muted">Выберите тему</span>}
       </div>
-      <button className="wide" onClick={() => ed.setSheet({ pitchTheme: dark ? 'light' : 'dark' })}>Сменить тему ({dark ? 'тёмная' : 'светлая'})</button>
+      <button className="wide fp-btn" onClick={() => ed.setSheet({ pitchTheme: dark ? 'light' : 'dark' })}>Сменить тему</button>
       <Row label="Соотношение сторон">
-        <select value={sheet.pitchRatio ?? 'auto'} onChange={e => ed.setSheet({ pitchRatio: e.target.value as Sheet['pitchRatio'] })} aria-label="Соотношение сторон">
+        <select value={ratio} onChange={e => ed.setSheet({ pitchRatio: e.target.value as Sheet['pitchRatio'] })} aria-label="Соотношение сторон" className="sel-sm">
           <option value="auto">Авто</option><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="9:16">9:16</option><option value="3:4">3:4</option>
         </select>
       </Row>
       {ref && <>
-        <Row label="Тема как слайд">
-          <select value={p.slide ?? 'auto'} onChange={e => setP({ slide: e.target.value as 'auto' })} aria-label="Тема как слайд">
-            <option value="auto">Авто</option><option value="yes">Да</option><option value="no">Нет</option>
+        <div className="fp-sep" />
+        <Row label="Слайд темы">
+          <select value={vis(p.slide)} onChange={e => setP({ slide: e.target.value as 'auto' })} aria-label="Слайд темы" className="sel-sm">
+            <option value="auto">Авто</option><option value="yes">Видимый</option><option value="no">Скрытый</option>
           </select>
         </Row>
-        <Row label="Подтемы как слайды">
-          <select value={p.subSlides ?? 'auto'} onChange={e => setP({ subSlides: e.target.value as 'auto' })} aria-label="Подтемы как слайды">
-            <option value="auto">Авто</option><option value="yes">Да</option><option value="no">Нет</option>
+        {kids.length > 0 && <>
+          <div className="fp-sep" />
+          <Row label="Слайд-список">
+            <select value={vis(p.subSlides)} onChange={e => setP({ subSlides: e.target.value as 'auto' })} aria-label="Слайд-список" className="sel-sm">
+              <option value="auto">Авто</option><option value="yes">Видимый</option><option value="no">Скрытый</option>
+            </select>
+          </Row>
+          <div className="fp-cap">Показ</div>
+          <select className="wide" value={p.delivery ?? 'drill'} onChange={e => setP({ delivery: e.target.value as 'drill' })} aria-label="Показ">
+            <option value="drill">По одной — с погружением</option><option value="one">По одной</option><option value="all">Все сразу</option>
           </select>
-        </Row>
-        <div className="fp-sub">Показ</div>
-        <select className="wide" value={p.delivery ?? 'drill'} onChange={e => setP({ delivery: e.target.value as 'drill' })} aria-label="Показ">
-          <option value="drill">По одной — с погружением</option><option value="one">По одной</option><option value="all">Все сразу</option>
-        </select>
-        <div className="fp-sub">Раскладка</div>
-        <div className="seg-group">
-          {layouts.map(([v, n, d]) => (
-            <button key={v} className={'seg-btn' + ((p.layout ?? 'list') === v ? ' on' : '')} title={n} aria-label={n} onClick={() => setP({ layout: v })}>
-              <svg width={20} height={16}><path d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" /></svg>
-            </button>
-          ))}
-        </div>
+          <div className="fp-cap">Раскладка</div>
+          <div className="seg-group">
+            {layouts.map(([v, n, d]) => (
+              <button key={v} className={'seg-btn' + ((p.layout ?? 'list') === v ? ' on' : '')} title={n} aria-label={n} onClick={() => setP({ layout: v })}>
+                <svg width={20} height={16}><path d={d} fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            ))}
+          </div>
+        </>}
       </>}
     </>
   )

@@ -12,7 +12,7 @@ import { useCollab } from '../collab/session'
 type Layout = NonNullable<NonNullable<Topic['pitch']>['layout']>
 interface TitleSlide { kind: 'title'; topic: Topic; crumbs: string[] }
 interface OverviewSlide { kind: 'overview'; topic: Topic; items: Topic[]; crumbs: string[]; layout: Layout; reveal: boolean; root: boolean }
-type Slide = TitleSlide | OverviewSlide
+export type Slide = TitleSlide | OverviewSlide
 
 export function buildSlides(root: Topic): Slide[] {
   const out: Slide[] = []
@@ -55,7 +55,7 @@ function Crumbs({ crumbs, H }: { crumbs: string[]; H: number }) {
   return <div className="pitch-crumbs" style={{ fontSize: Math.max(12, H * 0.027) }}>{crumbs.join('  ›  ')}<i /></div>
 }
 
-function SlideView({ slide, step, W, H, anim }: { slide: Slide; step: number; W: number; H: number; anim: boolean }) {
+export function SlideView({ slide, step, W, H, anim }: { slide: Slide; step: number; W: number; H: number; anim: boolean }) {
   if (slide.kind === 'title') {
     const fs = fitSize(slide.topic.title, H * 0.155, W * 0.84, H * 0.7, 0.62)
     return (
@@ -82,7 +82,7 @@ function SlideView({ slide, step, W, H, anim }: { slide: Slide; step: number; W:
         <Crumbs crumbs={slide.crumbs} H={H} />
         <div className="pitch-head side" style={{ fontSize: headFs, width: W * 0.36, left: W * 0.08 }}>{topic.title}</div>
         {shown.length > 0 && (
-          <svg className="pitch-lines" width={W} height={H}>
+          <svg className="pitch-lines" width={W} height={H} style={{ strokeWidth: Math.max(1.5, H * 0.0046) }}>
             {layout === 'list'
               ? (() => {
                   const y0 = n === 1 ? H * 0.4 : top - itemFs * 0.6, y1 = n === 1 ? H * 0.6 : bottom + itemFs * 0.6, ym = H / 2, r = Math.min(14, (y1 - y0) / 6)
