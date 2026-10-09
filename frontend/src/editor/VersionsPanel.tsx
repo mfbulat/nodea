@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import type { MapFull, VersionSummary } from '../api/types'
 import { useDoc } from '../store/doc'
 
-export default function VersionsPanel({ mapId, onClose }: { mapId: string; onClose: () => void }) {
+export default function VersionsPanel({ mapId, onClose, onRestored }: { mapId: string; onClose: () => void; onRestored?: () => void }) {
   const [versions, setVersions] = useState<VersionSummary[]>([])
   const [error, setError] = useState('')
   const { open, flush } = useDoc()
@@ -20,6 +20,7 @@ export default function VersionsPanel({ mapId, onClose }: { mapId: string; onClo
     if (!confirm(`Восстановить версию от ${new Date(v.created_at).toLocaleString('ru')}? Текущее состояние сохранится в истории.`)) return
     await flush()
     open(await api<MapFull>(`/api/maps/${mapId}/versions/${v.id}/restore`, { method: 'POST' }))
+    onRestored?.()
     reload()
   }
 
