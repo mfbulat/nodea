@@ -15,7 +15,7 @@ export interface Theme {
 
 /** Цветовые палитры веток (выбираются отдельно от темы) */
 export const PALETTES: { id: string; name: string; colors: string[] }[] = [
-  { id: 'dawn', name: 'Заря', colors: ['#f07470', '#f3a06e', '#a5d3b9', '#9fe2d8', '#8dcdf4', '#d48dea'] },
+  { id: 'dawn', name: 'Заря', colors: ['#ff6b6b', '#ff9f69', '#97d3b6', '#88e2d7', '#6fd0f9', '#e18ef0'] },
   { id: 'ocean', name: 'Океан', colors: ['#5b8def', '#4cc3d9', '#7bd4a8', '#3f6fb5', '#8fa7f5', '#5fb8c9'] },
   { id: 'forest', name: 'Лес', colors: ['#7cb66a', '#c7d36a', '#4f9a7d', '#a6c48a', '#e2b55e', '#6e9f5b'] },
   { id: 'candy', name: 'Карамель', colors: ['#ff8fab', '#ffc46b', '#9be08e', '#8ecbff', '#c9a0ff', '#ff9e80'] },
@@ -24,7 +24,7 @@ export const PALETTES: { id: string; name: string; colors: string[] }[] = [
 ]
 export const getPalette = (id?: string) => PALETTES.find(p => p.id === id)
 
-export const MAP_FONT = '"Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+export const MAP_FONT = '"Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 const FONT = MAP_FONT
 
 function base(o: Partial<FullStyle>): FullStyle {
@@ -62,7 +62,7 @@ export const THEMES: Theme[] = [
       lineWidth: 2, lineShape: 'curve', lineColor: '#9a9a9a' },
     { fill: '#eeeeee', borderStyle: 'none', borderWidth: 0, textColor: '#000000', fontSize: 18, fontWeight: 'medium',
       lineWidth: 2, lineShape: 'rounded', lineColor: '#9a9a9a' },
-    { fill: '#f2f2f2', borderStyle: 'none', borderWidth: 0, textColor: '#333333', fontSize: 14,
+    { fill: '#f2f2f2', borderStyle: 'none', borderWidth: 0, textColor: '#333333', fontSize: 14, textAlign: 'left',
       lineWidth: 2, lineShape: 'rounded', lineColor: '#9a9a9a' },
     { fill: '#e6e6e6', borderStyle: 'none', borderWidth: 0, textColor: '#000000', fontSize: 16, fontWeight: 'medium', lineWidth: 2, lineShape: 'rounded', lineColor: '#9a9a9a' },
     true),
@@ -122,7 +122,11 @@ export function resolveStyle(sheet: Sheet, ref: TopicRef): FullStyle {
     if (th.colored) {
       // как в теме по умолчанию: основная — цвет ветки, глубже — светлый оттенок с тёмным текстом того же тона
       if (level === 'main') { s.fill = c; s.textColor = '#000000' }
-      else if (level === 'sub' || level === 'summary') { s.fill = mix(c, '#ffffff', 0.8); s.textColor = mix(c, '#000000', 0.62) }
+      else if (level === 'sub' || level === 'summary') {
+        // как в веб-версии: второй уровень — цвет ветки с прозрачностью 20 %, глубже — без заливки; текст — тёмный тон цвета ветки
+        s.fill = ref.depth === 2 || level === 'summary' ? rgba(c, 0.2) : 'transparent'
+        s.textColor = darkTone(c)
+      }
     } else if (level === 'main') { s.borderColor = c; s.fill = mix(c, th.background, 0.8) }
     else if (s.shape === 'underline') s.borderColor = c
   }
@@ -157,3 +161,22 @@ export const STYLE_KEYS: (keyof TopicStyle)[] = ['shape', 'fill', 'borderColor',
   'lineShape', 'lineWidth', 'lineColor', 'lineStyle', 'lineEnd', 'textTransform', 'maxWidth', 'width']
 
 export type { Topic }
+
+function rgba(c: string, a: number) {
+  const p = hex(c)
+  return p ? `rgba(${p[0]}, ${p[1]}, ${p[2]}, ${a})` : c
+}
+
+/** Тот же оттенок, насыщенность 100 %, светлота 20 % (#ff6b6b → #660000) */
+export function darkTone(c: string) {
+  const p = hex(c)
+  if (!p) return '#333333'
+  const [r, g, b] = p.map(v => v / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  let h = 0
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  h = (h * 60 + 360) % 360
+  const l = 0.2, sat = 1, cc = (1 - Math.abs(2 * l - 1)) * sat, x = cc * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - cc / 2
+  const [rr, gg, bb] = h < 60 ? [cc, x, 0] : h < 120 ? [x, cc, 0] : h < 180 ? [0, cc, x] : h < 240 ? [0, x, cc] : h < 300 ? [x, 0, cc] : [cc, 0, x]
+  return '#' + [rr, gg, bb].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('')
+}

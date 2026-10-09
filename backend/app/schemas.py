@@ -32,6 +32,7 @@ class MapCreate(BaseModel):
 
 class MapUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=500)
+    starred: bool | None = None
     document: dict | None = None
     base_revision: int | None = None
 
@@ -42,6 +43,9 @@ class MapSummary(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+    starred: bool = False
+    deleted_at: datetime | None = None
+    last_opened_at: datetime | None = None
 
 
 class MapOut(MapSummary):
@@ -71,3 +75,12 @@ class TemplateOut(BaseModel):
     title: str
     document: dict
     created_at: datetime
+
+
+class SharedMapOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    updated_at: datetime
+    visited_at: datetime
+    share_token: str
+    owner_email: str

@@ -219,20 +219,25 @@ class Engine {
     }
     const side = (idx: number[], dir: 1 | -1) => {
       const blocks = idx.map(i => this.layout(kids[i], dir > 0 ? 'logic-right' : 'logic-left'))
-      const total = blocks.reduce((a, c) => a + (c.maxY - c.minY), 0) + MAIN_GAP * (blocks.length - 1)
+      let gap = MAIN_GAP
+      // XMind разводит крайние основные темы стороны минимум на две высоты центральной
+      if (blocks.length > 1) {
+        const first = this.size(kids[idx[0]]), last = this.size(kids[idx[idx.length - 1]])
+        const span = blocks.reduce((a, c) => a + (c.maxY - c.minY), 0) + gap * (blocks.length - 1) - first.h / 2 - last.h / 2
+        if (span < 2 * s.h) gap += (2 * s.h - span) / (blocks.length - 1)
+      }
+      const total = blocks.reduce((a, c) => a + (c.maxY - c.minY), 0) + gap * (blocks.length - 1)
       let y = s.h / 2 - total / 2
       blocks.forEach((cb, j) => {
         const k = kids[idx[j]], ks = this.size(k)
         const dx = dir > 0 ? s.w + ROOT_GAP - cb.minX : -ROOT_GAP - cb.maxX
         const dy = y - cb.minY
         merge(b, cb, dx, dy)
-        // ветка выходит там, где луч из центра к теме пересекает рамку центральной темы
+        // как в XMind: ветка начинается внутри центральной темы — на её горизонтали, в 2/3 полуширины
         const end = { x: dir > 0 ? dx : dx + ks.w, y: dy + this.anchorY(k) }
-        const ddx = end.x - s.w / 2, ddy = end.y - s.h / 2
-        const tt = Math.min(Math.abs(ddx) > 0 ? (s.w / 2) / Math.abs(ddx) : Infinity, Math.abs(ddy) > 0 ? (s.h / 2) / Math.abs(ddy) : Infinity)
-        const start = { x: s.w / 2 + ddx * tt, y: s.h / 2 + ddy * tt }
+        const start = { x: s.w / 2 + dir * (s.w / 2) * (2 / 3), y: s.h / 2 }
         b.edges.push({ from: t.id, to: k.id, kind: 'h', fromRoot: true, pts: [start, end] })
-        y += cb.maxY - cb.minY + MAIN_GAP
+        y += cb.maxY - cb.minY + gap
       })
     }
     side(right, 1)
@@ -509,7 +514,7 @@ export function countAll(t: Topic): number {
 /** Раскладка листа. Начало координат — центр центральной темы. */
 export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
   const c = !!sheet.compact
-  SIB_GAP = c ? 2 : 5; H_GAP = c ? 18 : 30; ROOT_GAP = c ? 32 : 50; V_GAP = c ? 22 : 36; MAIN_GAP = c ? 14 : 40
+  SIB_GAP = c ? 2 : 6; H_GAP = c ? 16 : 27; ROOT_GAP = c ? 32 : 51; V_GAP = c ? 22 : 36; MAIN_GAP = c ? 14 : 35
   BALANCE = !!sheet.balance
   const eng = new Engine(size)
   const root = sheet.rootTopic

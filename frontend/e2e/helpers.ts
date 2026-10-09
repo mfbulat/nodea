@@ -8,7 +8,8 @@ export async function signUp(page: Page) {
 }
 
 export async function newMap(page: Page, document?: object, title = 'Центральная тема') {
-  const r = await page.request.post('/api/maps', { data: { title, document } })
+  const doc = document ?? { version: 1, sheets: [{ id: 's', title: 'Карта 1', rootTopic: { id: 'r', title, children: [] } }] }
+  const r = await page.request.post('/api/maps', { data: { title, document: doc } })
   const m = await r.json()
   await page.goto(`/map/${m.id}`)
   await expect(page.getByTestId('map-canvas')).toBeVisible()

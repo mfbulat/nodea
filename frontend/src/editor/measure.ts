@@ -43,7 +43,7 @@ export function measureText(text: string, s: FullStyle): TextBox {
     }
     lines.push(line || ' ')
   }
-  const lineHeight = Math.round(s.fontSize * 1.3)
+  const lineHeight = Math.round(s.fontSize * 1.18)
   const textW = Math.max(...lines.map(l => c.measureText(l).width), s.fontSize * 0.5)
   const box = { lines, textW: Math.ceil(textW), textH: lines.length * lineHeight, lineHeight }
   if (cache.size > 5000) cache.clear()
@@ -135,7 +135,8 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   const innerH = parts.reduce((a, p) => a + p, 0) + GAP * Math.max(0, parts.length - 1)
 
   // поля зависят от формы
-  let padX = 16, padY = 9
+  // поля как в веб-версии: основные 18×10, подтемы 6×6, центральная 29×15
+  let padX = s.fontSize >= 24 ? 29 : s.fontSize >= 16 ? 18 : 6, padY = s.fontSize >= 24 ? 15 : s.fontSize >= 16 ? 10 : 6
   switch (s.shape) {
     case 'capsule': padX = 10 + (innerH + 16) / 2; break
     case 'ellipse': padX = innerW * 0.22 + 16; padY = innerH * 0.3 + 10; break
@@ -145,7 +146,6 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
     case 'underline': padX = 4; padY = 6; break
     case 'none': padX = 4; padY = 6; break
   }
-  if (s.fontSize >= 24 && s.shape !== 'underline' && s.shape !== 'none') { padX += 12; padY += 4 }
   const shapeW = s.width ? Math.max(s.width, innerW + padX * 2) : innerW + padX * 2, shapeH = innerH + padY * 2
   const labelsH = labels.length ? labels[0].h + 4 : 0
   // «показывать все заметки»: текст заметки под темой

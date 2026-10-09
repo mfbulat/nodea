@@ -29,3 +29,17 @@
   --icon-active: #e8e8e8;
   --color-selection: #4aa3f5;
 }
+:root {
+  --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --app-bg: #edf0f2;
+  --surface: #fafbfc;
+  --surface-dim: #edf0f2;
+  --border-muted: #e4e7eb;
+  --border-input: #bdc2c7;
+  --text-primary: #1f2326;
+  --text-tertiary: rgba(0, 0, 0, .5);
+  --btn-dark: #383c40;
+  --btn-dark-text: #f5f6f7;
+  --hover-overlay: rgba(28, 40, 52, .05);
+  --menu-bg: rgba(245, 246, 247, .92);
+}

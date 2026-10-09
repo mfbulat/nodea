@@ -22,6 +22,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<MapsPage />} />
+      <Route path="/home/:view" element={<MapsPage />} />
       <Route path="/account" element={<AccountPage />} />
       <Route path="/map/:id" element={<EditorPage />} />
       <Route path="/s/:token" element={<EditorPage shared />} />

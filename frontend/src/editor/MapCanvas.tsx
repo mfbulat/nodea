@@ -27,6 +27,8 @@ export function renderSheet(sheet: Sheet): Rendered {
   for (const [id, ref] of idx) {
     const st = resolveStyle(sheet, ref)
     // автоцвет плавающих тем: цвет из палитры по порядку
+    // центральная тема без заливки закрашивается фоном, чтобы начало веток было скрыто (как в XMind)
+    if (ref.kind === 'root' && st.fill === 'transparent') st.fill = sheetBackground(sheet)
     if (sheet.autoColorFloating && ref.kind === 'floating' && !ref.topic.style?.fill) { st.fill = branchColor(sheet, ref.index + 2); st.textColor = '#000000' }
     styles.set(id, st)
   }
@@ -554,7 +556,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           <span style={{ background: p.color }}>{p.name}</span>
         </div>
       ))}
-      {!readOnly && !drag && !editingId && selection.length === 1 && r.layout.boxes.get(selection[0]) && (
+      {SHOW_MINI_TOOLBAR && !readOnly && !drag && !editingId && selection.length === 1 && r.layout.boxes.get(selection[0]) && (
         <MiniToolbar id={selection[0]} x={r.layout.boxes.get(selection[0])!.x * view.zoom + view.x}
           y={r.layout.boxes.get(selection[0])!.y * view.zoom + view.y} />
       )}
@@ -598,6 +600,9 @@ function HoverTracker({ onHover }: { onHover: (id: string | null) => void }) {
   }, [onHover])
   return null
 }
+
+/** В веб-версии мини-панели нет (она есть только в десктопной) */
+const SHOW_MINI_TOOLBAR = false
 
 /** Мини-панель над выделенной темой: связь, ссылка, изображение, заметка, задача, кисть формата */
 function MiniToolbar({ id, x, y }: { id: string; x: number; y: number }) {

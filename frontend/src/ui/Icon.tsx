@@ -48,6 +48,16 @@ const P: Record<string, JSX.Element> = {
   indent: <path d="M4 5h12M8 8.5h8M8 12h8M4 15.5h12M4 8.5l2.2 1.75L4 12" />,
   outdent: <path d="M4 5h12M8 8.5h8M8 12h8M4 15.5h12M6.2 8.5L4 10.25 6.2 12" />,
   nav: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12M4.8 7.5h1.5M4.8 10h1.5M4.8 12.5h1.5" /></>,
+  grid: <><rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="11" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="3.5" y="11" width="5.5" height="5.5" rx="1" /><rect x="11" y="11" width="5.5" height="5.5" rx="1" /></>,
+  list: <path d="M4 5.5h12M4 10h12M4 14.5h12" />,
+  sort: <path d="M7 4v12M4 7l3-3 3 3M13 16V4M10 13l3 3 3-3" />,
+  bell: <><path d="M5.5 13.5V9a4.5 4.5 0 019 0v4.5l1.5 1.5H4z" /><path d="M8.5 16.5a1.5 1.5 0 003 0" /></>,
+  bulb: <><path d="M7.5 13.5a5 5 0 115 0V15h-5z" /><path d="M8 17h4" /></>,
+  mindmap: <><path d="M7.5 10h5M7.5 10C5.5 10 5 6 3 6M7.5 10C5.5 10 5 14 3 14M12.5 10c2 0 2.5-4 4.5-4M12.5 10c2 0 2.5 4 4.5 4" /></>,
+  importFile: <><path d="M10 3.5v9M6.5 9L10 12.5 13.5 9" /><path d="M4 12.5v4h12v-4" /></>,
+  restore: <path d="M4 10a6 6 0 106-6 6 6 0 00-4.5 2M4 3.5V6.5h3" />,
+  chevronRight: <path d="M8 5l5 5-5 5" />,
+  hamburger: <path d="M4 6h12M4 10h12M4 14h12" />,
   settings: <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" /></>,
 }
 

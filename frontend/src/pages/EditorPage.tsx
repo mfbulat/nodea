@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { MapFull } from '../api/types'
 import { hasPendingChanges, useDoc } from '../store/doc'
 import MapCanvas, { isTyping } from '../editor/MapCanvas'
-import { BottomRight, Crumbs, MoreMenu, TopCenter, TopLeft, TopRight } from '../editor/Chrome'
+import { BottomRight, Crumbs, MainMenu, OutlineCenter, TopCenter, TopLeft, TopRight } from '../editor/Chrome'
+import { exportMap, ExportFormat } from '../io'
+import { importAsNewMap } from '../editor/FileMenu'
 import HelpDialog from '../editor/HelpDialog'
 import FormatPanel from '../editor/FormatPanel'
 import VersionsPanel from '../editor/VersionsPanel'
@@ -19,7 +21,6 @@ import FilterPanel from '../editor/FilterPanel'
 import Presentation from '../editor/Presentation'
 import { useAuth } from '../store/auth'
 import TopBar from './TopBar'
-import FileMenu from '../editor/FileMenu'
 import { collab, startCollab, stopCollab, useCollab } from '../collab/session'
 import ShareDialog from '../collab/ShareDialog'
 
@@ -76,6 +77,12 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const collabState = useCollab()
   const [shareOpen, setShareOpen] = useState(false)
   const [help, setHelp] = useState(false)
+  const [busy, setBusy] = useState('')
+  const nav = useNavigate()
+  async function run(label: string, fn: () => Promise<unknown>) {
+    setBusy(label)
+    try { await fn() } catch (e) { alert(`${label}: ${(e as Error).message}`) } finally { setBusy('') }
+  }
   const user = useAuth(s => s.user)
   const sheetId = useEditor(s => s.sheetId)
   const panel = useEditor(s => s.panel)
@@ -95,6 +102,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
     load.then(({ m, role }) => {
       open(m, role)
       setMapId(m.id)
+      if (role === 'owner') api(`/api/maps/${m.id}/opened`, { method: 'POST' }).catch(() => {})
       useEditor.getState().reset()
       // совместная работа: документ синхронизирует комната на сервере
       startCollab(m.id, share, useAuth.getState().user?.email ?? '', d => {
@@ -129,23 +137,44 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
 
   if (presenting) return <Presentation sheet={sheet} />
 
+  const doExport = (fmt: string) => run('Экспорт', async () => {
+    await useDoc.getState().flush()
+    const { doc: dd, title: tt } = useDoc.getState()
+    const sh = useEditor.getState().sheet()
+    if (dd && sh) await exportMap(fmt as ExportFormat, dd, sh, tt)
+  })
+  const doImport = () => run('Импорт', async () => { const nid = await importAsNewMap(); if (nid) nav(`/map/${nid}`) })
+  const saveTemplate = () => run('Шаблон', async () => {
+    await useDoc.getState().flush()
+    const { doc: dd, title: tt } = useDoc.getState()
+    const name = prompt('Название шаблона', tt)?.trim()
+    if (name && dd) { await api('/api/templates', { method: 'POST', json: { title: name, document: dd } }); alert('Шаблон сохранён') }
+  })
+  const hasPanel = !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
+
   return (
-    <div className={'editor' + (zen ? ' zen' : '') + (!zen && panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly) ? ' has-panel' : '')}>
+    <div className={'editor' + (zen ? ' zen' : '') + (hasPanel ? ' has-panel' : '')}>
+      {!zen && <div className="topbar-x">
+        <TopLeft guest={!user} mapId={id} mainMenu={<MainMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)}
+          onShare={role === 'owner' ? () => setShareOpen(true) : undefined} onExport={doExport} onImport={doImport} onSaveTemplate={saveTemplate} />} />
+        {!readOnly && (viewMode === 'map' ? <TopCenter /> : <OutlineCenter />)}
+        <TopRight onShare={role === 'owner' ? () => setShareOpen(true) : undefined} isOwner={role === 'owner'} outline={viewMode !== 'map'} />
+      </div>}
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
         <SearchBar />
+        {zen && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
+        {!zen && <Crumbs sheet={sheet} />}
+        {!zen && <Legend sheet={sheet} readOnly={readOnly} />}
+        {busy && <div className="busy-toast">{busy}…</div>}
       </div>
-      {zen ? <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button> : <>
-        <TopLeft guest={!user} fileMenu={user ? <FileMenu /> : null} />
-        {viewMode === 'map' && !readOnly && <TopCenter />}
-        <TopRight onShare={role === 'owner' ? () => setShareOpen(true) : undefined}
-          more={<MoreMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)} />} />
-        <Crumbs sheet={sheet} />
-        <Legend sheet={sheet} readOnly={readOnly} />
+      {!zen && <div className="bottombar-x">
         <SheetTabs />
         <BottomRight sheet={sheet} />
-        {panel === 'format' && viewMode === 'map' && !readOnly && <FormatPanel sheet={sheet} />}
-        {panel === 'markers' && !readOnly && <MarkersPanel sheet={sheet} />}
+      </div>}
+      {hasPanel && <>
+        {panel === 'format' && <FormatPanel sheet={sheet} />}
+        {panel === 'markers' && <MarkersPanel sheet={sheet} />}
         {panel === 'notes' && <NotesPanel sheet={sheet} />}
         {panel === 'comments' && <CommentsPanel sheet={sheet} />}
         {panel === 'filter' && <FilterPanel sheet={sheet} />}

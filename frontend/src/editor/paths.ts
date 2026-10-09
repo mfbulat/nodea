@@ -58,11 +58,11 @@ export function edgePath(e: Edge, shape: LineShape, width: number): { d: string;
   const pt = (p: Pt) => `${f(p.x)},${f(p.y)}`
   // ветка от центральной темы: начинается под темой, уходит вертикально и подходит к теме горизонтально
   if (e.fromRoot && (shape === 'curve' || shape === 'rounded' || shape === 'elbow')) {
-    if (!vertical) return { d: `M${pt(a)}Q${f(a.x)},${f(b.y)} ${pt(b)}`, filled: false }
+    if (!vertical) return { d: `M${pt(a)}Q${f(a.x + (b.x - a.x) * 0.2)},${f(b.y)} ${pt(b)}`, filled: false }
   }
   // отвод к подтемам — короткий, у самого родителя (ствол не посередине)
   const su0 = Math.sign(bu - au) || 1
-  const trunk = au + su0 * Math.min(14, Math.abs(bu - au) / 2)
+  const trunk = au + su0 * Math.min(12, Math.abs(bu - au) / 2)
   switch (shape) {
     case 'straight': return { d: `M${pt(a)}L${pt(b)}`, filled: false }
     case 'elbow': return { d: `M${pt(a)}L${pt(P(trunk, av))}L${pt(P(trunk, bv))}L${pt(b)}`, filled: false }

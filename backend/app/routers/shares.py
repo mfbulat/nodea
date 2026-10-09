@@ -3,13 +3,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..access import optional_user, resolve_role
 from ..collab import rooms
 from ..db import SessionLocal, get_db
-from ..models import Map, MapShare, User
+from ..models import Map, MapShare, MapVisit, User
 from ..schemas import MapOut
 from ..security import ACCESS_COOKIE, current_user
 
@@ -74,6 +74,14 @@ def open_shared(token: str, request: Request, db: Session = Depends(get_db)):
     user = optional_user(request.cookies.get(ACCESS_COOKIE), db)
     m = db.get(Map, s.map_id)
     role = "owner" if user and m.owner_id == user.id else s.role
+    # запоминаем для раздела «Общие»
+    if user and m.owner_id != user.id:
+        v = db.scalar(select(MapVisit).where(MapVisit.user_id == user.id, MapVisit.map_id == m.id))
+        if v:
+            v.share_token, v.visited_at = token, func.now()
+        else:
+            db.add(MapVisit(user_id=user.id, map_id=m.id, share_token=token))
+        db.commit()
     return {"map": m, "role": role}
 
 
