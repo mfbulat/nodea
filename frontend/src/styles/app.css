@@ -723,3 +723,10 @@ body { font-family: var(--font-ui); }
 .markers-panel .group-head { padding: 14px 0 10px; font-size: 12px; font-weight: 700; }
 .markers-panel .marker-grid { gap: 8px 10px; }
 .markers-panel .marker-btn { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.markers-panel .cat-row { display: flex; align-items: center; height: 32px; margin-top: 4px; font-size: 12px; color: #646a73; }
+.markers-panel .cat-row select { border: 0; background: transparent; font: 12px var(--font-ui); color: #1f2326; text-align: right; cursor: pointer; }
+.markers-panel .sticker-grid.panel { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.markers-panel .sticker-grid.panel button { height: 44px; font-size: 30px; line-height: 1; padding: 0; }
+.markers-panel .illus-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.markers-panel .illus-grid button { border: 0; padding: 4px; background: transparent; border-radius: 6px; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.markers-panel .illus-grid button:hover:not(:disabled) { background: #edf0f2; }

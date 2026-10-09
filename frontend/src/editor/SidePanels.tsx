@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEditor } from './store'
 import { indexSheet, type Sheet } from './model'
-import { MARKER_GROUPS, MarkerIcon, markerName, STICKERS } from './markers'
+import { MARKER_GROUPS, MarkerIcon, markerName, STICKER_CATEGORIES } from './markers'
 import { useDoc } from '../store/doc'
-import { ILLUSTRATIONS, illustrationSrc } from './illustrations'
+import { ILLUSTRATION_CATEGORIES, ILLUSTRATIONS, illustrationSrc } from './illustrations'
 
 function Header({ title }: { title: string }) {
   return (
@@ -20,6 +20,8 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
   const tab = useEditor(st => st.markerTab)
   const setTab = useEditor.getState().setMarkerTab
   const [closed, setClosed] = useState<Set<string>>(new Set())
+  const [cat, setCat] = useState('')
+  useEffect(() => setCat(''), [tab])
   const id = selection[selection.length - 1]
   const current = new Set(id ? indexSheet(sheet).get(id)?.topic.markers ?? [] : [])
   const toggleGroup = (g: string) => setClosed(c => { const n = new Set(c); if (n.has(g)) n.delete(g); else n.add(g); return n })
@@ -48,14 +50,35 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
           </div>}
         </div>
       ))}
-      {tab === 'illustrations' && <div className="illus-grid">
-        {ILLUSTRATIONS.map(il => <button key={il.id} disabled={!id} title={il.name} aria-label={'Иллюстрация ' + il.name}
-          onClick={() => ed.setTopic(selection, { image: { src: illustrationSrc(il.svg), width: 120, height: 90 } })}>
-          <img src={illustrationSrc(il.svg)} alt="" /></button>)}
-      </div>}
-      {tab === 'stickers' && <div className="sticker-grid panel">
-        {STICKERS.map(st => <button key={st} disabled={!id} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
-      </div>}
+      {tab !== 'markers' && (
+        <div className="cat-row"><span>Категория</span><div className="spacer" />
+          <select value={cat} onChange={e => setCat(e.target.value)} aria-label="Категория">
+            <option value="">Все</option>
+            {(tab === 'stickers' ? STICKER_CATEGORIES.map(c => c.name) : [...ILLUSTRATION_CATEGORIES]).map(n => <option key={n} value={n}>{n}</option>)}
+          </select></div>
+      )}
+      {tab === 'stickers' && STICKER_CATEGORIES.filter(c => !cat || c.name === cat).map(c => (
+        <div key={c.name}>
+          <button className="group-head" onClick={() => toggleGroup('s:' + c.name)}>
+            <span className={'caret' + (closed.has('s:' + c.name) ? ' closed' : '')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{c.name}
+          </button>
+          {!closed.has('s:' + c.name) && <div className="sticker-grid panel">
+            {c.items.map(st => <button key={st} disabled={!id} aria-label={'Стикер ' + st} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
+          </div>}
+        </div>
+      ))}
+      {tab === 'illustrations' && ILLUSTRATION_CATEGORIES.filter(c => !cat || c === cat).map(c => (
+        <div key={c}>
+          <button className="group-head" onClick={() => toggleGroup('i:' + c)}>
+            <span className={'caret' + (closed.has('i:' + c) ? ' closed' : '')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{c}
+          </button>
+          {!closed.has('i:' + c) && <div className="illus-grid">
+            {ILLUSTRATIONS.filter(il => il.category === c).map(il => <button key={il.id} disabled={!id} title={il.name} aria-label={'Иллюстрация ' + il.name}
+              onClick={() => ed.setTopic(selection, { image: { src: illustrationSrc(il.svg), width: 120, height: 90 } })}>
+              <img src={illustrationSrc(il.svg)} alt="" /></button>)}
+          </div>}
+        </div>
+      ))}
     </div>
   )
 }
