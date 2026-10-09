@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { CommentLayer, nearestTopic } from './Comments'
 import type { Sheet, Topic } from './model'
 import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
@@ -89,7 +90,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
   focusIds?: Set<string> | null
 }) {
   const wrap = useRef<HTMLDivElement>(null)
-  const { view, selection, editingId, element, relating, drillId, filter, search } = useEditor()
+  const { view, selection, editingId, element, relating, drillId, filter, search, commenting } = useEditor()
   const sheet = useMemo(() => displaySheet(realSheet, drillId), [realSheet, drillId])
   const ed = useEditor.getState
   const [fontEpoch, setFontEpoch] = useState(0)
@@ -142,7 +143,19 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     return { x: (cx - rect.left - v.x) / v.zoom, y: (cy - rect.top - v.y) / v.zoom }
   }
 
+  // режим комментирования: щелчок в любом месте — новое обсуждение у ближайшей темы
+  function onCommentPointerDown(e: React.PointerEvent) {
+    if (!ed().commenting || e.button !== 0 || (e.target as Element).closest('.cm-pop, .cm-pin')) return
+    e.stopPropagation(); e.preventDefault()
+    const p = toWorld(e.clientX, e.clientY)
+    const b = nearestTopic(r.layout.boxes, p)
+    if (!b) return
+    const has = idx.get(b.id)?.topic.comments?.length
+    ed().setThread(has ? { id: b.id } : { id: b.id, pos: { x: p.x - b.x, y: p.y - b.y } })
+  }
+
   function onBgPointerDown(e: React.PointerEvent) {
+    if (ed().thread) ed().setThread(null)
     if ((e.target as Element).closest('.topic, .toggle, .title-editor, .rel, .boundary, .cp-handle, .label-editor')) return
     wrap.current!.focus()
     if (ed().editingId) ed().stopEdit()
@@ -402,9 +415,9 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
   })
 
   return (
-    <div ref={wrap} className={'map-canvas' + (relating ? ' relating' : '')} tabIndex={0} data-testid="map-canvas"
+    <div ref={wrap} className={'map-canvas' + (relating ? ' relating' : '') + (commenting ? ' commenting' : '')} tabIndex={0} data-testid="map-canvas"
       style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : relating ? 'crosshair' : 'default' }}
-      onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      onPointerDownCapture={onCommentPointerDown} onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
       onContextMenu={e => e.preventDefault()}
       onDragOver={e => { if (!readOnly) e.preventDefault() }} onDrop={onDrop}
       onDoubleClick={e => {
@@ -550,6 +563,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           )}
         </g>
       </svg>
+      {!focusIds && <CommentLayer sheet={sheet} boxes={r.layout.boxes} view={view} readOnly={readOnly} />}
+      {commenting && <div className="relating-hint">Щёлкните в любом месте карты, чтобы добавить комментарий. Esc — отмена.</div>}
       {peers.filter(p => p.cursor).map(p => (
         <div key={'pc' + p.clientId} className="peer-cursor" data-testid="peer-cursor"
           style={{ left: p.cursor!.x * view.zoom + view.x, top: p.cursor!.y * view.zoom + view.y, color: p.color }}>

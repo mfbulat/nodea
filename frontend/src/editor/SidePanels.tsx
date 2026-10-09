@@ -106,43 +106,6 @@ function NoteEditor({ id, html }: { id: string; html: string }) {
   )
 }
 
-export function CommentsPanel({ sheet }: { sheet: Sheet }) {
-  const { selection, userName } = useEditor()
-  const ed = useEditor.getState()
-  const [text, setText] = useState('')
-  const id = selection[selection.length - 1]
-  const topic = id ? indexSheet(sheet).get(id)?.topic : undefined
-  const all = [...indexSheet(sheet).values()].filter(r => r.topic.comments?.length)
-  const send = () => { if (text.trim() && id) { ed.addComment(id, text.trim()); setText('') } }
-  return (
-    <div className="side-panel" data-testid="comments-panel">
-      <Header title="Комментарии" />
-      {topic ? (
-        <>
-          <div className="muted" style={{ marginBottom: 6 }}>К теме «{topic.title}»</div>
-          {(topic.comments ?? []).map(c => (
-            <div key={c.id} className="comment">
-              <div className="comment-head"><b>{c.author || 'Аноним'}</b>
-                <span className="muted">{new Date(c.createdAt).toLocaleString('ru')}</span>
-                {c.author === userName && <button className="mini" onClick={() => ed.removeComment(topic.id, c.id)} title="Удалить">×</button>}
-              </div>
-              <div style={{ whiteSpace: 'pre-wrap' }}>{c.text}</div>
-            </div>
-          ))}
-          <textarea rows={3} placeholder="Комментарий…" value={text} onChange={e => setText(e.target.value)}
-            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }} style={{ width: '100%' }} />
-          <button className="primary" onClick={send} disabled={!text.trim()}>Добавить</button>
-        </>
-      ) : <p className="muted">Выберите тему.</p>}
-      {all.length > 0 && <>
-        <h4 className="panel-sub">Все темы с комментариями</h4>
-        {all.map(r => <div key={r.topic.id}><button className="link-btn" onClick={() => ed.select([r.topic.id])}>
-          {r.topic.title || '(без названия)'} — {r.topic.comments!.length}</button></div>)}
-      </>}
-    </div>
-  )
-}
-
 const NO_SHEETS: Sheet[] = []
 
 export function SheetTabs() {

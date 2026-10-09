@@ -32,7 +32,7 @@ export default function InsertMenu() {
         {item('note', 'Заметка', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
         {item('label', 'Метка', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}
         {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'root')(close)}
-        {item('comment', 'Комментарий', () => ed.setPanel('comments'))(close)}
+        {item('comment', 'Комментарий', () => { ed.setPanel('comments'); ed.setThread({ id }) })(close)}
         {item('task', 'To-Do', () => ed.setTopic(selection, { task: ref?.topic.task ? undefined : { done: false } }), none, '⌥ ⌘ T')(close)}
         {item('gantt', 'Задача', () => { ed.setTaskDialog(id) })(close)}
         <SubMenu icon="link" label="Ссылка">

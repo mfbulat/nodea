@@ -169,7 +169,7 @@ export async function toXmind(doc: MapDocument): Promise<Blob> {
     if (t.boundaries?.length) x.boundaries = t.boundaries.map(b => ({ id: b.id, range: b.ids.includes(t.id) ? 'master' : rangeOf(t, b.ids), title: b.title }))
     // всё, чего нет в XMind, — в собственном поле
     const extra: Record<string, unknown> = {}
-    for (const k of ['equation', 'task', 'comments', 'attachment'] as const) if (t[k]) extra[k] = t[k]
+    for (const k of ['equation', 'task', 'comments', 'commentPos', 'commentsResolved', 'attachment'] as const) if (t[k]) extra[k] = t[k]
     if (t.image?.src.startsWith('emoji:')) extra.image = t.image
     if (t.style) extra.style = t.style
     if (t.boundaries?.length) extra.boundaries = t.boundaries
@@ -284,6 +284,8 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
     if (extra.equation) t.equation = extra.equation
     if (extra.task) t.task = extra.task
     if (extra.comments) t.comments = extra.comments
+    if (extra.commentPos) t.commentPos = extra.commentPos
+    if (extra.commentsResolved) t.commentsResolved = extra.commentsResolved
     if (extra.image) t.image = extra.image
     if (extra.style) t.style = extra.style
     if (extra.boundaries) {

@@ -73,6 +73,9 @@ export interface Topic {
   /** настройки слайда в режиме презентации */
   pitch?: { slide?: 'auto' | 'yes' | 'no'; subSlides?: 'auto' | 'yes' | 'no'; delivery?: 'all' | 'one' | 'drill'; layout?: 'list' | 'bullets' | 'indent' | 'branch' | 'columns' }
   comments?: Comment[]
+  /** положение метки обсуждения относительно левого верхнего угла темы */
+  commentPos?: { x: number; y: number }
+  commentsResolved?: boolean
   boundaries?: Boundary[]
   summaries?: Summary[]
   callouts?: Topic[]

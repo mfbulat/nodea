@@ -62,9 +62,10 @@ export function Dropdown({ trigger, children, align = 'left', up = false }: {
   )
 }
 
-export function MenuItem({ label, hint, onClick, disabled, icon }: { label: string; hint?: string; onClick: () => void; disabled?: boolean; icon?: IconName }) {
+export function MenuItem({ label, hint, onClick, disabled, icon, checked }: { label: string; hint?: string; onClick: () => void; disabled?: boolean; icon?: IconName; checked?: boolean }) {
   return (
-    <button role="menuitem" disabled={disabled} onClick={onClick}>
+    <button role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={checked} disabled={disabled} onClick={onClick}>
+      {checked !== undefined && <span className="mi-check">{checked && <svg width={14} height={14} viewBox="0 0 14 14"><path d="M3 7.2l2.6 2.6L11 4.4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>}
       {icon && <Icon name={icon} size={16} />}<span className="mi-label">{label}</span>{hint && <kbd>{hint}</kbd>}
     </button>
   )

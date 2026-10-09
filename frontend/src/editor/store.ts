@@ -99,6 +99,14 @@ interface EditorState {
   markerTab: 'markers' | 'stickers' | 'illustrations'
   taskDialog: string | null
   setMarkerTab: (t: EditorState['markerTab']) => void
+  /** режим «щёлкните по карте, чтобы прокомментировать» */
+  commenting: boolean
+  /** открытое обсуждение: тема и (для нового) место метки */
+  thread: { id: string; pos?: { x: number; y: number } } | null
+  setCommenting: (v: boolean) => void
+  setThread: (t: EditorState['thread']) => void
+  resolveThread: (id: string, resolved: boolean) => void
+  removeThread: (id: string) => void
   setTaskDialog: (id: string | null) => void
   mapShot: boolean
   setGantt: (v: boolean) => void
@@ -158,7 +166,7 @@ interface EditorState {
   updateBoundary: (id: string, patch: Partial<Boundary>) => void
   addSummary: () => void
   addCallout: () => void
-  addComment: (id: string, text: string) => void
+  addComment: (id: string, text: string, pos?: { x: number; y: number }) => void
   removeComment: (id: string, commentId: string) => void
   removeElement: () => void
   setSheetId: (id: string) => void
@@ -210,7 +218,11 @@ export const useEditor = create<EditorState>((set, get) => {
   return {
     sheetId: null, selection: [], editingId: null, editSeed: null, past: [], future: [],
     view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false, markerTab: 'markers', taskDialog: null,
-    setMarkerTab: t => set({ markerTab: t }), setTaskDialog: id => set({ taskDialog: id }),
+    setMarkerTab: t => set({ markerTab: t }),
+    commenting: false, thread: null,
+    setCommenting: v => set({ commenting: v }), setThread: t => set({ thread: t, commenting: false }),
+    resolveThread: (id, resolved) => mutate(sh => { const t = locate(sh, id)?.topic; if (t) { if (resolved) t.commentsResolved = true; else delete t.commentsResolved } }),
+    removeThread: id => { mutate(sh => { const t = locate(sh, id)?.topic; if (t) { delete t.comments; delete t.commentPos; delete t.commentsResolved } }); if (get().thread?.id === id) set({ thread: null }) }, setTaskDialog: id => set({ taskDialog: id }),
     setGantt: v => set({ gantt: v }), setMapShot: v => set({ mapShot: v }),
     element: null, panel: 'format', relating: null, dialog: null, userName: '',
     viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,
@@ -219,7 +231,7 @@ export const useEditor = create<EditorState>((set, get) => {
     reset: () => {
       const d = useDoc.getState().doc
       set({ sheetId: d?.sheets[0]?.id ?? null, selection: d ? [d.sheets[0].rootTopic.id] : [], editingId: null, past: [], future: [],
-        element: null, relating: null, dialog: null, drillId: null, filter: null, presenting: false,
+        element: null, relating: null, dialog: null, drillId: null, filter: null, presenting: false, commenting: false, thread: null,
         search: { open: false, query: '', hits: [], index: 0 } })
     },
     sheet: () => { const d = useDoc.getState().doc; return d ? current(d) : null },
@@ -532,15 +544,18 @@ export const useEditor = create<EditorState>((set, get) => {
       mutate(sh => { const t = locate(sh, id)?.topic; if (t) (t.callouts ??= []).push(topic) })
       get().startEdit(topic.id)
     },
-    addComment: (id, text) => mutate(sh => {
+    addComment: (id, text, pos) => mutate(sh => {
       const t = locate(sh, id)?.topic
-      if (t) (t.comments ??= []).push({ id: uid(), author: get().userName, text, createdAt: new Date().toISOString() })
+      if (!t) return
+      ;(t.comments ??= []).push({ id: uid(), author: get().userName, text, createdAt: new Date().toISOString() })
+      if (pos && !t.commentPos) t.commentPos = pos
+      delete t.commentsResolved
     }),
     removeComment: (id, commentId) => mutate(sh => {
       const t = locate(sh, id)?.topic
       if (!t?.comments) return
       t.comments = t.comments.filter(c => c.id !== commentId)
-      if (!t.comments.length) delete t.comments
+      if (!t.comments.length) { delete t.comments; delete t.commentPos; delete t.commentsResolved }
     }),
     removeElement: () => {
       const e = get().element

@@ -114,7 +114,7 @@ export function layoutContent(t: Topic, s: FullStyle, showNotes = false): Conten
   if (t.notes?.plain?.trim() || t.notes?.html) right.push({ kind: 'note' })
   if (t.attachment) right.push({ kind: 'attachment' })
   if (t.audio) right.push({ kind: 'audio' })
-  if (t.comments?.length) right.push({ kind: 'comments' })
+  // комментарии показываются меткой обсуждения на холсте, а не значком в теме
 
   const rowItemsW = (left.length + right.length) * (icon + ICON_GAP)
   const rowH = Math.max(tb?.textH ?? 0, left.length + right.length ? icon : 0)
