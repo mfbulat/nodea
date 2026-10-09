@@ -6,9 +6,10 @@ import type { Sheet, StructureId, Topic } from './model'
 
 export interface Pt { x: number; y: number }
 export interface Box { id: string; x: number; y: number; w: number; h: number; cell?: boolean }
-export type EdgeKind = 'h' | 'v' | 'tree' | 'brace' | 'line'
+export type EdgeKind = 'h' | 'v' | 'tree' | 'brace' | 'vbrace' | 'line'
 export interface Edge { from: string; to: string; kind: EdgeKind; pts: Pt[] }
-export interface Deco { kind: 'grid' | 'spine'; pts: Pt[]; owner: string }
+export interface Deco { kind: 'grid' | 'spine' | 'callout'; pts: Pt[]; owner: string }
+export interface BoundaryGeom { id: string; owner: string; x: number; y: number; w: number; h: number; title?: string; color?: string; lineStyle?: string; fill?: string }
 export interface Toggle { id: string; x: number; y: number; collapsed: boolean; count: number }
 
 interface Block {
@@ -22,6 +23,7 @@ export interface LayoutResult {
   decos: Deco[]
   toggles: Toggle[]
   bounds: { minX: number; minY: number; maxX: number; maxY: number }
+  boundaries: BoundaryGeom[]
   /** структура, в которой лежат дети темы (для перетаскивания) */
   childAxis: Map<string, 'x' | 'y'>
 }
@@ -72,6 +74,52 @@ class Engine {
   anchorY(t: Topic) { const s = this.size(t); return s.underline ? s.h : s.h / 2 }
 
   layout(t: Topic, st: Internal): Block {
+    const b = this.layoutStructure(t, st)
+    this.decorate(t, b)
+    return b
+  }
+
+  /** Сводки (скобка + тема сводки) и выноски вокруг уже разложенного поддерева */
+  decorate(t: Topic, b: Block) {
+    const own = b.boxes.find(x => x.id === t.id)!
+    for (const sm of t.collapsed ? [] : t.summaries ?? []) {
+      const ids = new Set<string>()
+      for (const k of this.kids(t)) if (sm.ids.includes(k.id)) subtreeIds(k, ids, true)
+      const covered = b.boxes.filter(x => ids.has(x.id))
+      if (!covered.length) continue
+      const minX = Math.min(...covered.map(c => c.x)), maxX = Math.max(...covered.map(c => c.x + c.w))
+      const minY = Math.min(...covered.map(c => c.y)), maxY = Math.max(...covered.map(c => c.y + c.h))
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+      const ocx = own.x + own.w / 2, ocy = own.y + own.h / 2
+      const down = minY > own.y + own.h && cx > own.x - 4 && cx < own.x + own.w + 4 && Math.abs(cx - ocx) < Math.abs(cy - ocy) && (maxX - minX) > (maxY - minY)
+      const sb = this.layout(sm.topic, 'logic-right')
+      const ss = this.size(sm.topic)
+      if (down) {
+        const y0 = maxY + 6, tip = y0 + 16
+        merge(b, sb, cx - ss.w / 2, tip + 12 - sb.minY)
+        b.edges.push({ from: t.id, to: sm.topic.id, kind: 'vbrace', pts: [{ x: minX, y: tip }, { x: cx, y: y0 }, { x: maxX, y: tip }] })
+      } else {
+        const dir = cx >= ocx ? 1 : -1
+        const x0 = dir > 0 ? maxX + 6 : minX - 6, tip = x0 + dir * 16
+        const dx = dir > 0 ? tip + 12 - sb.minX : tip - 12 - sb.maxX
+        merge(b, sb, dx, cy - this.anchorY(sm.topic))
+        b.edges.push({ from: t.id, to: sm.topic.id, kind: 'brace', pts: [{ x: tip, y: minY }, { x: x0, y: cy }, { x: tip, y: maxY }] })
+      }
+    }
+    for (const c of t.callouts ?? []) {
+      const cb = this.layout(c, 'logic-right')
+      const cs = this.size(c)
+      const off = c.position ?? { x: 12, y: -(cs.h + 28) }
+      const dx = own.x + own.w + off.x, dy = own.y + off.y
+      // выноска не раздвигает соседние ветки: габариты блока не меняем
+      const keep = { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }
+      merge(b, cb, dx, dy)
+      Object.assign(b, keep)
+      b.decos.push({ kind: 'callout', owner: c.id, pts: [{ x: own.x + own.w * 0.75, y: own.y + own.h / 2 }, { x: dx + cs.w / 2, y: dy + cs.h / 2 }] })
+    }
+  }
+
+  layoutStructure(t: Topic, st: Internal): Block {
     const own = (t.structure as Internal | undefined) ?? st
     switch (own) {
       case 'mindmap': case 'mindmap-cw': case 'mindmap-acw': return this.mindmap(t, own)
@@ -428,6 +476,17 @@ function merge(into: Block, b: Block, dx: number, dy: number) {
   into.minY = Math.min(into.minY, b.minY + dy); into.maxY = Math.max(into.maxY, b.maxY + dy)
 }
 
+/** id темы и всех её потомков (с темами сводок и выносками) */
+export function subtreeIds(t: Topic, into = new Set<string>(), extras = true): Set<string> {
+  into.add(t.id)
+  if (!t.collapsed) t.children?.forEach(c => subtreeIds(c, into, extras))
+  if (extras) {
+    if (!t.collapsed) t.summaries?.forEach(s => subtreeIds(s.topic, into, extras))
+    t.callouts?.forEach(c => subtreeIds(c, into, extras))
+  }
+  return into
+}
+
 export function countAll(t: Topic): number {
   return (t.children ?? []).reduce((a, c) => a + 1 + countAll(c), 0)
 }
@@ -448,9 +507,34 @@ export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
     const p = f.position ?? { x: 0, y: 0 }
     merge(all, fb, p.x, p.y)
   }
+  const boxes = new Map(all.boxes.map(b => [b.id, b]))
+  for (const b of all.boxes) {
+    all.minX = Math.min(all.minX, b.x); all.minY = Math.min(all.minY, b.y)
+    all.maxX = Math.max(all.maxX, b.x + b.w); all.maxY = Math.max(all.maxY, b.y + b.h)
+  }
+  // границы: прямоугольник вокруг поддеревьев выбранных детей
+  const boundaries: BoundaryGeom[] = []
+  const visit = (t: Topic) => {
+    if (t.collapsed && t !== root) return
+    for (const bd of t.boundaries ?? []) {
+      const ids = new Set<string>()
+      for (const k of t.children ?? []) if (bd.ids.includes(k.id)) subtreeIds(k, ids)
+      if (bd.ids.includes(t.id)) subtreeIds(t, ids)
+      const bs = [...ids].map(i => boxes.get(i)).filter((x): x is Box => !!x)
+      if (!bs.length) continue
+      const pad = 10
+      const x = Math.min(...bs.map(c => c.x)) - pad, y = Math.min(...bs.map(c => c.y)) - pad - (bd.title ? 18 : 0)
+      const x2 = Math.max(...bs.map(c => c.x + c.w)) + pad, y2 = Math.max(...bs.map(c => c.y + c.h)) + pad
+      boundaries.push({ id: bd.id, owner: t.id, x, y, w: x2 - x, h: y2 - y, title: bd.title, color: bd.color, lineStyle: bd.lineStyle, fill: bd.fill })
+      all.minX = Math.min(all.minX, x); all.minY = Math.min(all.minY, y); all.maxX = Math.max(all.maxX, x2); all.maxY = Math.max(all.maxY, y2)
+    }
+    t.children?.forEach(visit)
+    t.summaries?.forEach(s => visit(s.topic))
+  }
+  visit(root)
+  sheet.floatingTopics?.forEach(visit)
   return {
-    boxes: new Map(all.boxes.map(b => [b.id, b])),
-    edges: all.edges, decos: all.decos, toggles: all.toggles,
+    boxes, edges: all.edges, decos: all.decos, toggles: all.toggles, boundaries,
     bounds: { minX: all.minX, minY: all.minY, maxX: all.maxX, maxY: all.maxY },
     childAxis: eng.childAxis,
   }

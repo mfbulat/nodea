@@ -9,6 +9,9 @@ import FormatPanel from '../editor/FormatPanel'
 import VersionsPanel from '../editor/VersionsPanel'
 import { useEditor } from '../editor/store'
 import { useEditorKeys } from '../editor/useEditorKeys'
+import Dialogs from '../editor/Dialogs'
+import { CommentsPanel, MarkersPanel, NotesPanel, SheetTabs } from '../editor/SidePanels'
+import { useAuth } from '../store/auth'
 import type { MapDocument } from '../editor/model'
 import TopBar from './TopBar'
 
@@ -21,9 +24,12 @@ export default function EditorPage() {
   const { id } = useParams()
   const { doc, title, saveState, saveError, open, close, setTitle, flush } = useDoc()
   const sheetId = useEditor(s => s.sheetId)
+  const panel = useEditor(s => s.panel)
+  const setPanel = useEditor(s => s.setPanel)
+  const email = useAuth(s => s.user?.email ?? '')
   const [error, setError] = useState('')
-  const [panel, setPanel] = useState<'format' | 'versions' | null>('format')
   useEditorKeys(!!doc)
+  useEffect(() => { useEditor.setState({ userName: email }) }, [email])
 
   useEffect(() => {
     api<MapFull>(`/api/maps/${id}`).then(m => { open(m); useEditor.getState().reset() }).catch(e => setError(e.message))
@@ -44,15 +50,20 @@ export default function EditorPage() {
       <TopBar>
         <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Название карты" />
         <span className="save-state" title={saveError}>{SAVE_LABEL[saveState]}</span>
-        <button onClick={() => setPanel(p => (p === 'versions' ? null : 'versions'))}>История</button>
+        <button onClick={() => setPanel(panel === 'versions' ? null : 'versions')}>История</button>
       </TopBar>
-      <Toolbar formatOpen={panel === 'format'} onToggleFormat={() => setPanel(p => (p === 'format' ? null : 'format'))} />
+      <Toolbar />
       <div className="editor-body">
         <div className="canvas"><MapCanvas sheet={sheet} /></div>
         {panel === 'format' && <FormatPanel sheet={sheet} />}
+        {panel === 'markers' && <MarkersPanel sheet={sheet} />}
+        {panel === 'notes' && <NotesPanel sheet={sheet} />}
+        {panel === 'comments' && <CommentsPanel sheet={sheet} />}
         {panel === 'versions' && id && <VersionsPanel mapId={id} onClose={() => setPanel(null)}
           onRestored={() => useEditor.getState().reset()} />}
       </div>
+      <SheetTabs />
+      <Dialogs />
     </div>
   )
 }

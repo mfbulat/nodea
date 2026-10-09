@@ -9,7 +9,7 @@ const MIME = 'application/x-mindmap-topics'
 
 // Латинская и русская раскладки; e.code бывает пустым у синтетических событий
 const KEYS: Record<string, string[]> = {
-  KeyA: ['a', 'ф'], KeyC: ['c', 'с'], KeyX: ['x', 'ч'], KeyV: ['v', 'м'], KeyZ: ['z', 'я'], KeyY: ['y', 'н'],
+  KeyA: ['a', 'ф'], KeyL: ['l', 'д'], KeyB: ['b', 'и'], KeyK: ['k', 'л'], KeyN: ['n', 'т'], BracketRight: [']', 'ъ'], KeyC: ['c', 'с'], KeyX: ['x', 'ч'], KeyV: ['v', 'м'], KeyZ: ['z', 'я'], KeyY: ['y', 'н'],
   Slash: ['/', '.'], Equal: ['=', '+'], Minus: ['-', '_'], Digit0: ['0', ')'],
 }
 const is = (e: KeyboardEvent, code: string) =>
@@ -55,6 +55,11 @@ export function useEditorKeys(enabled: boolean) {
       if (mod && is(e, 'KeyY')) { handled(); ed().redo(); return }
       if (mod && is(e, 'Slash')) { handled(); ed().toggleCollapse(); return }
       if (mod && is(e, 'KeyA')) { handled(); ed().selectAll(); return }
+      if (mod && is(e, 'KeyL')) { handled(); ed().startRelating(); return }
+      if (mod && is(e, 'KeyB')) { handled(); ed().addBoundary(); return }
+      if (mod && is(e, 'BracketRight')) { handled(); ed().addSummary(); return }
+      if (mod && is(e, 'KeyK') && primary) { handled(); ed().setDialog({ kind: 'link', id: primary }); return }
+      if (mod && e.shiftKey && is(e, 'KeyN') && primary) { handled(); ed().setPanel('notes'); return }
       // Буфер обмена: копирование — сразу во внутренний буфер (системный заполняется
       // в событии copy/cut); вставка ждёт событие paste, иначе берёт внутренний буфер
       if (mod && !e.altKey && (is(e, 'KeyC') || is(e, 'KeyX'))) {
@@ -74,7 +79,11 @@ export function useEditorKeys(enabled: boolean) {
       if (mod && is(e, 'Digit0')) { handled(); e.shiftKey ? canvasApi.zoomTo(1) : canvasApi.fit(); return }
       if (mod) return
 
-      if (k === 'Escape') { ed().select([]); return }
+      if (k === 'Escape') { if (!ed().relating) ed().select([]); return }
+      if (ed().element) {
+        if (k === 'Delete' || k === 'Backspace') { handled(); ed().removeElement() }
+        return
+      }
       if (!primary) {
         if (k === 'Enter' || k.startsWith('Arrow') || k === 'Tab') { handled(); const sh = ed().sheet(); if (sh) ed().select([sh.rootTopic.id]) }
         return

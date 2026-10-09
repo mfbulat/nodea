@@ -32,6 +32,8 @@ function theme(id: string, name: string, background: string, rainbow: string[],
       main: base({ fontSize: 16, ...main }),
       sub: subStyle,
       floating: base({ fontSize: 15, ...(floating ?? main) }),
+      summary: base({ fontSize: 15, ...main }),
+      callout: base({ fontSize: 13, shape: 'rounded', fill: '#fff8db', borderColor: '#e2c35b', textColor: '#3d3200', lineColor: '#e2c35b' }),
     },
   }
 }

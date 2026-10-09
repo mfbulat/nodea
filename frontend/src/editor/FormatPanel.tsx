@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react'
-import type { BorderStyle, LineShape, ShapeId, Sheet, StructureId, TopicStyle } from './model'
+import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { indexSheet } from './model'
 import { STRUCTURES } from './layout'
 import { getTheme, resolveStyle, THEMES } from './themes'
@@ -29,8 +29,102 @@ function Color({ value, onChange, allowNone }: { value: string; onChange: (v: st
   )
 }
 
+function ElementFormat({ sheet }: { sheet: Sheet }) {
+  const { element } = useEditor()
+  const ed = useEditor.getState()
+  if (element?.kind === 'relationship') {
+    const r = sheet.relationships?.find(x => x.id === element.id)
+    if (!r) return null
+    const up = (p: Partial<Relationship>) => ed.updateRelationship(r.id, p)
+    return (
+      <div className="side-panel format-panel" data-testid="format-panel">
+        <h4>Связь</h4>
+        <Row label="Подпись"><input value={r.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
+        <Row label="Цвет / толщина">
+          <Color value={r.color ?? '#667085'} onChange={v => up({ color: v })} />
+          <input type="number" min={1} max={8} value={r.width ?? 2} onChange={e => up({ width: +e.target.value })} />
+        </Row>
+        <Row label="Линия">
+          <select value={r.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
+            {BORDERS.filter(b => b[0] !== 'none').map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+        </Row>
+        <label className="fp-check"><input type="checkbox" checked={!!r.arrowStart} onChange={e => up({ arrowStart: e.target.checked })} />Стрелка в начале</label>
+        <label className="fp-check"><input type="checkbox" checked={r.arrowEnd !== false} onChange={e => up({ arrowEnd: e.target.checked })} />Стрелка в конце</label>
+        <div className="fp-buttons" style={{ marginTop: 10 }}>
+          <button onClick={() => up({ cp1: undefined, cp2: undefined })}>Сбросить изгиб</button>
+          <button className="danger" onClick={ed.removeElement}>Удалить связь</button>
+        </div>
+        <p className="muted" style={{ fontSize: 12 }}>Изгиб — перетаскиванием белых точек. Двойной щелчок по линии — подпись.</p>
+      </div>
+    )
+  }
+  if (element?.kind === 'boundary') {
+    let b: Boundary | undefined
+    const walk = (t: Topic) => { b ??= t.boundaries?.find(x => x.id === element.id); t.children?.forEach(walk); t.summaries?.forEach(s => walk(s.topic)) }
+    walk(sheet.rootTopic); sheet.floatingTopics?.forEach(walk)
+    if (!b) return null
+    const id = b.id
+    const up = (p: Partial<Boundary>) => ed.updateBoundary(id, p)
+    return (
+      <div className="side-panel format-panel" data-testid="format-panel">
+        <h4>Граница</h4>
+        <Row label="Заголовок"><input value={b.title ?? ''} onChange={e => up({ title: e.target.value })} /></Row>
+        <Row label="Цвет линии"><Color value={b.color ?? '#667085'} onChange={v => up({ color: v })} /></Row>
+        <Row label="Заливка"><Color value={b.fill ?? 'transparent'} allowNone onChange={v => up({ fill: v === 'transparent' ? undefined : v })} /></Row>
+        <Row label="Линия">
+          <select value={b.lineStyle ?? 'dashed'} onChange={e => up({ lineStyle: e.target.value as BorderStyle })}>
+            {BORDERS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          </select>
+        </Row>
+        <div className="fp-buttons" style={{ marginTop: 10 }}><button className="danger" onClick={ed.removeElement}>Удалить границу</button></div>
+      </div>
+    )
+  }
+  return null
+}
+
+function TopicElements({ topic }: { topic: Topic }) {
+  const ed = useEditor.getState()
+  const set = (p: Partial<Topic>) => ed.setTopic([topic.id], p)
+  const img = topic.image
+  const has = img || topic.attachment || topic.href || topic.equation || topic.labels?.length || topic.task || topic.markers?.length
+  if (!has) return null
+  return (
+    <>
+      <h4>Элементы темы</h4>
+      {img && !img.src.startsWith('emoji:') && (
+        <Row label="Ширина картинки">
+          <input type="number" min={16} max={1200} value={img.width}
+            onChange={e => { const w = +e.target.value; set({ image: { ...img, width: w, height: Math.round(img.height * w / img.width) } }) }} />
+          <button className="mini" onClick={() => set({ image: undefined })}>×</button>
+        </Row>
+      )}
+      {img?.src.startsWith('emoji:') && <Row label="Стикер"><span>{img.src.slice(6)}</span>
+        <input type="number" min={16} max={400} value={img.width} onChange={e => set({ image: { ...img, width: +e.target.value, height: +e.target.value } })} />
+        <button className="mini" onClick={() => set({ image: undefined })}>×</button></Row>}
+      {topic.attachment && <Row label="Вложение"><a href={topic.attachment.url} target="_blank" rel="noreferrer" className="ellipsis">{topic.attachment.name}</a>
+        <button className="mini" onClick={() => set({ attachment: undefined })}>×</button></Row>}
+      {topic.href && <Row label="Ссылка"><button className="mini" onClick={() => ed.setDialog({ kind: 'link', id: topic.id })}>Изменить</button>
+        <button className="mini" onClick={() => set({ href: undefined })}>×</button></Row>}
+      {topic.equation && <Row label="Формула"><button className="mini" onClick={() => ed.setDialog({ kind: 'equation', id: topic.id })}>Изменить</button>
+        <button className="mini" onClick={() => set({ equation: undefined })}>×</button></Row>}
+      {!!topic.labels?.length && <Row label="Метки"><button className="mini" onClick={() => ed.setDialog({ kind: 'labels', id: topic.id })}>Изменить</button>
+        <button className="mini" onClick={() => set({ labels: undefined })}>×</button></Row>}
+      {topic.task && <Row label="Задача"><label><input type="checkbox" checked={topic.task.done} onChange={() => ed.toggleTask(topic.id)} /> выполнено</label>
+        <button className="mini" onClick={() => set({ task: undefined })}>×</button></Row>}
+      {!!topic.markers?.length && <Row label="Маркеры"><button className="mini" onClick={() => set({ markers: undefined })}>Убрать все</button></Row>}
+    </>
+  )
+}
+
 export default function FormatPanel({ sheet }: { sheet: Sheet }) {
-  const { selection, styleClipboard } = useEditor()
+  const { selection, styleClipboard, element } = useEditor()
+  if (element) return <ElementFormat sheet={sheet} />
+  return <TopicFormat sheet={sheet} selection={selection} styleClipboard={styleClipboard} />
+}
+
+function TopicFormat({ sheet, selection, styleClipboard }: { sheet: Sheet; selection: string[]; styleClipboard: TopicStyle | null }) {
   const ed = useEditor.getState()
   const [tab, setTab] = useState<'topic' | 'map'>(selection.length ? 'topic' : 'map')
   const idx = indexSheet(sheet)
@@ -112,6 +206,7 @@ export default function FormatPanel({ sheet }: { sheet: Sheet }) {
             <Color value={s.lineColor} onChange={v => set({ lineColor: v })} />
           </Row>
 
+          <TopicElements topic={ref.topic} />
           <h4>Стиль</h4>
           <div className="fp-buttons">
             <button onClick={() => ed.copyStyle(s)} title="Ctrl+Alt+C">Копировать стиль</button>

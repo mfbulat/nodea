@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import boto3
 from botocore.client import Config
 
@@ -17,9 +19,12 @@ def ensure_bucket() -> None:
         s3.create_bucket(Bucket=settings.s3_bucket)
 
 
-def put_object(key: str, data: bytes, content_type: str) -> None:
+def put_object(key: str, data: bytes, content_type: str, filename: str | None = None) -> None:
+    extra = {}
+    if filename:
+        extra["ContentDisposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
     _client(settings.s3_endpoint).put_object(Bucket=settings.s3_bucket, Key=key, Body=data,
-                                             ContentType=content_type)
+                                             ContentType=content_type, **extra)
 
 
 def get_object(key: str):

@@ -1,26 +1,40 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import { useDoc } from '../store/doc'
-import type { MapDocument, Sheet, StructureId, Topic, TopicStyle } from './model'
+import type { Boundary, MapDocument, Relationship, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { cloneWithNewIds, indexSheet, isAncestor, uid } from './model'
+import { markerGroup } from './markers'
 import type { LayoutResult } from './layout'
 
 const HISTORY_LIMIT = 200
 
 export interface View { zoom: number; x: number; y: number }
 
-interface Located { topic: Topic; siblings: Topic[]; index: number; parent: Topic | null; floating: boolean }
+type LocKind = 'root' | 'child' | 'floating' | 'summary' | 'callout'
+interface Located { topic: Topic; siblings: Topic[]; index: number; parent: Topic | null; floating: boolean; kind: LocKind }
 
 export function locate(sheet: Sheet, id: string): Located | null {
-  if (sheet.rootTopic.id === id) return { topic: sheet.rootTopic, siblings: [], index: 0, parent: null, floating: false }
+  if (sheet.rootTopic.id === id) return { topic: sheet.rootTopic, siblings: [], index: 0, parent: null, floating: false, kind: 'root' }
   const fl = sheet.floatingTopics ?? []
   const fi = fl.findIndex(f => f.id === id)
-  if (fi >= 0) return { topic: fl[fi], siblings: fl, index: fi, parent: null, floating: true }
+  if (fi >= 0) return { topic: fl[fi], siblings: fl, index: fi, parent: null, floating: true, kind: 'floating' }
   const walk = (t: Topic): Located | null => {
     const ch = t.children ?? []
     for (let i = 0; i < ch.length; i++) {
-      if (ch[i].id === id) return { topic: ch[i], siblings: ch, index: i, parent: t, floating: false }
+      if (ch[i].id === id) return { topic: ch[i], siblings: ch, index: i, parent: t, floating: false, kind: 'child' }
       const r = walk(ch[i])
+      if (r) return r
+    }
+    const sm = t.summaries ?? []
+    for (let i = 0; i < sm.length; i++) {
+      if (sm[i].topic.id === id) return { topic: sm[i].topic, siblings: [], index: i, parent: t, floating: false, kind: 'summary' }
+      const r = walk(sm[i].topic)
+      if (r) return r
+    }
+    const co = t.callouts ?? []
+    for (let i = 0; i < co.length; i++) {
+      if (co[i].id === id) return { topic: co[i], siblings: co, index: i, parent: t, floating: false, kind: 'callout' }
+      const r = walk(co[i])
       if (r) return r
     }
     return null
@@ -33,6 +47,35 @@ export function topLevel(sheet: Sheet, ids: string[]): string[] {
   const idx = indexSheet(sheet)
   return ids.filter(id => idx.has(id) && !ids.some(o => o !== id && isAncestor(idx, o, id)))
 }
+
+/** Убирает ссылки границ/сводок/связей на удалённые темы */
+function prune(sheet: Sheet) {
+  const visit = (t: Topic) => {
+    const ids = new Set((t.children ?? []).map(c => c.id))
+    if (t.boundaries) {
+      for (const b of t.boundaries) b.ids = b.ids.filter(i => ids.has(i) || i === t.id)
+      t.boundaries = t.boundaries.filter(b => b.ids.length)
+      if (!t.boundaries.length) delete t.boundaries
+    }
+    if (t.summaries) {
+      for (const sm of t.summaries) sm.ids = sm.ids.filter(i => ids.has(i))
+      t.summaries = t.summaries.filter(sm => sm.ids.length)
+      if (!t.summaries.length) delete t.summaries
+    }
+    t.children?.forEach(visit)
+    t.summaries?.forEach(sm => visit(sm.topic))
+    t.callouts?.forEach(visit)
+  }
+  visit(sheet.rootTopic)
+  sheet.floatingTopics?.forEach(visit)
+  if (sheet.relationships) {
+    const idx = indexSheet(sheet)
+    sheet.relationships = sheet.relationships.filter(r => idx.has(r.end1) && idx.has(r.end2))
+  }
+}
+
+export type ElementSel = { kind: 'relationship' | 'boundary'; id: string } | null
+export type PanelId = 'format' | 'versions' | 'notes' | 'comments' | 'markers' | null
 
 let layoutRef: LayoutResult | null = null
 export const setCurrentLayout = (l: LayoutResult) => { layoutRef = l }
@@ -48,6 +91,11 @@ interface EditorState {
   view: View
   clipboard: Topic[] | null
   styleClipboard: TopicStyle | null
+  element: ElementSel
+  panel: PanelId
+  relating: string | null
+  dialog: { kind: 'link' | 'labels' | 'equation' | 'sticker'; id: string } | null
+  userName: string
 
   reset: () => void
   sheet: () => Sheet | null
@@ -78,6 +126,29 @@ interface EditorState {
   undo: () => void
   redo: () => void
   selectAll: () => void
+  selectElement: (e: ElementSel) => void
+  setPanel: (p: PanelId) => void
+  setDialog: (d: EditorState['dialog']) => void
+  setTopic: (ids: string[], patch: Partial<Topic>) => void
+  toggleMarker: (marker: string) => void
+  toggleTask: (id: string) => void
+  startRelating: () => void
+  finishRelating: (targetId: string | null) => void
+  updateRelationship: (id: string, patch: Partial<Relationship>) => void
+  addBoundary: () => void
+  updateBoundary: (id: string, patch: Partial<Boundary>) => void
+  addSummary: () => void
+  addCallout: () => void
+  addComment: (id: string, text: string) => void
+  removeComment: (id: string, commentId: string) => void
+  removeElement: () => void
+  setSheetId: (id: string) => void
+  addSheet: () => void
+  duplicateSheet: (id: string) => void
+  removeSheet: (id: string) => void
+  renameSheet: (id: string, title: string) => void
+  moveSheet: (id: string, delta: number) => void
+  revealTopic: (id: string) => boolean
 }
 
 export const useEditor = create<EditorState>((set, get) => {
@@ -90,23 +161,26 @@ export const useEditor = create<EditorState>((set, get) => {
     set(st => ({ past: [...st.past.slice(-HISTORY_LIMIT + 1), prev], future: [] }))
     useDoc.getState().setDoc(next)
   }
-  const mutate = (fn: (sheet: Sheet, d: MapDocument) => void) => commit(produce(doc(), d => fn(current(d), d)))
+  const mutate = (fn: (sheet: Sheet, d: MapDocument) => void) => commit(produce(doc(), d => { const sh = current(d); fn(sh, d); prune(sh) }))
+  const mutateDoc = (fn: (d: MapDocument) => void) => commit(produce(doc(), fn))
   const newTopic = (title: string): Topic => ({ id: uid(), title, children: [] })
   const childTitle = (sheet: Sheet, parentId: string) => sheet.rootTopic.id === parentId ? 'Основная тема' : 'Подтема'
 
   return {
     sheetId: null, selection: [], editingId: null, editSeed: null, past: [], future: [],
     view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null,
+    element: null, panel: 'format', relating: null, dialog: null, userName: '',
 
     reset: () => {
       const d = useDoc.getState().doc
-      set({ sheetId: d?.sheets[0]?.id ?? null, selection: d ? [d.sheets[0].rootTopic.id] : [], editingId: null, past: [], future: [] })
+      set({ sheetId: d?.sheets[0]?.id ?? null, selection: d ? [d.sheets[0].rootTopic.id] : [], editingId: null, past: [], future: [],
+        element: null, relating: null, dialog: null })
     },
     sheet: () => { const d = useDoc.getState().doc; return d ? current(d) : null },
     mutate,
     setView: v => set(st => ({ view: { ...st.view, ...v } })),
-    select: ids => set({ selection: ids }),
-    toggleSelect: id => set(st => ({ selection: st.selection.includes(id) ? st.selection.filter(s => s !== id) : [...st.selection, id] })),
+    select: ids => set({ selection: ids, element: null }),
+    toggleSelect: id => set(st => ({ element: null, selection: st.selection.includes(id) ? st.selection.filter(s => s !== id) : [...st.selection, id] })),
     startEdit: (id, seed = null) => set({ editingId: id, editSeed: seed, selection: [id] }),
     stopEdit: () => set({ editingId: null, editSeed: null }),
     setTitle: (id, title) => {
@@ -133,7 +207,8 @@ export const useEditor = create<EditorState>((set, get) => {
       const sheet = get().sheet()!
       const loc = locate(sheet, id)
       if (!loc) return
-      if (!loc.parent && !loc.floating) return get().addChild()
+      if ((!loc.parent && !loc.floating) || loc.kind === 'summary') return get().addChild()
+      if (loc.kind === 'callout') return
       const t = newTopic(loc.floating ? 'Плавающая тема' : childTitle(sheet, loc.parent!.id))
       mutate(sh => {
         const l = locate(sh, id)!
@@ -162,9 +237,14 @@ export const useEditor = create<EditorState>((set, get) => {
         ?? [...first.siblings].reverse().find((s, i) => first.siblings.length - 1 - i < first.index && !ids.includes(s.id))
         ?? first.parent ?? sheet.rootTopic
       mutate(sh => {
-        for (const id of ids) { const l = locate(sh, id); if (l) l.siblings.splice(l.index, 1) }
+        for (const id of ids) {
+          const l = locate(sh, id)
+          if (!l) continue
+          if (l.kind === 'summary') l.parent!.summaries = l.parent!.summaries!.filter(s => s.topic.id !== id)
+          else l.siblings.splice(l.index, 1)
+        }
       })
-      set({ selection: [next.id] })
+      set({ selection: [first.kind === 'summary' || first.kind === 'callout' ? first.parent!.id : next.id] })
     },
     toggleCollapse: () => {
       const sheet = get().sheet()
@@ -177,9 +257,11 @@ export const useEditor = create<EditorState>((set, get) => {
     move: (ids, targetId, mode) => {
       const sheet = get().sheet()!
       const idx = indexSheet(sheet)
-      const moving = topLevel(sheet, ids).filter(id => id !== sheet.rootTopic.id && id !== targetId && !isAncestor(idx, id, targetId))
+      const moving = topLevel(sheet, ids).filter(id => id !== sheet.rootTopic.id && id !== targetId && !isAncestor(idx, id, targetId)
+        && ['child', 'floating'].includes(idx.get(id)!.kind))
       if (!moving.length) return
-      if (mode !== 'child' && targetId === sheet.rootTopic.id) mode = 'child'
+      const tk = idx.get(targetId)?.kind
+      if (mode !== 'child' && (tk === 'root' || tk === 'summary' || tk === 'callout')) mode = 'child'
       mutate(sh => {
         const taken: Topic[] = []
         for (const id of moving) {
@@ -202,7 +284,8 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     detach: (ids, pos) => {
       const sheet = get().sheet()!
-      const moving = topLevel(sheet, ids).filter(id => id !== sheet.rootTopic.id)
+      const idx = indexSheet(sheet)
+      const moving = topLevel(sheet, ids).filter(id => idx.get(id)?.kind === 'child')
       if (!moving.length) return
       mutate(sh => {
         moving.forEach((id, i) => {
@@ -213,7 +296,7 @@ export const useEditor = create<EditorState>((set, get) => {
         })
       })
     },
-    setPosition: (id, pos) => mutate(sh => { const l = locate(sh, id); if (l?.floating) l.topic.position = pos }),
+    setPosition: (id, pos) => mutate(sh => { const l = locate(sh, id); if (l?.floating || l?.kind === 'callout') l.topic.position = pos }),
 
     copy: () => {
       const sheet = get().sheet()
@@ -301,6 +384,179 @@ export const useEditor = create<EditorState>((set, get) => {
     selectAll: () => {
       const sheet = get().sheet()
       if (sheet) set({ selection: [...indexSheet(sheet).keys()] })
+    },
+
+    selectElement: e => set({ element: e, selection: [], editingId: null }),
+    setPanel: p => set({ panel: p }),
+    setDialog: d => set({ dialog: d }),
+    setTopic: (ids, patch) => mutate(sh => {
+      for (const id of ids) {
+        const l = locate(sh, id)
+        if (!l) continue
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === undefined || (Array.isArray(v) && !v.length)) delete l.topic[k]
+          else l.topic[k] = v
+        }
+      }
+    }),
+    toggleMarker: marker => {
+      const sheet = get().sheet()
+      const ids = get().selection
+      if (!sheet || !ids.length) return
+      const has = !!locate(sheet, ids[ids.length - 1])?.topic.markers?.includes(marker)
+      mutate(sh => {
+        for (const id of ids) {
+          const t = locate(sh, id)?.topic
+          if (!t) continue
+          const rest = (t.markers ?? []).filter(m => markerGroup(m) !== markerGroup(marker))
+          t.markers = has ? rest : [...rest, marker]
+          if (!t.markers.length) delete t.markers
+        }
+      })
+    },
+    toggleTask: id => mutate(sh => { const t = locate(sh, id)?.topic; if (t?.task) t.task.done = !t.task.done }),
+
+    startRelating: () => { const id = primary(); if (id) set({ relating: id }) },
+    finishRelating: targetId => {
+      const src = get().relating
+      set({ relating: null })
+      if (!src || !targetId || targetId === src) return
+      const r: Relationship = { id: uid(), end1: src, end2: targetId, title: '' }
+      mutate(sh => { (sh.relationships ??= []).push(r) })
+      set({ element: { kind: 'relationship', id: r.id }, selection: [] })
+    },
+    updateRelationship: (id, patch) => mutate(sh => {
+      const r = sh.relationships?.find(x => x.id === id)
+      if (r) Object.assign(r, patch)
+    }),
+    addBoundary: () => {
+      const sheet = get().sheet()
+      if (!sheet) return
+      const ids = topLevel(sheet, get().selection)
+      if (!ids.length) return
+      const idx = indexSheet(sheet)
+      const first = idx.get(ids[0])!
+      const b: Boundary = { id: uid(), ids: [], title: '' }
+      if (first.kind === 'root' || first.kind === 'floating') {
+        // граница вокруг всей (плавающей) карты
+        b.ids = [first.topic.id]
+        mutate(sh => { const t = locate(sh, first.topic.id)!.topic; (t.boundaries ??= []).push(b) })
+      } else {
+        const parent = first.parent!
+        b.ids = ids.filter(i => idx.get(i)?.parent?.id === parent.id && idx.get(i)?.kind === 'child')
+        if (!b.ids.length) return
+        mutate(sh => { const t = locate(sh, parent.id)!.topic; (t.boundaries ??= []).push(b) })
+      }
+      set({ element: { kind: 'boundary', id: b.id }, selection: [] })
+    },
+    updateBoundary: (id, patch) => mutate(sh => {
+      const walk = (t: Topic): boolean => {
+        const b = t.boundaries?.find(x => x.id === id)
+        if (b) { Object.assign(b, patch); return true }
+        return (t.children ?? []).some(walk) || (t.summaries ?? []).some(s => walk(s.topic))
+      }
+      walk(sh.rootTopic) || (sh.floatingTopics ?? []).some(walk)
+    }),
+    addSummary: () => {
+      const sheet = get().sheet()
+      if (!sheet) return
+      const idx = indexSheet(sheet)
+      const ids = topLevel(sheet, get().selection).filter(i => idx.get(i)?.kind === 'child')
+      if (!ids.length) return
+      const parent = idx.get(ids[0])!.parent!
+      const same = ids.filter(i => idx.get(i)!.parent!.id === parent.id)
+      // сводка охватывает непрерывный диапазон от первой до последней выбранной темы
+      const pos = same.map(i => idx.get(i)!.index)
+      const range = (parent.children ?? []).slice(Math.min(...pos), Math.max(...pos) + 1).map(c => c.id)
+      const topic: Topic = { id: uid(), title: 'Сводка', children: [] }
+      mutate(sh => {
+        const t = locate(sh, parent.id)!.topic
+        ;(t.summaries ??= []).push({ id: uid(), ids: range, topic })
+      })
+      get().startEdit(topic.id)
+    },
+    addCallout: () => {
+      const id = primary()
+      if (!id) return
+      const topic: Topic = { id: uid(), title: 'Выноска', children: [] }
+      mutate(sh => { const t = locate(sh, id)?.topic; if (t) (t.callouts ??= []).push(topic) })
+      get().startEdit(topic.id)
+    },
+    addComment: (id, text) => mutate(sh => {
+      const t = locate(sh, id)?.topic
+      if (t) (t.comments ??= []).push({ id: uid(), author: get().userName, text, createdAt: new Date().toISOString() })
+    }),
+    removeComment: (id, commentId) => mutate(sh => {
+      const t = locate(sh, id)?.topic
+      if (!t?.comments) return
+      t.comments = t.comments.filter(c => c.id !== commentId)
+      if (!t.comments.length) delete t.comments
+    }),
+    removeElement: () => {
+      const e = get().element
+      if (!e) return
+      if (e.kind === 'relationship') mutate(sh => { sh.relationships = sh.relationships?.filter(r => r.id !== e.id) })
+      else mutate(sh => {
+        const walk = (t: Topic) => {
+          if (t.boundaries) t.boundaries = t.boundaries.filter(b => b.id !== e.id)
+          t.children?.forEach(walk); t.summaries?.forEach(s => walk(s.topic))
+        }
+        walk(sh.rootTopic); sh.floatingTopics?.forEach(walk)
+      })
+      set({ element: null })
+    },
+
+    setSheetId: id => {
+      const d = doc()
+      const sh = d.sheets.find(s => s.id === id)
+      if (sh) set({ sheetId: id, selection: [sh.rootTopic.id], element: null, editingId: null, relating: null })
+    },
+    addSheet: () => {
+      const sh: Sheet = { id: uid(), title: `Лист ${doc().sheets.length + 1}`, rootTopic: { id: uid(), title: 'Центральная тема', children: [] } }
+      mutateDoc(d => { d.sheets.push(sh) })
+      get().setSheetId(sh.id)
+    },
+    duplicateSheet: id => {
+      const src = doc().sheets.find(s => s.id === id)
+      if (!src) return
+      const copy: Sheet = { ...structuredClone(src), id: uid(), title: src.title + ' (копия)' }
+      // новые id тем и пересчёт связей
+      const oldIdx = indexSheet(src)
+      copy.rootTopic = cloneWithNewIds(src.rootTopic)
+      copy.floatingTopics = src.floatingTopics?.map(cloneWithNewIds)
+      const newIdx = [...indexSheet(copy).keys()]
+      const map = new Map([...oldIdx.keys()].map((k, i) => [k, newIdx[i]]))
+      copy.relationships = src.relationships?.map(r => ({ ...r, id: uid(), end1: map.get(r.end1) ?? r.end1, end2: map.get(r.end2) ?? r.end2 }))
+      mutateDoc(d => { d.sheets.splice(d.sheets.findIndex(s => s.id === id) + 1, 0, copy) })
+      get().setSheetId(copy.id)
+    },
+    removeSheet: id => {
+      const d = doc()
+      if (d.sheets.length <= 1) return
+      const i = d.sheets.findIndex(s => s.id === id)
+      mutateDoc(dd => { dd.sheets.splice(i, 1) })
+      if (get().sheetId === id) get().setSheetId(doc().sheets[Math.max(0, i - 1)].id)
+    },
+    renameSheet: (id, title) => mutateDoc(d => { const s = d.sheets.find(x => x.id === id); if (s) s.title = title }),
+    moveSheet: (id, delta) => mutateDoc(d => {
+      const i = d.sheets.findIndex(s => s.id === id), j = i + delta
+      if (i < 0 || j < 0 || j >= d.sheets.length) return
+      const [s] = d.sheets.splice(i, 1)
+      d.sheets.splice(j, 0, s)
+    }),
+    revealTopic: id => {
+      const d = doc()
+      const sh = d.sheets.find(s => indexSheet(s).has(id))
+      if (!sh) return false
+      // разворачиваем свёрнутых предков
+      const idx = indexSheet(sh)
+      const collapsedAncestors: string[] = []
+      let cur = idx.get(id)
+      while (cur?.parent) { if (cur.parent.collapsed) collapsedAncestors.push(cur.parent.id); cur = idx.get(cur.parent.id) }
+      if (sh.id !== get().sheetId) get().setSheetId(sh.id)
+      if (collapsedAncestors.length) mutate(s2 => { for (const a of collapsedAncestors) locate(s2, a)!.topic.collapsed = false })
+      set({ selection: [id], element: null })
+      return true
     },
   }
 

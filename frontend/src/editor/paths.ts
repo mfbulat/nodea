@@ -26,6 +26,12 @@ export function edgePath(e: Edge, shape: LineShape, width: number): { d: string;
   if (shape === 'none') return { d: '', filled: false }
   const [a, b] = e.pts
   if (e.kind === 'line') return { d: `M${f(a.x)},${f(a.y)}L${f(b.x)},${f(b.y)}`, filled: false }
+  if (e.kind === 'vbrace') {
+    // та же скобка, повёрнутая на 90°
+    const sw = (p: Pt): Pt => ({ x: p.y, y: p.x })
+    const r = edgePath({ ...e, kind: 'brace', pts: e.pts.map(sw) }, shape, width)
+    return { d: r.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, '$2,$1').replace(/([VH])(-?[\d.]+)/g, (_, c, n) => (c === 'V' ? 'H' : 'V') + n), filled: false }
+  }
   if (e.kind === 'brace') {
     // «{»: острие у родителя (x0), концы — у детей (x2)
     const [top, mid, bottom] = e.pts

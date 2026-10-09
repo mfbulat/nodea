@@ -4,31 +4,33 @@ import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
 import { layoutSheet } from './layout'
 import { FullStyle, resolveStyle, sheetBackground } from './themes'
-import { measureText, TextBox, topicSize } from './measure'
-import { edgePath, shapePath } from './paths'
+import { Content, IconKind, layoutContent, onFontsChanged } from './measure'
+import { edgePath } from './paths'
 import { currentLayout, setCurrentLayout, topLevel, useEditor } from './store'
+import { boxCenter, relGeometry } from './relations'
+import { dashOf, TopicNode } from './TopicView'
+import { followLink, uploadToTopic } from './actions'
 
 export interface Rendered {
   layout: LayoutResult
   styles: Map<string, FullStyle>
-  texts: Map<string, TextBox & { padX: number; padY: number }>
+  contents: Map<string, Content>
 }
 
 export function renderSheet(sheet: Sheet): Rendered {
   const idx = indexSheet(sheet)
   const styles = new Map<string, FullStyle>()
-  const texts = new Map<string, TextBox & { padX: number; padY: number }>()
+  const contents = new Map<string, Content>()
   const sizes = new Map<string, { w: number; h: number; underline: boolean }>()
   for (const [id, ref] of idx) {
     const st = resolveStyle(sheet, ref)
-    const tb = measureText(ref.topic.title, st)
-    const sz = topicSize(tb, st)
+    const c = layoutContent(ref.topic, st)
     styles.set(id, st)
-    texts.set(id, { ...tb, padX: sz.padX, padY: sz.padY })
-    sizes.set(id, { w: sz.w, h: sz.h, underline: st.shape === 'underline' })
+    contents.set(id, c)
+    sizes.set(id, { w: c.w, h: c.h, underline: st.shape === 'underline' })
   }
   const layout = layoutSheet(sheet, (t: Topic) => sizes.get(t.id)!)
-  return { layout, styles, texts }
+  return { layout, styles, contents }
 }
 
 type Drag =
@@ -36,14 +38,22 @@ type Drag =
   | { kind: 'marquee'; a: Pt; b: Pt; additive: boolean; base: string[] }
   | { kind: 'topic'; ids: string[]; start: Pt; cur: Pt; active: boolean; grab: Pt;
       target: { id: string; mode: 'child' | 'before' | 'after' } | null }
+  | { kind: 'cp'; relId: string; which: 1 | 2; cur: Pt }
+
+type LabelEdit = { kind: 'relationship' | 'boundary'; id: string; x: number; y: number; value: string }
 
 export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; readOnly?: boolean }) {
   const wrap = useRef<HTMLDivElement>(null)
-  const { view, selection, editingId } = useEditor()
+  const { view, selection, editingId, element, relating } = useEditor()
   const ed = useEditor.getState
-  const r = useMemo(() => renderSheet(sheet), [sheet])
+  const [fontEpoch, setFontEpoch] = useState(0)
+  useEffect(() => onFontsChanged(() => setFontEpoch(e => e + 1)), [])
+  const r = useMemo(() => renderSheet(sheet), [sheet, fontEpoch])
   setCurrentLayout(r.layout)
   const [drag, setDrag] = useState<Drag | null>(null)
+  const [pointer, setPointer] = useState<Pt | null>(null)
+  const [labelEdit, setLabelEdit] = useState<LabelEdit | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const dragRef = useRef<Drag | null>(null)
   const spaceDown = useRef(false)
   const updateDrag = (d: Drag | null) => { dragRef.current = d; setDrag(d) }
@@ -55,8 +65,11 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   }, [sheet.id])
 
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => { if (e.code === 'Space' && !isTyping(e)) spaceDown.current = true }
-    const ku = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDown.current = false }
+    const kd = (e: KeyboardEvent) => {
+      if ((e.code === 'Space' || e.key === ' ') && !isTyping(e)) spaceDown.current = true
+      if (e.key === 'Escape' && ed().relating) ed().finishRelating(null)
+    }
+    const ku = (e: KeyboardEvent) => { if (e.code === 'Space' || e.key === ' ') spaceDown.current = false }
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku)
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
   }, [])
@@ -83,9 +96,10 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   }
 
   function onBgPointerDown(e: React.PointerEvent) {
-    if ((e.target as Element).closest('.topic, .toggle, .title-editor')) return
+    if ((e.target as Element).closest('.topic, .toggle, .title-editor, .rel, .boundary, .cp-handle, .label-editor')) return
     wrap.current!.focus()
     if (ed().editingId) ed().stopEdit()
+    if (ed().relating) { ed().finishRelating(null); return }
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     if (e.button === 1 || e.button === 2 || spaceDown.current || readOnly) {
       updateDrag({ kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed().view.x, vy: ed().view.y })
@@ -101,6 +115,7 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
     if (e.button !== 0) return
     e.stopPropagation()
     wrap.current!.focus()
+    if (ed().relating) { ed().finishRelating(id); return }
     if (ed().editingId && ed().editingId !== id) ed().stopEdit()
     if (ed().editingId === id) return
     const sel = ed().selection
@@ -116,6 +131,7 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    if (ed().relating) setPointer(toWorld(e.clientX, e.clientY))
     const d = dragRef.current
     if (!d) return
     if (d.kind === 'pan') {
@@ -126,6 +142,8 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
       const hit = [...r.layout.boxes.values()].filter(bx => bx.x < x2 && bx.x + bx.w > x1 && bx.y < y2 && bx.y + bx.h > y1).map(bx => bx.id)
       ed().select([...new Set([...d.base, ...hit])])
       updateDrag({ ...d, b })
+    } else if (d.kind === 'cp') {
+      updateDrag({ ...d, cur: toWorld(e.clientX, e.clientY) })
     } else {
       const cur = toWorld(e.clientX, e.clientY)
       const active = d.active || Math.hypot(cur.x - d.start.x, cur.y - d.start.y) * ed().view.zoom > 4
@@ -136,27 +154,51 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
   function onPointerUp() {
     const d = dragRef.current
     updateDrag(null)
-    if (!d || d.kind !== 'topic') return
+    if (!d) return
+    if (d.kind === 'cp') {
+      const rel = sheet.relationships?.find(x => x.id === d.relId)
+      const b = rel && r.layout.boxes.get(d.which === 1 ? rel.end1 : rel.end2)
+      if (rel && b) {
+        const c = boxCenter(b)
+        ed().updateRelationship(rel.id, { [d.which === 1 ? 'cp1' : 'cp2']: { x: d.cur.x - c.x, y: d.cur.y - c.y } })
+        // вторая точка фиксируется текущим значением, чтобы кривая не «прыгала»
+        const g = relGeometry(rel, r.layout.boxes)
+        const other = d.which === 1 ? 'cp2' : 'cp1'
+        if (g && !rel[other]) {
+          const ob = r.layout.boxes.get(d.which === 1 ? rel.end2 : rel.end1)!
+          const oc = boxCenter(ob), cp = d.which === 1 ? g.c2 : g.c1
+          ed().updateRelationship(rel.id, { [other]: { x: cp.x - oc.x, y: cp.y - oc.y } })
+        }
+      }
+      return
+    }
+    if (d.kind !== 'topic') return
     if (!d.active) {
       // простой щелчок по теме из мультивыделения — выделить только её
       const id = d.ids.find(i => { const b = r.layout.boxes.get(i); return b && d.start.x >= b.x && d.start.x <= b.x + b.w && d.start.y >= b.y && d.start.y <= b.y + b.h })
       if (id && d.ids.length > 1) ed().select([id])
       return
     }
-    const root = sheet.rootTopic.id
-    const ids = d.ids.filter(id => id !== root)
+    const idx = indexSheet(sheet)
+    const ids = d.ids.filter(id => id !== sheet.rootTopic.id)
     if (!ids.length) return
+    const pos = { x: d.cur.x - d.grab.x, y: d.cur.y - d.grab.y }
+    // выноска перемещается относительно своей темы
+    const one = idx.get(ids[0])
+    if (ids.length === 1 && one?.kind === 'callout') {
+      const ob = r.layout.boxes.get(one.parent!.id)!
+      ed().setPosition(ids[0], { x: pos.x - (ob.x + ob.w), y: pos.y - ob.y })
+      return
+    }
     if (d.target) { ed().move(ids, d.target.id, d.target.mode); return }
     // отпущено на пустом месте: плавающая тема двигается, обычная — становится плавающей
-    const pos = { x: d.cur.x - d.grab.x, y: d.cur.y - d.grab.y }
-    const floating = new Set((sheet.floatingTopics ?? []).map(f => f.id))
-    if (ids.length === 1 && floating.has(ids[0])) ed().setPosition(ids[0], pos)
+    if (ids.length === 1 && one?.kind === 'floating') ed().setPosition(ids[0], pos)
     else ed().detach(ids, pos)
   }
 
   function findDropTarget(p: Pt, ids: string[]): { id: string; mode: 'child' | 'before' | 'after' } | null {
     const idx = indexSheet(sheet)
-    const excluded = (id: string) => ids.some(m => m === id || isAncestor(idx, m, id))
+    const excluded = (id: string) => ids.some(m => m === id || isAncestor(idx, m, id)) || idx.get(id)?.kind === 'callout'
     let best: { box: Box; dist: number } | null = null
     for (const box of r.layout.boxes.values()) {
       if (excluded(box.id)) continue
@@ -168,7 +210,7 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
     if (!best) return null
     const { box } = best
     const ref = idx.get(box.id)!
-    if (!ref.parent || best.dist > 0) return { id: box.id, mode: 'child' }
+    if (!ref.parent || best.dist > 0 || ref.kind !== 'child') return { id: box.id, mode: 'child' }
     const axis = r.layout.childAxis.get(ref.parent.id) ?? 'y'
     const rel = axis === 'y' ? (p.y - box.y) / box.h : (p.x - box.x) / box.w
     return { id: box.id, mode: rel < 0.25 ? 'before' : rel > 0.75 ? 'after' : 'child' }
@@ -218,7 +260,35 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
       if (sy + b.h * v.zoom > height - 20) y -= sy + b.h * v.zoom - height + 20
       if (x !== v.x || y !== v.y) ed().setView({ x, y })
     }
+    canvasApi.center = (id: string) => {
+      const b = currentLayout()?.boxes.get(id)
+      const el = wrap.current
+      if (!b || !el) return
+      const { width, height } = el.getBoundingClientRect()
+      const z = ed().view.zoom
+      ed().setView({ x: width / 2 - (b.x + b.w / 2) * z, y: height / 2 - (b.y + b.h / 2) * z })
+    }
   })
+
+  function onIcon(id: string, kind: IconKind) {
+    const t = indexSheet(sheet).get(id)?.topic
+    if (!t) return
+    ed().select([id])
+    if (kind === 'task') ed().toggleTask(id)
+    else if (kind === 'link') followLink(t.href!)
+    else if (kind === 'note') ed().setPanel('notes')
+    else if (kind === 'comments') ed().setPanel('comments')
+    else if (kind === 'attachment' && t.attachment) window.open(t.attachment.url, '_blank')
+  }
+
+  // файлы, перетащенные на тему: изображения — в картинку, остальное — во вложение
+  function onDrop(e: React.DragEvent) {
+    if (readOnly || !e.dataTransfer.files.length) return
+    e.preventDefault()
+    const g = (e.target as Element).closest('.topic') as SVGGElement | null
+    const id = g?.dataset.id ?? ed().selection[ed().selection.length - 1]
+    if (id) uploadToTopic(id, e.dataTransfer.files[0])
+  }
 
   const idx = useMemo(() => indexSheet(sheet), [sheet])
   const selSet = new Set(selection)
@@ -228,20 +298,52 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
 
   const bg = sheetBackground(sheet)
   const rootStyle = r.styles.get(sheet.rootTopic.id)!
+  const relColor = rootStyle.lineColor
+
+  const relGeoms = (sheet.relationships ?? []).map(rel => {
+    let g = relGeometry(rel, r.layout.boxes)
+    if (g && drag?.kind === 'cp' && drag.relId === rel.id) {
+      // во время перетаскивания одна точка следует за курсором, вторая остаётся на месте
+      const rel1 = (end: string, p: Pt) => { const c = boxCenter(r.layout.boxes.get(end)!); return { x: p.x - c.x, y: p.y - c.y } }
+      g = relGeometry({ ...rel,
+        cp1: drag.which === 1 ? rel1(rel.end1, drag.cur) : rel1(rel.end1, g.c1),
+        cp2: drag.which === 2 ? rel1(rel.end2, drag.cur) : rel1(rel.end2, g.c2) }, r.layout.boxes)
+    }
+    return { rel, g }
+  })
 
   return (
-    <div ref={wrap} className="map-canvas" tabIndex={0} data-testid="map-canvas"
-      style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : 'default' }}
+    <div ref={wrap} className={'map-canvas' + (relating ? ' relating' : '')} tabIndex={0} data-testid="map-canvas"
+      style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : relating ? 'crosshair' : 'default' }}
       onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
       onContextMenu={e => e.preventDefault()}
+      onDragOver={e => { if (!readOnly) e.preventDefault() }} onDrop={onDrop}
       onDoubleClick={e => {
-        if (readOnly || (e.target as Element).closest('.topic')) return
+        if (readOnly || (e.target as Element).closest('.topic, .rel, .boundary')) return
         const p = toWorld(e.clientX, e.clientY)
         ed().addFloating(p.x, p.y - 15)
       }}>
       <svg className="bg" width="100%" height="100%" style={{ display: 'block' }}>
         <g transform={`translate(${view.x},${view.y}) scale(${view.zoom})`}>
-          {r.layout.decos.map((d, i) => (
+          {r.layout.boundaries.map(b => {
+            const color = b.color ?? relColor
+            const sel = element?.kind === 'boundary' && element.id === b.id
+            return (
+              <g key={b.id} className="boundary" onPointerDown={e => { e.stopPropagation(); ed().selectElement({ kind: 'boundary', id: b.id }) }}
+                onDoubleClick={e => { e.stopPropagation(); setLabelEdit({ kind: 'boundary', id: b.id, x: b.x + 8, y: b.y, value: b.title ?? '' }) }}>
+                <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={12} fill={b.fill ?? color} fillOpacity={b.fill ? 0.25 : 0.06}
+                  stroke={color} strokeWidth={sel ? 2.5 : 1.5} strokeDasharray={dashOf(b.lineStyle ?? 'dashed', 1.5)} />
+                {b.title && <>
+                  <rect x={b.x} y={b.y} width={Math.min(b.w, b.title.length * 7.5 + 16)} height={20} rx={8} fill={color} />
+                  <text x={b.x + 8} y={b.y + 14} fontSize={12} fill="#fff" fontFamily="var(--font-map)">{b.title}</text>
+                </>}
+                {sel && <rect x={b.x - 3} y={b.y - 3} width={b.w + 6} height={b.h + 6} rx={14} fill="none" stroke="var(--color-selection)" strokeWidth={1.5} />}
+              </g>
+            )
+          })}
+          {r.layout.decos.map((d, i) => d.kind === 'callout' ? (
+            <CalloutTail key={'d' + i} from={d.pts[0]} to={d.pts[1]} style={r.styles.get(d.owner)!} />
+          ) : (
             <polyline key={'d' + i} points={d.pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
               stroke={d.kind === 'grid' ? rootStyle.borderColor : rootStyle.lineColor}
               strokeWidth={d.kind === 'grid' ? 1 : Math.max(3, rootStyle.lineWidth + 1)} />
@@ -250,20 +352,51 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
             const from = r.styles.get(e.from)!, to = r.styles.get(e.to)
             const color = sheet.rainbow && e.from === sheet.rootTopic.id && to ? to.lineColor : from.lineColor
             const shape = e.kind === 'line' ? 'straight' : from.lineShape
-            const { d, filled } = edgePath(e, shape, from.lineWidth)
+            const { d, filled } = edgePath(e, shape === 'none' && (e.kind === 'brace' || e.kind === 'vbrace') ? 'curve' : shape, from.lineWidth)
             if (!d) return null
             return <path key={e.from + '-' + e.to + e.kind} d={d} fill={filled ? color : 'none'}
-              stroke={filled ? 'none' : color} strokeWidth={from.lineWidth} strokeLinecap="round"
-              opacity={ghostIds.has(e.to) ? 0.25 : 1} />
+              stroke={filled ? 'none' : color} strokeWidth={e.kind === 'brace' || e.kind === 'vbrace' ? Math.min(2, from.lineWidth) : from.lineWidth}
+              strokeLinecap="round" opacity={ghostIds.has(e.to) ? 0.25 : 1} />
           })}
           {[...r.layout.boxes.values()].map(b => {
             const ref = idx.get(b.id)
             if (!ref) return null
-            return <TopicNode key={b.id} box={b} topic={ref.topic} style={r.styles.get(b.id)!} text={r.texts.get(b.id)!}
+            return <TopicNode key={b.id} box={b} topic={ref.topic} style={r.styles.get(b.id)!} content={r.contents.get(b.id)!}
               selected={selSet.has(b.id)} dim={ghostIds.has(b.id)} hidden={editingId === b.id}
-              central={levelOf(ref) === 'central'}
+              central={levelOf(ref) === 'central'} relTarget={!!relating && hoverId === b.id && relating !== b.id}
               onPointerDown={e => onTopicPointerDown(e, b.id)}
-              onDoubleClick={e => { e.stopPropagation(); if (!readOnly) ed().startEdit(b.id) }} />
+              onDoubleClick={e => { e.stopPropagation(); if (!readOnly) ed().startEdit(b.id) }}
+              onIcon={kind => onIcon(b.id, kind)}
+              onMarker={() => { ed().select([b.id]); ed().setPanel('markers') }} />
+          })}
+          {relGeoms.map(({ rel, g }) => {
+            if (!g) return null
+            const color = rel.color ?? relColor
+            const w = rel.width ?? 2
+            const sel = element?.kind === 'relationship' && element.id === rel.id
+            return (
+              <g key={rel.id} className="rel" onPointerDown={e => { e.stopPropagation(); ed().selectElement({ kind: 'relationship', id: rel.id }) }}
+                onDoubleClick={e => { e.stopPropagation(); setLabelEdit({ kind: 'relationship', id: rel.id, x: g.mid.x, y: g.mid.y, value: rel.title ?? '' }) }}>
+                <path d={g.d} fill="none" stroke="transparent" strokeWidth={14} style={{ cursor: 'pointer' }} />
+                <path d={g.d} fill="none" stroke={color} strokeWidth={w} strokeDasharray={dashOf(rel.lineStyle ?? 'dashed', w)} />
+                {rel.arrowEnd !== false && <path d={g.arrowEnd} fill={color} />}
+                {rel.arrowStart && <path d={g.arrowStart} fill={color} />}
+                {rel.title && <RelLabel x={g.mid.x} y={g.mid.y} text={rel.title} color={color} bg={bg} />}
+                {sel && <>
+                  <line x1={g.p1.x} y1={g.p1.y} x2={g.c1.x} y2={g.c1.y} stroke="var(--color-selection)" strokeDasharray="3 3" />
+                  <line x1={g.p2.x} y1={g.p2.y} x2={g.c2.x} y2={g.c2.y} stroke="var(--color-selection)" strokeDasharray="3 3" />
+                  {([1, 2] as const).map(which => (
+                    <circle key={which} className="cp-handle" cx={which === 1 ? g.c1.x : g.c2.x} cy={which === 1 ? g.c1.y : g.c2.y} r={6 / view.zoom}
+                      fill="#fff" stroke="var(--color-selection)" strokeWidth={2 / view.zoom} style={{ cursor: 'move' }}
+                      onPointerDown={e => {
+                        e.stopPropagation()
+                        ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+                        updateDrag({ kind: 'cp', relId: rel.id, which, cur: toWorld(e.clientX, e.clientY) })
+                      }} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+                  ))}
+                </>}
+              </g>
+            )
           })}
           {r.layout.toggles.map(t => (
             <g key={'t' + t.id} className={'toggle' + (t.collapsed ? ' collapsed' : '')}
@@ -275,6 +408,10 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
                 : <path d="M-3,0H3" stroke={r.styles.get(t.id)!.lineColor} strokeWidth={1.5} />}
             </g>
           ))}
+          {relating && pointer && r.layout.boxes.get(relating) && (
+            <line x1={boxCenter(r.layout.boxes.get(relating)!).x} y1={boxCenter(r.layout.boxes.get(relating)!).y}
+              x2={pointer.x} y2={pointer.y} stroke={relColor} strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />
+          )}
           {drag?.kind === 'topic' && drag.active && (
             <>
               {dragIds.map(id => {
@@ -295,18 +432,65 @@ export default function MapCanvas({ sheet, readOnly = false }: { sheet: Sheet; r
           )}
         </g>
       </svg>
+      {relating && <div className="relating-hint">Щёлкните тему, с которой нужно связать. Esc — отмена.</div>}
       {editingId && r.layout.boxes.get(editingId) && (
         <TitleEditor key={editingId} id={editingId} box={r.layout.boxes.get(editingId)!}
-          style={r.styles.get(editingId)!} text={r.texts.get(editingId)!}
+          style={r.styles.get(editingId)!} content={r.contents.get(editingId)!}
           title={idx.get(editingId)?.topic.title ?? ''} />
       )}
+      {labelEdit && (
+        <input className="label-editor" autoFocus defaultValue={labelEdit.value}
+          style={{ left: labelEdit.x * view.zoom + view.x - (labelEdit.kind === 'relationship' ? 80 : 0), top: labelEdit.y * view.zoom + view.y - 14 }}
+          placeholder={labelEdit.kind === 'relationship' ? 'Подпись связи' : 'Заголовок границы'}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setLabelEdit(null)
+          }}
+          onBlur={e => {
+            const v = e.target.value
+            if (labelEdit.kind === 'relationship') ed().updateRelationship(labelEdit.id, { title: v })
+            else ed().updateBoundary(labelEdit.id, { title: v })
+            setLabelEdit(null)
+          }} />
+      )}
+      {/* наведение для подсветки цели связи */}
+      {relating && <HoverTracker onHover={setHoverId} />}
     </div>
   )
 }
 
+function HoverTracker({ onHover }: { onHover: (id: string | null) => void }) {
+  useEffect(() => {
+    const mv = (e: PointerEvent) => {
+      const g = (e.target as Element | null)?.closest?.('.topic') as SVGGElement | null
+      onHover(g?.dataset.id ?? null)
+    }
+    window.addEventListener('pointermove', mv)
+    return () => { window.removeEventListener('pointermove', mv); onHover(null) }
+  }, [onHover])
+  return null
+}
+
+function RelLabel({ x, y, text, color, bg }: { x: number; y: number; text: string; color: string; bg: string }) {
+  const w = text.length * 7 + 14
+  return <g>
+    <rect x={x - w / 2} y={y - 11} width={w} height={22} rx={6} fill={bg} stroke={color} strokeWidth={1} />
+    <text x={x} y={y + 4.5} textAnchor="middle" fontSize={12} fill={color} fontFamily="var(--font-map)">{text}</text>
+  </g>
+}
+
+function CalloutTail({ from, to, style }: { from: Pt; to: Pt; style: FullStyle }) {
+  const dx = to.x - from.x, dy = to.y - from.y
+  const len = Math.hypot(dx, dy) || 1
+  const nx = -dy / len * 7, ny = dx / len * 7
+  return <path d={`M${from.x},${from.y}L${to.x + nx},${to.y + ny}L${to.x - nx},${to.y - ny}Z`}
+    fill={style.fill === 'transparent' ? '#fff8db' : style.fill} stroke={style.borderColor} strokeWidth={1} />
+}
+
 export const canvasApi = {
   fit: () => {}, zoomBy: (_k: number) => {}, zoomTo: (_z: number) => {}, focus: () => {},
-  ensureVisible: (_id: string) => {},
+  ensureVisible: (_id: string) => {}, center: (_id: string) => {},
 }
 
 export function isTyping(e: Event) {
@@ -326,46 +510,7 @@ function DropIndicator({ box, mode, axis }: { box: Box; mode: 'child' | 'before'
   return <line x1={x} x2={x} y1={box.y} y2={box.y + box.h} stroke="var(--color-selection)" strokeWidth={3} strokeLinecap="round" />
 }
 
-function TopicNode({ box, topic, style: s, text, selected, dim, hidden, central, onPointerDown, onDoubleClick }: {
-  box: Box; topic: Topic; style: FullStyle; text: TextBox & { padX: number; padY: number }
-  selected: boolean; dim: boolean; hidden: boolean; central: boolean
-  onPointerDown: (e: React.PointerEvent) => void; onDoubleClick: (e: React.MouseEvent) => void
-}) {
-  const shape = box.cell ? 'rect' : s.shape
-  const dash = s.borderStyle === 'dashed' ? `${s.borderWidth * 4} ${s.borderWidth * 3}` : s.borderStyle === 'dotted' ? `${s.borderWidth} ${s.borderWidth * 2}` : undefined
-  const stroke = s.borderStyle === 'none' ? 'none' : s.borderColor
-  const tx = s.textAlign === 'left' ? text.padX : s.textAlign === 'right' ? box.w - text.padX : box.w / 2
-  const anchor = s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle'
-  const ty = (box.h - text.textH) / 2 + text.lineHeight * 0.78
-  return (
-    <g className="topic" data-id={topic.id} data-central={central || undefined} transform={`translate(${box.x},${box.y})`}
-      opacity={dim ? 0.35 : 1} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} style={{ cursor: 'pointer' }}>
-      {selected && <rect x={-4} y={-4} width={box.w + 8} height={box.h + 8} rx={8} fill="none"
-        stroke="var(--color-selection)" strokeWidth={2} />}
-      {shape === 'underline' ? (
-        <>
-          <rect width={box.w} height={box.h} fill={s.fill === 'transparent' ? 'rgba(0,0,0,0)' : s.fill} />
-          <line x1={0} x2={box.w} y1={box.h} y2={box.h} stroke={stroke === 'none' ? s.lineColor : stroke}
-            strokeWidth={Math.max(s.borderWidth, s.lineWidth)} strokeDasharray={dash} />
-        </>
-      ) : shape === 'none' ? (
-        <rect width={box.w} height={box.h} fill={s.fill === 'transparent' ? 'rgba(0,0,0,0)' : s.fill} />
-      ) : (
-        <path d={shapePath(shape, box.w, box.h)} fill={s.fill === 'transparent' ? 'rgba(0,0,0,0)' : s.fill}
-          stroke={stroke} strokeWidth={s.borderWidth} strokeDasharray={dash} />
-      )}
-      {!hidden && (
-        <text x={tx} y={ty} textAnchor={anchor} fill={s.textColor} fontFamily={s.fontFamily} fontSize={s.fontSize}
-          fontWeight={s.fontWeight} fontStyle={s.fontStyle} textDecoration={s.textDecoration}
-          style={{ userSelect: 'none', whiteSpace: 'pre' }}>
-          {text.lines.map((l, i) => <tspan key={i} x={tx} dy={i ? text.lineHeight : 0}>{l}</tspan>)}
-        </text>
-      )}
-    </g>
-  )
-}
-
-function TitleEditor({ id, box, style: s, text, title }: { id: string; box: Box; style: FullStyle; text: TextBox & { padX: number; padY: number }; title: string }) {
+function TitleEditor({ id, box, style: s, content: c, title }: { id: string; box: Box; style: FullStyle; content: Content; title: string }) {
   const { view, editSeed } = useEditor()
   const ed = useEditor.getState
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -382,14 +527,19 @@ function TitleEditor({ id, box, style: s, text, title }: { id: string; box: Box;
   const commit = (after?: () => void) => {
     if (done.current) return
     done.current = true
-    ed().setTitle(id, value.trim() ? value : title)
+    const keepEmpty = !!(c.image || c.equation)
+    ed().setTitle(id, value.trim() || keepEmpty ? value : title)
     ed().stopEdit()
     canvasApi.focus()
     after?.()
   }
   const cancel = () => { done.current = true; ed().stopEdit(); canvasApi.focus() }
   const z = view.zoom
+  const lh = c.text?.lineHeight ?? Math.round(s.fontSize * 1.3)
   const lines = Math.max(1, value.split('\n').length)
+  const tx = c.text ? c.text.x + (box.w - c.w) / 2 : c.padX
+  const ty = c.text ? c.text.y + (box.h - c.h) / 2 : c.padY
+  const w = Math.max(c.text?.textW ?? 60, Math.min(s.maxWidth, value.length * s.fontSize * 0.62)) + 16
   return (
     <textarea ref={ref} className="title-editor" value={value} spellCheck={false}
       onChange={e => setValue(e.target.value)}
@@ -401,12 +551,13 @@ function TitleEditor({ id, box, style: s, text, title }: { id: string; box: Box;
         else if (e.key === 'Tab') { e.preventDefault(); commit(() => ed().addChild()) }
       }}
       style={{
-        left: box.x * z + view.x, top: box.y * z + view.y,
-        minWidth: box.w * z, width: Math.max(box.w, Math.min(s.maxWidth, value.length * s.fontSize * 0.62) + text.padX * 2) * z,
-        height: Math.max(box.h, lines * text.lineHeight + text.padY * 2) * z,
-        padding: `${text.padY * z}px ${text.padX * z}px`,
-        font: `${s.fontStyle} ${s.fontWeight} ${s.fontSize * z}px/${text.lineHeight * z}px ${s.fontFamily}`,
+        left: (box.x + tx - 8) * z + view.x, top: (box.y + ty - 4) * z + view.y,
+        width: w * z, height: (Math.max(lines * lh, c.text?.textH ?? lh) + 8) * z,
+        padding: `${4 * z}px ${8 * z}px`,
+        font: `${s.fontStyle} ${s.fontWeight} ${s.fontSize * z}px/${lh * z}px ${s.fontFamily}`,
         textAlign: s.textAlign, color: s.textColor,
       }} />
   )
 }
+
+if (import.meta.env.DEV) Object.assign((window as unknown as { __mm: object }).__mm ?? {}, { canvasApi })
