@@ -45,4 +45,12 @@ describe('форматы', () => {
     const back = await fromXmind(await toXmind(d))
     expect(back.sheets[0]).toMatchObject({ zones: [{ id: 'z', title: 'Идеи', w: 30 }], palette: 'iris', pitchTheme: 'light', taskSkipWeekends: true, structure: 'logic-right' })
   })
+  it('.xmind сохраняет баланс, стороны и свободное положение веток', async () => {
+    const d = structuredClone(doc)
+    Object.assign(d.sheets[0], { balance: false, freeBranch: true })
+    Object.assign(d.sheets[0].rootTopic.children![0], { side: 'l', freePos: { x: 300, y: -120 } })
+    const back = await fromXmind(await toXmind(d))
+    expect(back.sheets[0]).toMatchObject({ balance: false, freeBranch: true })
+    expect(back.sheets[0].rootTopic.children![0]).toMatchObject({ side: 'l', freePos: { x: 300, y: -120 } })
+  })
 })

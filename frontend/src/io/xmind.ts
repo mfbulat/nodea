@@ -161,6 +161,8 @@ export async function toXmind(doc: MapDocument): Promise<Blob> {
       }
     }
     if (t.position) x.position = t.position
+    // сторона основной ветки без баланса и свободное положение — в своём расширении
+    if (t.side || t.freePos) x['x-mindmap'] = { side: t.side, freePos: t.freePos }
     const style = styleToX(t.style)
     if (style) x.style = { id: uid(), properties: style }
     const children: Record<string, XTopic[]> = {}
@@ -268,6 +270,9 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
       t.image = { src, width: img.width ?? 200, height: img.height ?? 150 }
     }
     if (x.position) t.position = x.position as Topic['position']
+    const ext = x['x-mindmap'] as Pick<Topic, 'side' | 'freePos'> | undefined
+    if (ext?.side) t.side = ext.side
+    if (ext?.freePos) t.freePos = ext.freePos
     const style = styleFromX((x.style as { properties?: Record<string, string> } | undefined)?.properties)
     if (style) t.style = style
     const ch = (x.children ?? {}) as Record<string, XTopic[]>
