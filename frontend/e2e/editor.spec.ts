@@ -46,6 +46,7 @@ test('перетаскивание меняет родителя', async ({ page
 test('раскладки и стиль через панель формата', async ({ page }) => {
   const id = await newMap(page)
   await topic(page, 'Центральная тема').click()
+  await page.getByLabel('Формат', { exact: true }).click()
   await page.getByTestId('format-panel').locator('select[aria-label="Структура"]').selectOption('org-down')
   await page.getByRole('button', { name: 'Карта', exact: true }).last().click()
   await page.getByRole('button', { name: 'Цветовая тема', exact: true }).click()

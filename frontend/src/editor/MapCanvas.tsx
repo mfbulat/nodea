@@ -105,9 +105,13 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
   const spaceDown = useRef(false)
   const updateDrag = (d: Drag | null) => { dragRef.current = d; setDrag(d) }
 
-  // начальное положение: центральная тема по центру, крупные карты — вписать
+  // начальное положение как в веб-версии: масштаб 100 %, центральная тема в центре холста
   useLayoutEffect(() => {
-    fitToScreen(true)
+    const el = wrap.current, rb = (currentLayout() ?? r.layout).boxes.get(sheet.rootTopic.id)
+    if (el && rb) {
+      const { width, height } = el.getBoundingClientRect()
+      ed().setView({ zoom: 1, x: width / 2 - (rb.x + rb.w / 2), y: height / 2 - (rb.y + rb.h / 2) })
+    } else fitToScreen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet.id, drillId])
 
@@ -288,7 +292,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
 
   function zoomAt(z: number, sx: number, sy: number) {
     const v = ed().view
-    const zoom = Math.min(4, Math.max(0.1, z))
+    const zoom = Math.min(5, Math.max(0.1, z))
     ed().setView({ zoom, x: sx - (sx - v.x) * (zoom / v.zoom), y: sy - (sy - v.y) * (zoom / v.zoom) })
   }
 

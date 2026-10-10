@@ -96,7 +96,7 @@ export function useBarFit() {
   useEffect(() => { const f = () => setW(window.innerWidth); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [])
   const panel = useEditor(s => s.panel)
   const free = w - (panel ? 300 : 0)
-  return { summary: free >= 1000, relation: free >= 900, subtitle: w - (panel ? 200 : 0) >= 900, gantt: free >= 900, present: free >= 800 }
+  return { summary: free >= 1000, relation: free >= 930, subtitle: w - (panel ? 200 : 0) >= 900, gantt: free >= 900, present: free >= 800 }
 }
 
 export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest: boolean; mapId?: string }) {
@@ -243,7 +243,7 @@ export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveT
           <MenuItem label="Увеличить" hint="⌘ +" onClick={() => canvasApi.zoomBy(1.2)} />
           <MenuItem label="Уменьшить" hint="⌘ −" onClick={() => canvasApi.zoomBy(1 / 1.2)} />
           <MenuItem label="Реальный размер" hint="⌘ 0" onClick={() => { close(); canvasApi.zoomTo(1) }} />
-          <MenuItem label="Вписать карту" hint="⇧ ⌘ 0" onClick={() => { close(); canvasApi.fit() }} />
+          <MenuItem label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
           <div className="menu-sep" />
           <MenuItem label={drillId ? 'Показать всю карту' : 'Показать только ветку'} hint="⌘ ;" onClick={() => { close(); drillId ? ed.drillUp() : ed.drillDown() }} />
           <MenuItem label={(zen ? '✓ ' : '') + 'ZEN-режим'} hint="⌥ ⌘ F" onClick={() => { close(); ed.setZen(!zen) }} />
@@ -266,23 +266,19 @@ export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveT
 
 /** Нижняя строка справа: масштаб и переключатель «Структура / Карта» */
 export function BottomRight({ sheet }: { sheet: Sheet }) {
-  const { view, selection, viewMode } = useEditor()
+  const { view, viewMode } = useEditor()
   const ed = useEditor.getState()
-  const total = indexSheet(sheet).size
+  void sheet
   return (
     <div className="bar-bottom-right">
-      <span className="status-text" data-testid="topic-count">Темы: {selection.length ? `${selection.length} / ` : ''}{total}</span>
       {viewMode === 'map' && (
         <Dropdown align="right" up trigger={(open, toggle) => (
           <button className={'zoom-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Масштаб">{Math.round(view.zoom * 100)}%<Icon name="chevron" size={14} /></button>
         )}>
           {close => <>
-            <MenuItem label="Увеличить" hint="⌘ +" onClick={() => canvasApi.zoomBy(1.2)} />
-            <MenuItem label="Уменьшить" hint="⌘ −" onClick={() => canvasApi.zoomBy(1 / 1.2)} />
+            {[50, 80, 100, 120, 150, 200, 300, 400, 500].map(z => <MenuItem key={z} label={`${z}%`} onClick={() => { close(); canvasApi.zoomTo(z / 100) }} />)}
             <div className="menu-sep" />
-            {[50, 75, 100, 150, 200].map(z => <MenuItem key={z} label={`${z}%`} onClick={() => { close(); canvasApi.zoomTo(z / 100) }} />)}
-            <div className="menu-sep" />
-            <MenuItem label="Вписать карту" hint="⇧ ⌘ 0" onClick={() => { close(); canvasApi.fit() }} />
+            <MenuItem label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
           </>}
         </Dropdown>
       )}

@@ -224,7 +224,7 @@ export const useEditor = create<EditorState>((set, get) => {
     resolveThread: (id, resolved) => mutate(sh => { const t = locate(sh, id)?.topic; if (t) { if (resolved) t.commentsResolved = true; else delete t.commentsResolved } }),
     removeThread: id => { mutate(sh => { const t = locate(sh, id)?.topic; if (t) { delete t.comments; delete t.commentPos; delete t.commentsResolved } }); if (get().thread?.id === id) set({ thread: null }) }, setTaskDialog: id => set({ taskDialog: id }),
     setGantt: v => set({ gantt: v }), setMapShot: v => set({ mapShot: v }),
-    element: null, panel: 'format', relating: null, dialog: null, userName: '',
+    element: null, panel: null, relating: null, dialog: null, userName: '',
     viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,
     search: { open: false, query: '', hits: [], index: 0 },
 
