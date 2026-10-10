@@ -19,6 +19,7 @@ import { Legend, MarkersPanel, NotesPanel, SheetTabs } from '../editor/SidePanel
 import { CommentsPanel } from '../editor/Comments'
 import Outliner from '../editor/Outliner'
 import NavPanel from '../editor/NavPanel'
+import ContextMenu from '../editor/ContextMenu'
 import FilterPanel from '../editor/FilterPanel'
 import Presentation from '../editor/Presentation'
 import { useAuth } from '../store/auth'
@@ -184,6 +185,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
           onRestored={() => useEditor.getState().reset()} />}
       </>}
       <Dialogs />
+      <ContextMenu />
       {gantt && !zen && <Gantt sheet={sheet} />}
       {!zen && !embed && <TaskPanel sheet={sheet} />}
       {!zen && !embed && <NavPanel sheet={sheet} />}

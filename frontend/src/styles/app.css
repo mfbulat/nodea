@@ -889,3 +889,7 @@ body { font-family: var(--font-ui); }
 .empty .icon { color: #1f2326; stroke-width: 1.1; margin-bottom: 8px; }
 .empty b { font-size: 17px; font-weight: 700; color: #1f2326; }
 .empty p { font-size: 13px; color: #1f2326; }
+.ctx-menu { width: 252px; }
+.ctx-menu .mi-label { white-space: nowrap; }
+.ctx-menu.flip .menu.sub { left: auto; right: calc(100% + 4px); }
+.ctx-menu .menu.sub { min-width: 200px; }

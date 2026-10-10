@@ -188,6 +188,10 @@ interface EditorState {
   outdent: () => void
   addParent: () => void
   duplicate: () => void
+  /** «Сбросить положение»: убрать свободное смещение веток выделенных тем */
+  resetPosition: () => void
+  /** «Новый лист из темы»: копия ветки становится центральной темой нового листа */
+  newSheetFromTopic: (id: string) => void
   deleteSingle: () => void
   foldAll: (collapse?: boolean) => void
   selectBy: (kind: 'subtopics' | 'siblings' | 'level' | 'floating') => void
@@ -594,6 +598,19 @@ export const useEditor = create<EditorState>((set, get) => {
       mutateDoc(d => { d.sheets.push(sh) })
       get().setSheetId(sh.id)
     },
+    resetPosition: () => {
+      const ids = get().selection
+      mutate(sh => { for (const id of ids) { const t = locate(sh, id)?.topic; if (t) delete t.offset } })
+    },
+    newSheetFromTopic: id => {
+      const t = get().sheet() && locate(get().sheet()!, id)?.topic
+      if (!t) return
+      const root = cloneWithNewIds(t)
+      delete root.offset
+      const sh: Sheet = { id: uid(), title: t.title || `Карта ${doc().sheets.length + 1}`, structure: 'mindmap-cw', rootTopic: root }
+      mutateDoc(d => { d.sheets.push(sh) })
+      get().setSheetId(sh.id)
+    },
     duplicateSheet: id => {
       const src = doc().sheets.find(s => s.id === id)
       if (!src) return
@@ -662,7 +679,7 @@ export const useEditor = create<EditorState>((set, get) => {
       mutate(sh => {
         for (const id of ids) {
           const l = locate(sh, id)!
-          const c = cloneWithNewIds(structuredClone(l.topic) as Topic)
+          const c = cloneWithNewIds(JSON.parse(JSON.stringify(l.topic)) as Topic)
           if (l.kind === 'floating') c.position = { x: (l.topic.position?.x ?? 0) + 30, y: (l.topic.position?.y ?? 0) + 30 }
           l.siblings.splice(l.index + 1, 0, c)
           created.push(c.id)

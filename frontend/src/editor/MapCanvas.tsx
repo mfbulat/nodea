@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CommentLayer, nearestTopic } from './Comments'
+import { openTopicMenu } from './ContextMenu'
 import type { Sheet, Topic } from './model'
 import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
@@ -422,7 +423,14 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     <div ref={wrap} className={'map-canvas' + (relating ? ' relating' : '') + (commenting ? ' commenting' : '')} tabIndex={0} data-testid="map-canvas"
       style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : relating ? 'crosshair' : 'default' }}
       onPointerDownCapture={onCommentPointerDown} onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      onContextMenu={e => e.preventDefault()}
+      onContextMenu={e => {
+        e.preventDefault()
+        const g = (e.target as Element).closest('.topic') as SVGGElement | null
+        const id = g?.dataset.id
+        if (!id || readOnly || ed().editingId) return
+        if (!ed().selection.includes(id)) ed().select([id])
+        openTopicMenu(e.clientX, e.clientY, id)
+      }}
       onDragOver={e => { if (!readOnly) e.preventDefault() }} onDrop={onDrop}
       onDoubleClick={e => {
         if (readOnly || (e.target as Element).closest('.topic, .rel, .boundary')) return

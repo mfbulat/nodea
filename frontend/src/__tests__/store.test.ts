@@ -70,4 +70,21 @@ describe('операции редактора', () => {
     expect(ed().replaceAll('A', 'Z')).toBe(2)
     expect(titles(root())).toBe('R[Z[Z1],B]')
   })
+
+  it('дублировать, удалить только тему, новый лист из темы, сброс положения', () => {
+    ed().select(['a']); ed().duplicate()
+    expect(titles(root())).toBe('R[A[A1],A[A1],B]')
+    ed().undo()
+    ed().select(['a']); ed().deleteSingle()
+    expect(titles(root())).toBe('R[A1,B]')
+    ed().undo()
+    ed().newSheetFromTopic('a')
+    const sheets = useDoc.getState().doc!.sheets
+    expect(sheets.map(s => titles(s.rootTopic as Topic))).toEqual(['R[A[A1],B]', 'A[A1]'])
+    expect(sheets[1].rootTopic.id).not.toBe('a')
+    ed().setSheetId('s')
+    ed().select(['b']); ed().setTopic(['b'], { offset: { x: 10, y: 5 } })
+    ed().resetPosition()
+    expect((root().children![1] as Topic).offset).toBeUndefined()
+  })
 })

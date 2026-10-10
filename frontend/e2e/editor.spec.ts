@@ -159,3 +159,13 @@ test('задача: панель слева, карточка в теме, ди�
   await panel.getByRole('button', { name: 'Вставить' }).click()
   await expect(g.locator('.gt-row:not(.head)')).toHaveCount(1)
 })
+
+test('контекстное меню темы: дублировать и новый лист из темы', async ({ page }) => {
+  const id = await newMap(page, { version: 1, sheets: [{ id: 's', title: 'Л', rootTopic: { id: 'r', title: 'Центр', children: [{ id: 'a', title: 'Ветка', children: [{ id: 'a1', title: 'Лист' }] }] } }] })
+  await topic(page, 'Ветка').click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Меню темы' }).getByRole('menuitem', { name: /Дублировать/ }).click()
+  await expectTree(page, id, 'Центр[Ветка[Лист],Ветка[Лист]]')
+  await topic(page, 'Ветка').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Новый лист из темы' }).click()
+  await expect.poll(async () => (await docOf(page, id)).sheets.map((s: { rootTopic: { title: string } }) => s.rootTopic.title)).toEqual(['Центр', 'Ветка'])
+})
