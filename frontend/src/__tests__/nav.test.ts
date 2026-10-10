@@ -39,6 +39,6 @@ describe('календарь задач', () => {
     expect(ics).toContain('DTSTART;VALUE=DATE:20261010')
     expect(ics).toContain('DTEND;VALUE=DATE:20261013')
     expect(ics).toContain('SUMMARY:Задача')
-    expect(ics).toContain('Исполнитель: Аня')
+    expect(ics).toContain('Assignee: Аня')
   })
 })

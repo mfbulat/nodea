@@ -50,16 +50,16 @@ def clear_auth_cookies(response: Response) -> None:
 
 def decode_token(token: str | None, kind: str, db: Session) -> User:
     if not token:
-        raise HTTPException(401, "Не авторизован")
+        raise HTTPException(401, "Not authenticated")
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
-        raise HTTPException(401, "Недействительный токен")
+        raise HTTPException(401, "Invalid token")
     if payload.get("typ") != kind:
-        raise HTTPException(401, "Недействительный токен")
+        raise HTTPException(401, "Invalid token")
     user = db.get(User, uuid.UUID(payload["sub"]))
     if not user or user.token_version != payload.get("ver"):
-        raise HTTPException(401, "Сессия истекла")
+        raise HTTPException(401, "Session expired")
     return user
 
 

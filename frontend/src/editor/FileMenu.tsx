@@ -36,7 +36,7 @@ export default function FileMenu() {
     try { await fn() } catch (e) { alert(`${label}: ${(e as Error).message}`) } finally { setBusy('') }
   }
 
-  const doExport = (fmt: ExportFormat) => run('Экспорт', async () => {
+  const doExport = (fmt: ExportFormat) => run('Export', async () => {
     await useDoc.getState().flush()
     const { doc, title } = useDoc.getState()
     const sheet = useEditor.getState().sheet()
@@ -46,20 +46,20 @@ export default function FileMenu() {
   return (
     <div className="menu-wrap" ref={ref}>
       <button onClick={() => setOpen(o => !o)} className={'ibtn' + (open ? ' on' : '')} disabled={!!busy}
-        aria-label="Файл" title="Файл">{busy ? <span className="muted">{busy}…</span> : <Icon name="chevron" size={16} />}</button>
+        aria-label="File" title="File">{busy ? <span className="muted">{busy}…</span> : <Icon name="chevron" size={16} />}</button>
       {open && (
         <div className="menu" role="menu">
-          <button role="menuitem" onClick={() => run('Импорт', async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}>
-            <span>Открыть файл как новую карту…</span></button>
+          <button role="menuitem" onClick={() => run('Import', async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })}>
+            <span>Open File as New Map…</span></button>
           <div className="menu-hint">.xmind, Markdown, OPML, FreeMind</div>
-          <button role="menuitem" onClick={() => run('Шаблон', async () => {
+          <button role="menuitem" onClick={() => run('Template', async () => {
             await useDoc.getState().flush()
             const { doc, title } = useDoc.getState()
-            const name = prompt('Название шаблона', title)?.trim()
-            if (name && doc) { await api('/api/templates', { method: 'POST', json: { title: name, document: doc } }); alert('Шаблон сохранён') }
-          })}><span>Сохранить как шаблон…</span></button>
+            const name = prompt('Template name', title)?.trim()
+            if (name && doc) { await api('/api/templates', { method: 'POST', json: { title: name, document: doc } }); alert('Template saved') }
+          })}><span>Save as Template…</span></button>
           <div className="menu-sep" />
-          <div className="menu-hint">Экспорт</div>
+          <div className="menu-hint">Export</div>
           {EXPORTS.map(e => <button key={e.id} role="menuitem" onClick={() => doExport(e.id)}><span>{e.label}</span></button>)}
         </div>
       )}

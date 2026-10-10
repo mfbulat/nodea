@@ -28,7 +28,7 @@ test('правки по ссылке доходят в обе стороны, к
   await signUp(page)
   const id = await newMap(page, DOC)
   const g = await guest(browser, await shareLink(page, id, 'edit'))
-  await expect(g.getByText(/редактирование по ссылке/i)).toBeVisible()
+  await expect(g.getByText(/editing via link/i)).toBeVisible()
 
   await rename(page, 'Первая', 'От владельца')
   await expect(topic(g, 'От владельца')).toBeVisible()
@@ -73,7 +73,7 @@ test('ссылка для просмотра: правки недоступны,
   await signUp(page)
   const id = await newMap(page, DOC)
   const v = await guest(browser, await shareLink(page, id, 'view'))
-  await expect(v.getByTestId('save-state').getByText(/только просмотр/i)).toBeVisible()
+  await expect(v.getByTestId('save-state').getByText(/view only/i)).toBeVisible()
   await expect(v.locator('.bar-center')).toHaveCount(0)
   await topic(v, 'Первая').click()
   await v.keyboard.press('Tab')
@@ -92,7 +92,7 @@ test('отозванная ссылка не открывается', async ({ p
   const ctx = await browser.newContext()
   const g = await ctx.newPage()
   await g.goto(`/s/${s.token}`)
-  await expect(g.getByText('Ссылка недействительна или отозвана')).toBeVisible()
+  await expect(g.getByText('The link is invalid or has been revoked')).toBeVisible()
 })
 
 test('откат версии применяется у всех участников', async ({ page, browser }) => {

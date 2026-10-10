@@ -65,9 +65,9 @@ export function Dropdown({ trigger, children, align = 'left', up = false }: {
     const r = ref.current!.getBoundingClientRect(), m = menuRef.current!
     const w = m.offsetWidth, h = m.offsetHeight
     const left = Math.max(8, Math.min(align === 'right' ? r.right - w : r.left, window.innerWidth - w - 8))
-    let top = up ? r.top - h - 6 : r.bottom + 6
-    if (!up && top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6)
-    if (up && top < 8) top = r.bottom + 6
+    let top = up ? r.top - h - 8 : r.bottom + 8
+    if (!up && top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 8)
+    if (up && top < 8) top = r.bottom + 8
     setPos({ left, top })
   }, [open, align, up])
   return (
@@ -122,7 +122,7 @@ export function SubMenu({ label, icon, children }: { label: string; icon?: IconN
 }
 
 const SAVE: Record<string, string> = {
-  saved: 'Сохранено', dirty: 'Изменено', saving: 'Сохранение…', error: 'Ошибка сохранения', conflict: 'Конфликт версий',
+  saved: 'Saved', dirty: 'Edited', saving: 'Saving…', error: 'Save failed', conflict: 'Version conflict',
 }
 
 /** Слева: меню, название, избранное, путь */
@@ -156,21 +156,21 @@ export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest
     if (role === 'owner' && mapId) api<{ starred?: boolean }>(`/api/maps/${mapId}`).then(m => useStar.setState({ starred: !!m.starred })).catch(() => {})
   }, [mapId, role])
   const fit = useBarFit()
-  const state = status === 'offline' ? 'Нет связи — изменения синхронизируются при подключении' : status === 'connecting' ? 'Подключение…'
-    : role === 'owner' ? SAVE[saveState] : role === 'view' ? 'Только просмотр' : 'Редактирование по ссылке'
+  const state = status === 'offline' ? 'All changes will sync when connection is restored' : status === 'connecting' ? 'Connecting…'
+    : role === 'owner' ? SAVE[saveState] : role === 'view' ? 'View only' : 'Editing via link'
   return (
     <div className="bar-left">
       {mainMenu}
       <div className="title-block">
         <div className="title-row">
-          <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Название карты"
+          <input className="title-input" value={title} onChange={e => setTitle(e.target.value)} aria-label="Map title"
             readOnly={role !== 'owner'} size={Math.max(4, Math.min(40, title.length + 1))} />
-          {role === 'owner' && <Tip title={starred ? 'Убрать из избранного' : 'Добавить в избранное'}>
-            <button className={'star-btn' + (starred ? ' on' : '')} onClick={toggleStar} aria-label="Избранное"><Icon name="star" size={16} /></button>
+          {role === 'owner' && <Tip title={starred ? 'Remove from Starred' : 'Add to Starred'}>
+            <button className={'star-btn' + (starred ? ' on' : '')} onClick={toggleStar} aria-label="Starred"><Icon name="star" size={16} /></button>
           </Tip>}
         </div>
         <span className="crumb" data-testid="save-state" title={state} hidden={!fit.subtitle}>
-          {guest ? <Link to="/login">Войти</Link> : <Link to="/">Мои карты</Link>}<span className="dot">·</span>{state}
+          {guest ? <Link to="/login">Log In</Link> : <Link to="/">My Works</Link>}<span className="dot">·</span>{state}
         </span>
       </div>
     </div>
@@ -184,13 +184,13 @@ export function TopCenter() {
   const none = !selection.length
   const fit = useBarFit()
   return (
-    <div className="bar-center toolbar" role="toolbar" aria-label="Инструменты">
-      <IconButton icon="topic" label="Тема" keys="⏎" desc="Добавить тему после выбранной." onClick={() => ed.addSibling(false)} disabled={none} />
-      <IconButton icon="subtopic" label="Подтема" keys="⇥" desc="Добавить дочернюю тему к выбранной." onClick={ed.addChild} disabled={none} />
+    <div className="bar-center toolbar" role="toolbar" aria-label="Toolbar">
+      <IconButton icon="topic" label="Topic" keys="⏎" desc="Add a topic after the selected topic." onClick={() => ed.addSibling(false)} disabled={none} />
+      <IconButton icon="subtopic" label="Subtopic" keys="⇥" desc="Add a child topic to the selected topic." onClick={ed.addChild} disabled={none} />
       <span className="sep" />
-      {fit.relation && <IconButton icon="relationship" label="Связь" keys="⌘ ⇧ R" desc="Создать связь между двумя темами." onClick={ed.startRelating} disabled={none} />}
-      {fit.summary && <IconButton icon="summary" label="Сводка" desc="Добавить сводку к выбранным темам." onClick={ed.addSummary} disabled={none} />}
-      {fit.summary && <IconButton icon="boundary" label="Граница" keys="⌘ ⇧ B" desc="Объединить выбранные темы границей." onClick={ed.addBoundary} disabled={none} />}
+      {fit.relation && <IconButton icon="relationship" label="Relationship" keys="⌘ ⇧ R" desc="Create a relationship between the two topics." onClick={ed.startRelating} disabled={none} />}
+      {fit.summary && <IconButton icon="summary" label="Summary" desc="Add a summary to the selected topics." onClick={ed.addSummary} disabled={none} />}
+      {fit.summary && <IconButton icon="boundary" label="Boundary" keys="⌘ ⇧ B" desc="Group the selected topics with boundary." onClick={ed.addBoundary} disabled={none} />}
       {fit.relation && <span className="sep" />}
       <InsertMenu />
     </div>
@@ -203,9 +203,9 @@ export function OutlineCenter() {
   const ed = useEditor.getState()
   const none = !selection.length
   return (
-    <div className="bar-center toolbar" role="toolbar" aria-label="Инструменты">
-      <IconButton icon="outdent" label="Уровень вверх" keys="⇧ ⇥" onClick={ed.outdent} disabled={none} />
-      <IconButton icon="indent" label="Уровень вниз" keys="⇥" onClick={ed.indent} disabled={none} />
+    <div className="bar-center toolbar" role="toolbar" aria-label="Toolbar">
+      <IconButton icon="outdent" label="Promote" keys="⇧ ⇥" onClick={ed.outdent} disabled={none} />
+      <IconButton icon="indent" label="Demote" keys="⇥" onClick={ed.indent} disabled={none} />
       <span className="sep" />
       <InsertMenu />
     </div>
@@ -221,13 +221,13 @@ export function TopRight({ onShare, isOwner, outline, readOnly = false }: { onSh
   return (
     <div className="bar-right">
       <Presence />
-      {onShare && <button className="share-btn" onClick={onShare}>Поделиться</button>}
+      {onShare && <button className="share-btn" onClick={onShare}>Share</button>}
       <div className="bar-icons">
-        {!outline && fit.gantt && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта в отдельном окне." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
-        {fit.present && <IconButton icon="present" label="Презентация" keys="⌥ ⌘ P" desc="Перейти в режим презентации." onClick={() => ed.setPresenting(true)} />}
-        {!outline && fit.present && <IconButton icon="comment" label="Комментарии" desc="Открыть панель комментариев." onClick={() => toggle('comments')} active={panel === 'comments'} />}
-        {!readOnly && <IconButton icon="marker" label="Маркер" desc="Добавить маркер к выбранным темам." onClick={() => toggle('markers')} active={panel === 'markers'} />}
-        {!outline && !readOnly && <IconButton icon="panel" label="Формат" keys="⌘ ]" desc="Показать или скрыть параметры стиля и формата." onClick={() => toggle('format')} active={panel === 'format'} />}
+        {!outline && fit.gantt && <IconButton icon="gantt" label="Gantt" desc="Open Gantt Chart in a separate window." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
+        {fit.present && <IconButton icon="present" label="Pitch" keys="⌥ ⌘ P" desc="Access into Pitch Mode to present your ideas." onClick={() => ed.setPresenting(true)} />}
+        {!outline && fit.present && <IconButton icon="comment" label="Comment" desc="Open Comments panel to view and add comments." onClick={() => toggle('comments')} active={panel === 'comments'} />}
+        {!readOnly && <IconButton icon="marker" label="Marker" desc="Add a marker to selected topics." onClick={() => toggle('markers')} active={panel === 'markers'} />}
+        {!outline && !readOnly && <IconButton icon="panel" label="Format" keys="⌘ ]" desc="Show or hide style and format options." onClick={() => toggle('format')} active={panel === 'format'} />}
       </div>
     </div>
   )
@@ -235,7 +235,7 @@ export function TopRight({ onShare, isOwner, outline, readOnly = false }: { onSh
 
 /** Главное меню «☰» */
 const EXPORT_MENU: [string, string][] = [['png', 'PNG'], ['jpeg', 'JPEG'], ['svg', 'SVG'], ['pdf', 'PDF'], ['md', 'Markdown'], ['docx', 'Word'], ['xlsx', 'Excel'],
-  ['pptx', 'PowerPoint (презентация)'], ['webm', 'Видео презентации'], ['opml', 'OPML'], ['textbundle', 'TextBundle'], ['tasks-xlsx', 'Excel (задачи)'], ['ics', 'Календарь (задачи)']]
+  ['pptx', 'PowerPoint (Pitch)'], ['webm', 'Pitch Video'], ['opml', 'OPML'], ['textbundle', 'TextBundle'], ['tasks-xlsx', 'Excel (Task)'], ['ics', 'Calendar (Task)']]
 
 export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveTemplate }: {
   isOwner: boolean; onHelp: () => void; onShare?: () => void
@@ -252,66 +252,66 @@ export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveT
   const canRedo = collab() ? cu.canRedo : future.length > 0
   return (
     <Dropdown trigger={(open, toggle) => (
-      <Tip title="Меню"><button className={'ibtn' + (open ? ' on' : '')} onClick={toggle} aria-label="Меню"><Icon name="hamburger" /></button></Tip>
+      <Tip title="Menu"><button className={'ibtn' + (open ? ' on' : '')} onClick={toggle} aria-label="Menu"><Icon name="hamburger" /></button></Tip>
     )}>
       {close => <>
         <i className="mm-main" hidden />
-        {user && <MenuItem icon="arrowLeft" label="Назад к файлам" onClick={() => { close(); nav('/') }} />}
+        {user && <MenuItem icon="arrowLeft" label="Back to Files" onClick={() => { close(); nav('/') }} />}
         <div className="menu-sep" />
-        <SubMenu icon="file" label="Файл">
-          {user && <MenuItem label="Новая карта" onClick={async () => { close(); const m = await api<{ id: string }>('/api/maps', { method: 'POST', json: { title: 'Новая карта' } }); nav(`/map/${m.id}`) }} />}
-          {isOwner && <MenuItem label="Новый лист" onClick={() => { close(); ed.addSheet() }} />}
+        <SubMenu icon="file" label="File">
+          {user && <MenuItem label="New Map" onClick={async () => { close(); const m = await api<{ id: string }>('/api/maps', { method: 'POST', json: { title: 'Mind Map' } }); nav(`/map/${m.id}`) }} />}
+          {isOwner && <MenuItem label="New Sheet" onClick={() => { close(); ed.addSheet() }} />}
           <div className="menu-sep" />
-          {isOwner && <MenuItem label="Переименовать" onClick={() => { close(); (document.querySelector('.title-input') as HTMLInputElement)?.select() }} />}
-          {isOwner && <MenuItem label={starred ? 'Убрать из избранного' : 'Добавить в избранное'} onClick={() => { close(); toggleStar() }} />}
-          {isOwner && <MenuItem label="История версий" onClick={() => { close(); ed.setPanel('versions') }} />}
+          {isOwner && <MenuItem label="Rename" onClick={() => { close(); (document.querySelector('.title-input') as HTMLInputElement)?.select() }} />}
+          {isOwner && <MenuItem label={starred ? 'Remove from Starred' : 'Add to Starred'} onClick={() => { close(); toggleStar() }} />}
+          {isOwner && <MenuItem label="Version History" onClick={() => { close(); ed.setPanel('versions') }} />}
           <div className="menu-sep" />
-          {user && <MenuItem label="Импорт файла" onClick={() => { close(); onImport() }} />}
-          <MenuItem label="Скачать" onClick={() => { close(); onExport('xmind') }} />
-          {user && <MenuItem label="Сохранить как шаблон" onClick={() => { close(); onSaveTemplate() }} />}
+          {user && <MenuItem label="Import File" onClick={() => { close(); onImport() }} />}
+          <MenuItem label="Download" onClick={() => { close(); onExport('xmind') }} />
+          {user && <MenuItem label="Save as Template" onClick={() => { close(); onSaveTemplate() }} />}
         </SubMenu>
-        <SubMenu icon="edit" label="Правка">
-          <MenuItem label="Отменить" hint="⌘ Z" disabled={!canUndo} onClick={() => { close(); ed.undo() }} />
-          <MenuItem label="Повторить" hint="⇧ ⌘ Z" disabled={!canRedo} onClick={() => { close(); ed.redo() }} />
+        <SubMenu icon="edit" label="Edit">
+          <MenuItem label="Undo" hint="⌘ Z" disabled={!canUndo} onClick={() => { close(); ed.undo() }} />
+          <MenuItem label="Redo" hint="⇧ ⌘ Z" disabled={!canRedo} onClick={() => { close(); ed.redo() }} />
           <div className="menu-sep" />
-          <MenuItem label="Поиск" hint="⌘ F" onClick={() => { close(); ed.setNav('outline') }} />
-        </SubMenu>
-        <div className="menu-sep" />
-        <SubMenu icon="eye" label="Вид">
-          <MenuItem icon="actualSize" label="Реальный размер" onClick={() => { close(); canvasApi.zoomTo(1) }} />
-          <MenuItem icon="fit" label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
-          <div className="menu-sep" />
-          <MenuItem icon="branchOnly" label={drillId ? 'Показать всю карту' : 'Показать только ветку'} disabled={!drillId && !selection.length} onClick={() => { close(); drillId ? ed.drillUp() : ed.drillDown() }} />
-          <div className="menu-sep" />
-          <MenuItem icon="gantt" label="Диаграмма Ганта" onClick={() => { close(); ed.setGantt(true) }} />
-          <MenuItem icon="present" label="Режим презентации" onClick={() => { close(); ed.setPresenting(true) }} />
-          <div className="menu-sep" />
-          <SubMenu icon="navPanel" label="Навигационная панель">
-            <MenuItem label="Структура" checked={navOpen === 'outline'} onClick={() => { close(); ed.setNav('outline') }} />
-            <MenuItem label="Заметки" checked={navOpen === 'notes'} onClick={() => { close(); ed.setNav('notes') }} />
-            <MenuItem label="Маркеры и метки" checked={navOpen === 'tags'} onClick={() => { close(); ed.setNav('tags') }} />
-            <MenuItem label="Ресурсы" checked={navOpen === 'resources'} onClick={() => { close(); ed.setNav('resources') }} />
-          </SubMenu>
-          <SubMenu icon="panel" label="Панель формата">
-            <MenuItem label="Стиль" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'style' })), 30) }} />
-            <MenuItem label="Презентация" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'pitch' })), 30) }} />
-            <MenuItem label="Карта" onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'map' })), 30) }} />
-          </SubMenu>
-          <div className="menu-sep" />
-          <SubMenu icon="toolbar" label="Панель инструментов">
-            <MenuItem label="Только значки" checked={!toolbarText} onClick={() => { close(); ed.setToolbarText(false) }} />
-            <MenuItem label="Значки и текст" checked={toolbarText} onClick={() => { close(); ed.setToolbarText(true) }} />
-          </SubMenu>
+          <MenuItem label="Search" hint="⌘ F" onClick={() => { close(); ed.setNav('outline') }} />
         </SubMenu>
         <div className="menu-sep" />
-        {onShare && <MenuItem icon="shareNodes" label="Поделиться" onClick={() => { close(); onShare() }} />}
-        <SubMenu icon="upload" label="Экспортировать как">
+        <SubMenu icon="eye" label="View">
+          <MenuItem icon="actualSize" label="Actual Size" onClick={() => { close(); canvasApi.zoomTo(1) }} />
+          <MenuItem icon="fit" label="Fit Map" onClick={() => { close(); canvasApi.fit() }} />
+          <div className="menu-sep" />
+          <MenuItem icon="branchOnly" label={drillId ? 'Show Entire Map' : 'Show Branch Only'} disabled={!drillId && !selection.length} onClick={() => { close(); drillId ? ed.drillUp() : ed.drillDown() }} />
+          <div className="menu-sep" />
+          <MenuItem icon="gantt" label="Gantt Chart" onClick={() => { close(); ed.setGantt(true) }} />
+          <MenuItem icon="present" label="Pitch Mode" onClick={() => { close(); ed.setPresenting(true) }} />
+          <div className="menu-sep" />
+          <SubMenu icon="navPanel" label="Navigation Panel">
+            <MenuItem label="Topic" checked={navOpen === 'outline'} onClick={() => { close(); ed.setNav('outline') }} />
+            <MenuItem label="Note" checked={navOpen === 'notes'} onClick={() => { close(); ed.setNav('notes') }} />
+            <MenuItem label="Marker & Label" checked={navOpen === 'tags'} onClick={() => { close(); ed.setNav('tags') }} />
+            <MenuItem label="Resources" checked={navOpen === 'resources'} onClick={() => { close(); ed.setNav('resources') }} />
+          </SubMenu>
+          <SubMenu icon="panel" label="Format Panel">
+            <MenuItem label="Style" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'style' })), 30) }} />
+            <MenuItem label="Pitch" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'pitch' })), 30) }} />
+            <MenuItem label="Map" onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'map' })), 30) }} />
+          </SubMenu>
+          <div className="menu-sep" />
+          <SubMenu icon="toolbar" label="Toolbar">
+            <MenuItem label="Icon Only" checked={!toolbarText} onClick={() => { close(); ed.setToolbarText(false) }} />
+            <MenuItem label="Icon and Text" checked={toolbarText} onClick={() => { close(); ed.setToolbarText(true) }} />
+          </SubMenu>
+        </SubMenu>
+        <div className="menu-sep" />
+        {onShare && <MenuItem icon="shareNodes" label="Share" onClick={() => { close(); onShare() }} />}
+        <SubMenu icon="upload" label="Export As">
           {EXPORT_MENU.map(([f, l]) => <MenuItem key={f} label={l} onClick={() => { close(); onExport(f) }} />)}
         </SubMenu>
         <div className="menu-sep" />
-        <MenuItem icon="keyboard" label="Сочетания клавиш" onClick={() => { close(); onHelp() }} />
-        <MenuItem icon="print" label="Печать" onClick={() => { close(); setTimeout(() => window.print(), 50) }} />
-        <MenuItem icon="feedback" label="Отзыв" onClick={() => { close(); window.open('https://github.com/mfbulat/nodea/issues/new', '_blank', 'noopener') }} />
+        <MenuItem icon="keyboard" label="Shortcuts" onClick={() => { close(); onHelp() }} />
+        <MenuItem icon="print" label="Print" onClick={() => { close(); setTimeout(() => window.print(), 50) }} />
+        <MenuItem icon="feedback" label="Feedback" onClick={() => { close(); window.open('https://github.com/mfbulat/nodea/issues/new', '_blank', 'noopener') }} />
       </>}
     </Dropdown>
   )
@@ -326,17 +326,17 @@ export function BottomRight({ sheet }: { sheet: Sheet }) {
     <div className="bar-bottom-right">
       {viewMode === 'map' && (
         <Dropdown align="right" up trigger={(open, toggle) => (
-          <button className={'zoom-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Масштаб">{Math.round(view.zoom * 100)}%<Icon name="chevron" size={14} /></button>
+          <button className={'zoom-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Zoom">{Math.round(view.zoom * 100)}%<Icon name="chevron" size={14} /></button>
         )}>
           {close => <>
             {[20, 50, 80, 100, 120, 150, 200, 300, 400, 500].map(z => <MenuItem key={z} label={`${z}%`} onClick={() => { close(); canvasApi.zoomTo(z / 100) }} />)}
             <div className="menu-sep" />
-            <MenuItem label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
+            <MenuItem label="Fit Map" onClick={() => { close(); canvasApi.fit() }} />
           </>}
         </Dropdown>
       )}
       <button className="mode-btn" onClick={() => ed.setViewMode(viewMode === 'map' ? 'outline' : 'map')}>
-        {viewMode === 'map' ? 'Структура' : 'Интеллект-карта'}</button>
+        {viewMode === 'map' ? 'Outliner' : 'Mind Map'}</button>
     </div>
   )
 }
@@ -350,7 +350,7 @@ export function Crumbs({ sheet }: { sheet: Sheet }) {
   const list: { id: string | null; title: string }[] = []
   let cur = idx.get(drillId)
   while (cur && cur.topic.id !== sheet.rootTopic.id) { list.unshift({ id: cur.topic.id, title: cur.topic.title }); cur = cur.parent ? idx.get(cur.parent.id) : undefined }
-  list.unshift({ id: null, title: 'Вся карта' })
+  list.unshift({ id: null, title: 'Entire Map' })
   return (
     <div className="island crumbs">
       {list.map((c, i) => (

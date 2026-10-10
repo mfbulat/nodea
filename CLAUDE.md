@@ -9,7 +9,10 @@
 установленный XMind (/Applications/Xmind.app): открыть свой .xmind (`open -a Xmind file.xmind`)
 и сравнить скриншоты. Название, логотип, иконки и прочие ассеты XMind по-прежнему НЕ
 используем (и не извлекаем из app.asar): иконки свои (`frontend/src/ui/Icon.tsx`),
-шрифт Montserrat (OFL), название «MindMap». Цвета и шрифты — в токенах
+шрифт Montserrat (OFL), название «MindMap».
+Язык интерфейса — английский, тексты как в оригинале (решение пользователя от 10.10.2026);
+общение с пользователем и комментарии в коде — по-прежнему на русском. Выпадающие списки —
+`frontend/src/ui/Select.tsx` (не нативный `<select>`). Цвета и шрифты — в токенах
 (`frontend/src/styles/tokens.css`) и темах (`frontend/src/editor/themes.ts`).
 
 ## Стек

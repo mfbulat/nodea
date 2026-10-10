@@ -33,7 +33,7 @@ function GuestBar({ children }: { children?: React.ReactNode }) {
       <span className="brand">MindMap</span>
       {children}
       <div className="spacer" />
-      <Link to="/login">Войти</Link>
+      <Link to="/login">Log In</Link>
     </div>
   )
 }
@@ -136,25 +136,25 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const Bar = user ? TopBar : GuestBar
   if (error) return <><Bar /><p className="page error">{error}</p></>
   if (!doc || !collabState.synced && collabState.status !== 'offline') return <><Bar /><p className="page muted">
-    {collabState.status === 'connecting' ? 'Подключение к карте…' : 'Загрузка…'}</p></>
+    {collabState.status === 'connecting' ? 'Connecting to map…' : 'Loading…'}</p></>
   const d = doc as unknown as MapDocument
   const sheet = d.sheets.find(s => s.id === sheetId) ?? d.sheets[0]
   const ed = useEditor.getState()
 
   if (presenting) return <Presentation sheet={sheet} />
 
-  const doExport = (fmt: string) => run('Экспорт', async () => {
+  const doExport = (fmt: string) => run('Export', async () => {
     await useDoc.getState().flush()
     const { doc: dd, title: tt } = useDoc.getState()
     const sh = useEditor.getState().sheet()
     if (dd && sh) await exportMap(fmt as ExportFormat, dd, sh, tt)
   })
-  const doImport = () => run('Импорт', async () => { const nid = await importAsNewMap(); if (nid) nav(`/map/${nid}`) })
-  const saveTemplate = () => run('Шаблон', async () => {
+  const doImport = () => run('Import', async () => { const nid = await importAsNewMap(); if (nid) nav(`/map/${nid}`) })
+  const saveTemplate = () => run('Template', async () => {
     await useDoc.getState().flush()
     const { doc: dd, title: tt } = useDoc.getState()
-    const name = prompt('Название шаблона', tt)?.trim()
-    if (name && dd) { await api('/api/templates', { method: 'POST', json: { title: name, document: dd } }); alert('Шаблон сохранён') }
+    const name = prompt('Template name', tt)?.trim()
+    if (name && dd) { await api('/api/templates', { method: 'POST', json: { title: name, document: dd } }); alert('Template saved') }
   })
   const embed = new URLSearchParams(location.search).get('embed') === '1'
   const hasPanel = !embed && !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
@@ -169,7 +169,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       </div>}
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
-        {zen && !embed && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
+        {zen && !embed && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Exit ZEN</button>}
         {!zen && <Crumbs sheet={sheet} />}
         {!zen && <Legend sheet={sheet} readOnly={readOnly} />}
         {busy && <div className="busy-toast">{busy}…</div>}

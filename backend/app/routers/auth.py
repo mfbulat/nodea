@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def register(data: Credentials, response: Response, db: Session = Depends(get_db)):
     email = data.email.lower()
     if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(409, "Пользователь с такой почтой уже существует")
+        raise HTTPException(409, "A user with this email already exists")
     user = User(email=email, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
@@ -27,7 +27,7 @@ def register(data: Credentials, response: Response, db: Session = Depends(get_db
 def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == data.email.lower()))
     if not user or not verify_password(user.password_hash, data.password):
-        raise HTTPException(401, "Неверная почта или пароль")
+        raise HTTPException(401, "Incorrect email or password")
     set_auth_cookies(response, user)
     return user
 
@@ -54,7 +54,7 @@ def me(user: User = Depends(current_user)):
 def change_password(data: PasswordChange, response: Response,
                     user: User = Depends(current_user), db: Session = Depends(get_db)):
     if not verify_password(user.password_hash, data.current_password):
-        raise HTTPException(400, "Текущий пароль неверен")
+        raise HTTPException(400, "Current password is incorrect")
     user.password_hash = hash_password(data.new_password)
     user.token_version += 1  # инвалидирует остальные сессии
     db.commit()

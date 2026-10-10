@@ -11,11 +11,11 @@ def doc(title="T"):
 
 def test_crud_duplicate(client, user):
     m = client.post("/api/maps", json={"title": "Карта"}).json()
-    assert m["document"]["sheets"][0]["rootTopic"]["title"] == "Карта"
+    assert m["document"]["sheets"][0]["rootTopic"]["title"] == "Central Topic"
     r = client.patch(f"/api/maps/{m['id']}", json={"title": "Новое"})
     assert r.json()["title"] == "Новое"
     d = client.post(f"/api/maps/{m['id']}/duplicate").json()
-    assert d["title"] == "Новое (копия)" and d["id"] != m["id"]
+    assert d["title"] == "Copy of Новое" and d["id"] != m["id"]
     assert {x["id"] for x in client.get("/api/maps").json()} == {m["id"], d["id"]}
     assert client.delete(f"/api/maps/{m['id']}").status_code == 200
     assert client.get(f"/api/maps/{m['id']}").status_code == 404

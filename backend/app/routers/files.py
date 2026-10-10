@@ -15,7 +15,7 @@ MAX_SIZE = 25 * 1024 * 1024
 async def upload(file: UploadFile, user: User = Depends(current_user)):
     data = await file.read()
     if len(data) > MAX_SIZE:
-        raise HTTPException(413, "Файл больше 25 МБ")
+        raise HTTPException(413, "File is larger than 25 MB")
     key = f"{user.id}/{uuid.uuid4().hex}"
     put_object(key, data, file.content_type or "application/octet-stream", file.filename)
     return {"key": key, "url": f"/api/files/{key}", "name": file.filename, "size": len(data),
@@ -29,7 +29,7 @@ def download(owner: str, name: str):
     try:
         obj = get_object(f"{owner}/{name}")
     except Exception:
-        raise HTTPException(404, "Файл не найден")
+        raise HTTPException(404, "File not found")
     headers = {"Cache-Control": "private, max-age=31536000, immutable"}
     if obj.get("ContentDisposition"):
         headers["Content-Disposition"] = obj["ContentDisposition"]

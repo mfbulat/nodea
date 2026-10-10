@@ -226,7 +226,7 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
   if (!content) {
     const xml = zip.file('content.xml')
     if (xml) return fromXmindXml(await xml.async('string'))
-    throw new Error('В архиве нет content.json — это не файл .xmind')
+    throw new Error('The archive has no content.json, so it is not an .xmind file')
   }
   const raw = JSON.parse(await content.async('string')) as XTopic[]
   const uploaded = new Map<string, { url: string; name: string; size: number }>()
@@ -314,7 +314,7 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
     const ch = (root.children ?? {}) as Record<string, XTopic[]>
     const own = (xs['x-mindmap'] ?? {}) as Partial<Sheet>
     const sheet: Sheet = {
-      id: String(xs.id ?? uid()), title: String(xs.title ?? 'Лист'), rootTopic,
+      id: String(xs.id ?? uid()), title: String(xs.title ?? 'Sheet'), rootTopic,
       ...own,
       structure: own.structure ?? fromXStruct(root.structureClass as string) ?? 'mindmap',
     }
@@ -328,7 +328,7 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
     })
     sheets.push(sheet)
   }
-  if (!sheets.length) throw new Error('В файле нет листов')
+  if (!sheets.length) throw new Error('The file has no sheets')
   return { version: 1, sheets }
 }
 
@@ -381,8 +381,8 @@ function fromXmindXml(xml: string): MapDocument {
     const rootTopic = topic(root)
     const structure = rootTopic.structure ?? 'mindmap'
     delete rootTopic.structure
-    return { id: sh.getAttribute('id') ?? uid(), title: child(sh, 'title')?.textContent ?? 'Лист', rootTopic, structure } as Sheet
+    return { id: sh.getAttribute('id') ?? uid(), title: child(sh, 'title')?.textContent ?? 'Sheet', rootTopic, structure } as Sheet
   })
-  if (!sheets.length) throw new Error('Не удалось прочитать content.xml')
+  if (!sheets.length) throw new Error('Could not read content.xml')
   return { version: 1, sheets }
 }

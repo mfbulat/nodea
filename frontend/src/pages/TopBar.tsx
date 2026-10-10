@@ -10,7 +10,7 @@ export default function TopBar({ children }: { children?: ReactNode }) {
       {children}
       <div className="spacer" />
       <Link to="/account" className="muted">{user?.email}</Link>
-      <button onClick={() => logout()}>Выйти</button>
+      <button onClick={() => logout()}>Log Out</button>
     </div>
   )
 }

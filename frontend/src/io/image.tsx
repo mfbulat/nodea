@@ -31,8 +31,8 @@ function StaticMap({ sheet, equations }: { sheet: Sheet; equations: Map<string, 
         {zs.map(z => (
           <g key={z.id}>
             <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={4} fill={z.fill ?? 'rgba(155,155,155,.2)'} stroke="rgba(0,0,0,.4)" strokeWidth={1} />
-            <rect x={z.x} y={z.y - 26} width={Math.max(36, (z.title ?? 'Зона').length * 7 + 20)} height={22} rx={4} fill="rgba(155,155,155,.55)" />
-            <text x={z.x + 10} y={z.y - 11} fontSize={12} fill="#101010" fontFamily={MAP_FONT}>{z.title ?? 'Зона'}</text>
+            <rect x={z.x} y={z.y - 26} width={Math.max(36, (z.title ?? 'Zone').length * 7 + 20)} height={22} rx={4} fill="rgba(155,155,155,.55)" />
+            <text x={z.x + 10} y={z.y - 11} fontSize={12} fill="#101010" fontFamily={MAP_FONT}>{z.title ?? 'Zone'}</text>
           </g>
         ))}
         {r.layout.boundaries.map(bd => {

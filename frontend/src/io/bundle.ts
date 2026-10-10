@@ -26,7 +26,7 @@ export async function toTextBundle(doc: MapDocument): Promise<Blob> {
       } catch { /* недоступный файл пропускаем */ }
     }
   }
-  if (extra.length) md += '\n\n## Ресурсы\n\n' + extra.join('\n\n') + '\n'
+  if (extra.length) md += '\n\n## Resources\n\n' + extra.join('\n\n') + '\n'
   root.file('text.markdown', md)
   root.file('info.json', JSON.stringify({ version: 2, type: 'net.daringfireball.markdown', transient: false, creatorIdentifier: 'mindmap' }))
   return zip.generateAsync({ type: 'blob' })

@@ -29,7 +29,7 @@ def create_template(data: TemplateCreate, user: User = Depends(current_user), db
 def delete_template(template_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
     t = db.get(Template, template_id)
     if not t or t.owner_id != user.id:
-        raise HTTPException(404, "Шаблон не найден")
+        raise HTTPException(404, "Template not found")
     db.delete(t)
     db.commit()
     return {"ok": True}

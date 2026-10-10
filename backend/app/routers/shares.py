@@ -29,7 +29,7 @@ class ShareOut(BaseModel):
 def _own(map_id: uuid.UUID, user: User, db: Session) -> Map:
     m = db.get(Map, map_id)
     if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Карта не найдена")
+        raise HTTPException(404, "Map not found")
     return m
 
 
@@ -42,7 +42,7 @@ def list_shares(map_id: uuid.UUID, user: User = Depends(current_user), db: Sessi
 @router.post("/api/maps/{map_id}/shares", response_model=ShareOut)
 def create_share(map_id: uuid.UUID, data: ShareIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if data.role not in ("view", "edit"):
-        raise HTTPException(422, "role: view или edit")
+        raise HTTPException(422, "role: view or edit")
     _own(map_id, user, db)
     s = MapShare(map_id=map_id, token=secrets.token_urlsafe(24), role=data.role)
     db.add(s)
@@ -55,7 +55,7 @@ def delete_share(map_id: uuid.UUID, share_id: uuid.UUID, user: User = Depends(cu
     _own(map_id, user, db)
     s = db.get(MapShare, share_id)
     if not s or s.map_id != map_id:
-        raise HTTPException(404, "Ссылка не найдена")
+        raise HTTPException(404, "Link not found")
     db.delete(s)
     db.commit()
     return {"ok": True}
@@ -70,7 +70,7 @@ class SharedOut(BaseModel):
 def open_shared(token: str, request: Request, db: Session = Depends(get_db)):
     s = db.scalar(select(MapShare).where(MapShare.token == token))
     if not s:
-        raise HTTPException(404, "Ссылка недействительна или отозвана")
+        raise HTTPException(404, "The link is invalid or has been revoked")
     user = optional_user(request.cookies.get(ACCESS_COOKIE), db)
     m = db.get(Map, s.map_id)
     role = "owner" if user and m.owner_id == user.id else s.role

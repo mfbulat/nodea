@@ -26,7 +26,7 @@ class UserOut(BaseModel):
 
 
 class MapCreate(BaseModel):
-    title: str = Field(default="Новая карта", max_length=500)
+    title: str = Field(default="Mind Map", max_length=500)
     document: dict | None = None
 
 
@@ -46,6 +46,7 @@ class MapSummary(BaseModel):
     starred: bool = False
     deleted_at: datetime | None = None
     last_opened_at: datetime | None = None
+    size: int = 0
 
 
 class MapOut(MapSummary):

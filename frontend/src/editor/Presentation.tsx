@@ -9,6 +9,7 @@ import { displaySheet } from './MapCanvas'
 import { useEditor } from './store'
 import { useCollab } from '../collab/session'
 import Icon from '../ui/Icon'
+import { Select } from '../ui/Select'
 
 type Layout = NonNullable<NonNullable<Topic['pitch']>['layout']>
 interface TitleSlide { kind: 'title'; topic: Topic; crumbs: string[] }
@@ -176,52 +177,51 @@ export default function Presentation({ sheet: realSheet }: { sheet: Sheet }) {
       </div>
 
       <div className="pitch-ui pitch-top">
-        <button className="pitch-btn" aria-label="Зрители" onClick={() => setPop(p => (p === 'viewers' ? null : 'viewers'))}>
+        <button className="pitch-btn" aria-label="Viewers" onClick={() => setPop(p => (p === 'viewers' ? null : 'viewers'))}>
           <svg width={14} height={14} viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" strokeWidth={1.3} /><circle cx={8} cy={8} r={2} fill="currentColor" /></svg>
           <span>{peers.length + 1}</span>
         </button>
         <div className="pitch-group">
-          <button className={'pitch-btn' + (pop === 'settings' ? ' on' : '')} aria-label="Настройки" title="Настройки" onClick={() => setPop(p => (p === 'settings' ? null : 'settings'))}>
+          <button className={'pitch-btn' + (pop === 'settings' ? ' on' : '')} aria-label="Settings" title="Settings" onClick={() => setPop(p => (p === 'settings' ? null : 'settings'))}>
             <Icon name="settings" size={14} />
           </button>
-          <button className="pitch-btn" aria-label={fs ? 'Выйти из полноэкранного режима' : 'Полный экран'} title={fs ? 'Выйти из полноэкранного режима' : 'Полный экран'}
+          <button className="pitch-btn" aria-label={fs ? 'Exit Full Screen' : 'Full Screen'} title={fs ? 'Exit Full Screen' : 'Full Screen'}
             onClick={() => (document.fullscreenElement ? document.exitFullscreen() : root.current?.requestFullscreen())?.catch?.(() => {})}>
             <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round">
               {fs ? <path d="M9.5 6.5L14 2M9.5 6.5V3.5M9.5 6.5h3M6.5 9.5L2 14M6.5 9.5v3M6.5 9.5h-3" /> : <path d="M9.5 6.5L14 2M14 2h-3M14 2v3M6.5 9.5L2 14M2 14h3M2 14v-3" />}
             </svg>
           </button>
-          <button className="pitch-btn" aria-label="Выйти из презентации" title="Выйти (Esc)" onClick={exit}>
+          <button className="pitch-btn" aria-label="Exit Pitch" title="Exit (Esc)" onClick={exit}>
             <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5h-6v11h6M7 8h7.5M12 5.5L14.5 8 12 10.5" /></svg>
           </button>
         </div>
         {pop === 'viewers' && (
           <div className="pitch-pop viewers">
-            <div className="pv-row"><span className="pv-dot" style={{ background: '#ff9f69' }} />Вы</div>
+            <div className="pv-row"><span className="pv-dot" style={{ background: '#ff9f69' }} />You</div>
             {peers.map(p => <div key={p.clientId} className="pv-row"><span className="pv-dot" style={{ background: p.color }} />{p.name}</div>)}
           </div>
         )}
         {pop === 'settings' && (
-          <div className="pitch-pop" role="dialog" aria-label="Настройки презентации">
-            <b>Настройки</b>
-            <button className="pitch-wide" onClick={() => { setDark(!dark); persist({ pitchTheme: dark ? 'light' : 'dark' }) }}>Сменить тему</button>
-            <label className="pitch-row">Соотношение сторон
-              <select value={ratio} onChange={e => { const v = e.target.value as NonNullable<Sheet['pitchRatio']>; setRatio(v); persist({ pitchRatio: v }) }} aria-label="Соотношение сторон">
-                <option value="auto">Авто</option><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="9:16">9:16</option><option value="3:4">3:4</option>
-              </select>
-            </label>
-            <label className="pitch-check"><input type="checkbox" checked={anim} onChange={e => { setAnim(e.target.checked); persist({ pitchAnimation: e.target.checked }) }} />Анимация</label>
+          <div className="pitch-pop" role="dialog" aria-label="Pitch settings">
+            <b>Settings</b>
+            <button className="pitch-wide" onClick={() => { setDark(!dark); persist({ pitchTheme: dark ? 'light' : 'dark' }) }}>Change Theme</button>
+            <div className="pitch-row">Aspect Ratio
+              <Select label="Aspect Ratio" value={ratio} onChange={v => { setRatio(v); persist({ pitchRatio: v }) }}
+                options={(['auto', '16:9', '4:3', '9:16', '3:4'] as NonNullable<Sheet['pitchRatio']>[]).map(v => ({ value: v, label: v === 'auto' ? 'Auto' : v }))} />
+            </div>
+            <label className="pitch-check"><input type="checkbox" checked={anim} onChange={e => { setAnim(e.target.checked); persist({ pitchAnimation: e.target.checked }) }} />Animation</label>
           </div>
         )}
       </div>
 
       <div className="pitch-ui pitch-nav">
-        <button className="pitch-btn" aria-label="Предыдущий слайд" title="Предыдущий слайд (PgUp)" disabled={pos.i === 0 && pos.step === 0} onClick={prevSlide}><Tri d="M8 1.5v9L1.5 6z" /></button>
+        <button className="pitch-btn" aria-label="Previous Slide" title="Previous Slide (PgUp)" disabled={pos.i === 0 && pos.step === 0} onClick={prevSlide}><Tri d="M8 1.5v9L1.5 6z" /></button>
         <i />
-        <button className="pitch-btn" aria-label="Назад" title="Назад (←)" disabled={pos.i === 0 && pos.step === 0} onClick={prevStep}><TriO d="M8 1.5v9L1.5 6z" /></button>
+        <button className="pitch-btn" aria-label="Back" title="Back (←)" disabled={pos.i === 0 && pos.step === 0} onClick={prevStep}><TriO d="M8 1.5v9L1.5 6z" /></button>
         <i />
-        <button className="pitch-btn" aria-label="Вперёд" title="Вперёд (→)" disabled={last} onClick={nextStep}><TriO d="M2 1.5v9L8.5 6z" /></button>
+        <button className="pitch-btn" aria-label="Forward" title="Forward (→)" disabled={last} onClick={nextStep}><TriO d="M2 1.5v9L8.5 6z" /></button>
         <i />
-        <button className="pitch-btn" aria-label="Следующий слайд" title="Следующий слайд (PgDn)" disabled={pos.i === slides.length - 1} onClick={nextSlide}><Tri d="M2 1.5v9L8.5 6z" /></button>
+        <button className="pitch-btn" aria-label="Next Slide" title="Next Slide (PgDn)" disabled={pos.i === slides.length - 1} onClick={nextSlide}><Tri d="M2 1.5v9L8.5 6z" /></button>
       </div>
     </div>
   )

@@ -13,7 +13,7 @@ import Icon from '../ui/Icon'
 type Kind = 'topic' | 'note' | 'relationship' | 'boundary' | 'label' | 'link'
 export interface SearchOpts { replace: boolean; file: boolean; whole: boolean; matchCase: boolean; kinds: Kind[] }
 export const useSearchOpts = create<SearchOpts>(() => ({ replace: false, file: false, whole: false, matchCase: false, kinds: ['topic', 'note', 'relationship', 'boundary', 'label', 'link'] }))
-const KIND_NAMES: [Kind, string][] = [['topic', 'Тема'], ['note', 'Заметка'], ['relationship', 'Связь'], ['boundary', 'Граница'], ['label', 'Метка'], ['link', 'Ссылка']]
+const KIND_NAMES: [Kind, string][] = [['topic', 'Topic'], ['note', 'Note'], ['relationship', 'Relationship'], ['boundary', 'Boundary'], ['label', 'Label'], ['link', 'Link']]
 
 export interface Hit { sheetId: string; kind: Kind; id: string; text: string; topicId?: string; depth: number }
 
@@ -101,14 +101,14 @@ function SearchSettings({ onClose }: { onClose: () => void }) {
   )
   return (
     <div className="menu nav-settings" role="menu" onPointerDown={e => e.stopPropagation()}>
-      {item('Найти', !o.replace, () => { set({ replace: false }); onClose() })}
-      {item('Найти и заменить', o.replace, () => { set({ replace: true }); onClose() })}
+      {item('Find', !o.replace, () => { set({ replace: false }); onClose() })}
+      {item('Find & Replace', o.replace, () => { set({ replace: true }); onClose() })}
       <div className="menu-sep" />
-      {item('Текущая карта', !o.file, () => set({ file: false }))}
-      {item('Весь файл', o.file, () => set({ file: true }))}
+      {item('Current Sheet', !o.file, () => set({ file: false }))}
+      {item('Entire File', o.file, () => set({ file: true }))}
       <div className="menu-sep" />
-      {item('Целые слова', o.whole, () => set({ whole: !o.whole }))}
-      {item('С учётом регистра', o.matchCase, () => set({ matchCase: !o.matchCase }))}
+      {item('Whole Words', o.whole, () => set({ whole: !o.whole }))}
+      {item('Match Case', o.matchCase, () => set({ matchCase: !o.matchCase }))}
       <div className="menu-sep" />
       {KIND_NAMES.map(([k, n]) => item(n, o.kinds.includes(k), () => set({ kinds: o.kinds.includes(k) ? o.kinds.filter(x => x !== k) : [...o.kinds, k] })))}
     </div>
@@ -153,32 +153,32 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
 
   const idx = indexSheet(sheet)
   const all = [...idx.values()]
-  const tabs: [NonNullable<typeof nav>, string][] = [['outline', 'Структура'], ['notes', 'Заметки'], ['tags', 'Теги'], ['resources', 'Ресурсы']]
+  const tabs: [NonNullable<typeof nav>, string][] = [['outline', 'Topic'], ['notes', 'Note'], ['tags', 'Marker & Label'], ['resources', 'Resources']]
   const doReplace = (only?: Hit) => {
     let n = 0
     ed.mutateDocument(d => { n = replaceInDoc(d, sheet.id, q, rep, o, only) })
-    setMsg(n ? `Заменено: ${n}` : 'Совпадений нет')
+    setMsg(n ? `Replaced: ${n}` : 'No matches')
   }
 
   const searchBox = (
     <div className="nav-find" onKeyDown={e => e.stopPropagation()}>
       <div className="nav-input">
         <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round"><circle cx={7} cy={7} r={4.6} /><path d="M10.5 10.5l3 3" /></svg>
-        <input ref={input} placeholder="Найти" aria-label="Найти" value={q} onChange={e => { setQ(e.target.value); setMsg('') }}
+        <input ref={input} placeholder="Find" aria-label="Find" value={q} onChange={e => { setQ(e.target.value); setMsg('') }}
           onKeyDown={e => { if (e.key === 'Enter' && hits[0]) goTo(hits[0].sheetId, hits[0].topicId) ; if (e.key === 'Escape') { setQ(''); canvasApi.focus() } }} />
-        {q && <button className="nav-clear" aria-label="Очистить" onClick={() => setQ('')}><Icon name="close" size={9} /></button>}
+        {q && <button className="nav-clear" aria-label="Clear" onClick={() => setQ('')}><Icon name="close" size={9} /></button>}
       </div>
       <div className="nav-gear-wrap">
-        <button className={'ibtn' + (settings ? ' on' : '')} aria-label="Настройки поиска" onPointerDown={e => e.stopPropagation()} onClick={() => setSettings(s => !s)}>
+        <button className={'ibtn' + (settings ? ' on' : '')} aria-label="Search options" onPointerDown={e => e.stopPropagation()} onClick={() => setSettings(s => !s)}>
           <Icon name="settings" size={18} />
         </button>
         {settings && <SearchSettings onClose={() => setSettings(false)} />}
       </div>
       {o.replace && (
         <div className="nav-replace">
-          <input placeholder="Заменить на" aria-label="Заменить на" value={rep} onChange={e => setRep(e.target.value)} />
-          <button disabled={!hits.length} onClick={() => doReplace(hits[0])}>Заменить</button>
-          <button disabled={!hits.length} onClick={() => doReplace()}>Заменить все</button>
+          <input placeholder="Replace with" aria-label="Replace with" value={rep} onChange={e => setRep(e.target.value)} />
+          <button disabled={!hits.length} onClick={() => doReplace(hits[0])}>Replace</button>
+          <button disabled={!hits.length} onClick={() => doReplace()}>Replace All</button>
         </div>
       )}
       {msg && <div className="nav-msg">{msg}</div>}
@@ -197,14 +197,14 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
           </button>
         )
       })}
-      {!hits.length && <Empty icon={FIND_ICON} text="Ничего не найдено." />}
+      {!hits.length && <Empty icon={FIND_ICON} text="No results found." />}
     </div>
   )
 
   const tree = (t: Topic, depth: number): JSX.Element => (
     <div key={t.id}>
       <button className={'nav-row d' + Math.min(depth, 2)} style={{ paddingLeft: depth ? 20 + (depth - 1) * 20 : 0 }} onClick={() => goTo(sheet.id, t.id)}>
-        {depth > 0 && <i className="nav-bullet" />}<span className="nav-text">{t.title || '(без названия)'}</span>
+        {depth > 0 && <i className="nav-bullet" />}<span className="nav-text">{t.title || '(Untitled)'}</span>
       </button>
       {(t.children ?? []).map(c => tree(c, depth + 1))}
     </div>
@@ -221,8 +221,8 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
   for (const r of all) {
     const t = r.topic
     if (t.attachment) resources.push({ kind: 'files', name: t.attachment.name, topic: t, icon: 'attach' })
-    if (t.image && !t.image.src.startsWith('emoji:')) resources.push({ kind: 'media', name: t.title || 'Изображение', topic: t, icon: 'image' })
-    if (t.audio) resources.push({ kind: 'media', name: `Аудиозаметка · ${Math.round(t.audio.duration)} с`, topic: t, icon: 'mic' })
+    if (t.image && !t.image.src.startsWith('emoji:')) resources.push({ kind: 'media', name: t.title || 'Image', topic: t, icon: 'image' })
+    if (t.audio) resources.push({ kind: 'media', name: `Audio Note · ${Math.round(t.audio.duration)} s`, topic: t, icon: 'mic' })
     if (t.href) resources.push({ kind: 'links', name: t.href, topic: t, icon: 'link' })
   }
   const shownRes = resources.filter(x => (res === 'all' || x.kind === res) && (!q || searchRegex(q, o).test(x.name + ' ' + x.topic.title)))
@@ -234,12 +234,12 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
         <div className="nav-tabs" role="tablist">
           {tabs.map(([k, n]) => <button key={k} role="tab" aria-selected={nav === k} className={nav === k ? 'on' : ''} onClick={() => ed.setNav(k)}>{n}</button>)}
         </div>
-        <button className="tk-x" aria-label="Закрыть навигационную панель" onClick={() => ed.setNav(null)}><Icon name="close" size={12} /></button>
+        <button className="tk-x" aria-label="Close navigation panel" onClick={() => ed.setNav(null)}><Icon name="close" size={12} /></button>
       </div>
       {nav !== 'tags' && searchBox}
       {nav === 'resources' && (
         <div className="nav-seg">
-          {([['all', 'Все'], ['files', 'Файлы'], ['media', 'Медиа'], ['links', 'Ссылки']] as const).map(([k, n]) => <button key={k} className={res === k ? 'on' : ''} onClick={() => setRes(k)}>{n}</button>)}
+          {([['all', 'All'], ['files', 'Files'], ['media', 'Media'], ['links', 'Links']] as const).map(([k, n]) => <button key={k} className={res === k ? 'on' : ''} onClick={() => setRes(k)}>{n}</button>)}
         </div>
       )}
       <div className="nav-body">
@@ -249,7 +249,7 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
             <b><Highlight text={r.topic.title} q={q} o={o} /></b>
             <span><Highlight text={(r.topic.notes?.plain ?? '').slice(0, 200)} q={q} o={o} /></span>
           </button>
-        )) : <Empty icon={NOTE_ICON} text={q ? 'Ничего не найдено.' : 'Заметок нет.'} />)}
+        )) : <Empty icon={NOTE_ICON} text={q ? 'No results found.' : 'No notes.'} />)}
         {nav === 'tags' && (markerUse.size || labelUse.size ? <>
           {[...markerUse].map(([m, ids]) => (
             <button key={m} className="nav-tag" onClick={() => { ed.select(ids); canvasApi.center(ids[0]) }}>
@@ -261,12 +261,12 @@ export default function NavPanel({ sheet }: { sheet: Sheet }) {
               <span className="nav-label">{l}</span><em>{ids.length}</em>
             </button>
           ))}
-        </> : <Empty icon={TAG_ICON} text="Нет маркеров и меток." />)}
+        </> : <Empty icon={TAG_ICON} text="No markers or labels." />)}
         {nav === 'resources' && (shownRes.length ? shownRes.map((x, i) => (
           <button key={i} className="nav-res" onClick={() => goTo(sheet.id, x.topic.id)}>
             <Icon name={x.icon as 'link'} size={16} /><span className="nav-text">{x.name}</span><em>{x.topic.title}</em>
           </button>
-        )) : <Empty icon={FIND_ICON} text="Нет вложений, изображений, аудиозаметок и ссылок." />)}
+        )) : <Empty icon={FIND_ICON} text="No attachments, images, audio notes or links." />)}
       </div>
     </div>
   )

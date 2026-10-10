@@ -11,74 +11,74 @@ function build(n: Node): Topic {
 }
 
 function doc(root: Node, structure: StructureId = 'mindmap', theme = 'classic', rainbow = false): MapDocument {
-  return { version: 1, sheets: [{ id: uid(), title: 'Карта 1', rootTopic: build(root), structure, theme, ...(rainbow ? { rainbow } : {}) }] }
+  return { version: 1, sheets: [{ id: uid(), title: 'Map 1', rootTopic: build(root), structure, theme, ...(rainbow ? { rainbow } : {}) }] }
 }
 
 export interface TemplateDef { id: string; title: string; description: string; category: string; make: () => MapDocument }
 
-const MAIN4: Node = ['Центральная тема', ['Основная тема 1', 'Основная тема 2', 'Основная тема 3', 'Основная тема 4']]
+const MAIN4: Node = ['Central Topic', ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4']]
 const basic = (id: string, title: string, structure: StructureId): TemplateDef =>
-  ({ id, title, description: title, category: 'Базовые', make: () => doc(MAIN4, structure) })
+  ({ id, title, description: title, category: 'Basic', make: () => doc(MAIN4, structure) })
 
-export const CATEGORIES = ['Базовые', 'Управление знаниями', 'Встречи и планирование', 'Учёба и образование', 'Управление проектами', 'Досуг и жизнь', 'Анализ и решения']
+export const CATEGORIES = ['Basic', 'Knowledge Management', 'Meetings & Planning', 'Education', 'Project Management', 'Life', 'Analysis & Decisions']
 
 export const TEMPLATES: TemplateDef[] = [
-  basic('blank', 'Интеллект-карта', 'mindmap-cw'), basic('logic', 'Логическая схема', 'logic-right'), basic('brace', 'Скобочная схема', 'brace-right'),
-  basic('org', 'Оргструктура', 'org-down'), basic('tree', 'Дерево', 'tree-right'), basic('timeline', 'Временная шкала', 'timeline-h'),
-  basic('fishbone', 'Рыбья кость', 'fishbone-right'), basic('table', 'Табличное дерево', 'tree-table'),
+  basic('blank', 'Mind Map', 'mindmap-cw'), basic('logic', 'Logic Chart', 'logic-right'), basic('brace', 'Brace Map', 'brace-right'),
+  basic('org', 'Org Chart', 'org-down'), basic('tree', 'Tree Chart', 'tree-right'), basic('timeline', 'Timeline', 'timeline-h'),
+  basic('fishbone', 'Fishbone', 'fishbone-right'), basic('table', 'Tree Table', 'tree-table'),
 
-  { id: 'problem', title: 'Шаги решения проблемы', description: '', category: 'Управление знаниями', make: () => doc(['Решение проблемы', [
-    ['Определить проблему', ['Симптомы', 'Границы']], ['Собрать факты', ['Данные', 'Интервью']], ['Найти причины', ['5 почему']],
-    ['Варианты решений', ['Вариант А', 'Вариант Б']], ['Выбрать и внедрить', ['План', 'Ответственные']], ['Проверить результат', ['Метрики']]]], 'mindmap-cw') },
-  { id: 'book', title: 'Конспект книги', description: '', category: 'Управление знаниями', make: () => doc(['Название книги', [
-    ['Автор и контекст', ['…']], ['Главные идеи', ['Идея 1', 'Идея 2']], ['Цитаты', ['…']], ['Что применить', ['…']]]], 'mindmap-acw') },
-  { id: 'concept', title: 'Карта понятий', description: '', category: 'Управление знаниями', make: () => doc(['Понятие', [
-    ['Определение', ['…']], ['Признаки', ['…', '…']], ['Примеры', ['…']], ['Связанные понятия', ['…']]]], 'mindmap') },
+  { id: 'problem', title: 'Problem Solving Steps', description: '', category: 'Knowledge Management', make: () => doc(['Problem Solving', [
+    ['Define the Problem', ['Symptoms', 'Scope']], ['Gather Facts', ['Data', 'Interviews']], ['Find Root Causes', ['5 Whys']],
+    ['Possible Solutions', ['Option A', 'Option B']], ['Choose & Implement', ['Plan', 'Owners']], ['Check Results', ['Metrics']]]], 'mindmap-cw') },
+  { id: 'book', title: 'Book Notes', description: '', category: 'Knowledge Management', make: () => doc(['Book Title', [
+    ['Author & Context', ['…']], ['Key Ideas', ['Idea 1', 'Idea 2']], ['Quotes', ['…']], ['Takeaways', ['…']]]], 'mindmap-acw') },
+  { id: 'concept', title: 'Concept Map', description: '', category: 'Knowledge Management', make: () => doc(['Concept', [
+    ['Definition', ['…']], ['Characteristics', ['…', '…']], ['Examples', ['…']], ['Related Concepts', ['…']]]], 'mindmap') },
 
-  { id: 'meeting', title: 'Протокол встречи', description: '', category: 'Встречи и планирование', make: () => doc(['Встреча', [
-    ['Участники', ['…']], ['Повестка', ['Вопрос 1', 'Вопрос 2']], ['Решения', ['…']],
-    ['Поручения', [['Кто — что — когда', [], { task: { done: false } }]]], ['Следующая встреча', ['Дата']]]], 'logic-right') },
-  { id: 'bplan', title: 'Бизнес-план', description: '', category: 'Встречи и планирование', make: () => doc(['Бизнес-план', [
-    ['Резюме', ['…']], ['Рынок', ['Клиенты', 'Конкуренты']], ['Продукт', ['…']], ['Маркетинг', ['Каналы']], ['Финансы', ['Доходы', 'Расходы']], ['Команда', ['…']]]], 'mindmap-cw') },
-  { id: 'event', title: 'Подготовка мероприятия', description: '', category: 'Встречи и планирование', make: () => doc(['Мероприятие', [
-    ['Место', ['…']], ['Дата и время', ['…']], ['Гости', ['Список', 'Приглашения']], ['Программа', ['…']], ['Бюджет', ['…']]]], 'mindmap-cw') },
-  { id: 'week', title: 'План недели', description: '', category: 'Встречи и планирование', make: () => doc(['Неделя', [
-    ['Понедельник', ['…']], ['Вторник', ['…']], ['Среда', ['…']], ['Четверг', ['…']], ['Пятница', ['…']]]], 'tree-table') },
+  { id: 'meeting', title: 'Meeting Minutes', description: '', category: 'Meetings & Planning', make: () => doc(['Meeting', [
+    ['Attendees', ['…']], ['Agenda', ['Item 1', 'Item 2']], ['Decisions', ['…']],
+    ['Action Items', [['Who — What — When', [], { task: { done: false } }]]], ['Next Meeting', ['Date']]]], 'logic-right') },
+  { id: 'bplan', title: 'Business Plan', description: '', category: 'Meetings & Planning', make: () => doc(['Business Plan', [
+    ['Resume', ['…']], ['Market', ['Customers', 'Competitors']], ['Product', ['…']], ['Marketing', ['Channels']], ['Finance', ['Revenue', 'Expenses']], ['Team', ['…']]]], 'mindmap-cw') },
+  { id: 'event', title: 'Event Planning', description: '', category: 'Meetings & Planning', make: () => doc(['Event', [
+    ['Venue', ['…']], ['Date & Time', ['…']], ['Guests', ['List', 'Invitations']], ['Program', ['…']], ['Budget', ['…']]]], 'mindmap-cw') },
+  { id: 'week', title: 'Weekly Plan', description: '', category: 'Meetings & Planning', make: () => doc(['Week', [
+    ['Monday', ['…']], ['Tuesday', ['…']], ['Wednesday', ['…']], ['Thursday', ['…']], ['Friday', ['…']]]], 'tree-table') },
 
-  { id: 'timetable', title: 'Расписание занятий', description: '', category: 'Учёба и образование', make: () => doc(['Расписание', [
-    ['Понедельник', ['Математика', 'Литература']], ['Вторник', ['Физика', 'История']], ['Среда', ['Химия', 'Английский']], ['Четверг', ['Биология']], ['Пятница', ['Информатика']]]], 'tree-table') },
-  { id: 'notes', title: 'Конспект лекции', description: '', category: 'Учёба и образование', make: () => doc(['Тема лекции', [
-    ['Ключевые понятия', ['…']], ['Примеры', ['…']], ['Вопросы', ['…']], ['Домашнее задание', [['…', [], { task: { done: false } }]]]]], 'logic-right') },
-  { id: 'learn', title: 'План обучения', description: '', category: 'Учёба и образование', make: () => doc(['Навык', [
-    ['Основы', ['Курс', 'Книга']], ['Практика', ['Проект 1', 'Проект 2']], ['Сообщество', ['…']], ['Проверка знаний', ['…']]]], 'timeline-h') },
-  { id: 'resume', title: 'Резюме', description: '', category: 'Учёба и образование', make: () => doc(['Имя Фамилия', [
-    ['Контакты', ['…']], ['Опыт', ['Компания 1', 'Компания 2']], ['Образование', ['…']], ['Навыки', ['…']], ['Языки', ['…']]]], 'logic-right') },
+  { id: 'timetable', title: 'Class Schedule', description: '', category: 'Education', make: () => doc(['Schedule', [
+    ['Monday', ['Math', 'Literature']], ['Tuesday', ['Physics', 'History']], ['Wednesday', ['Chemistry', 'English']], ['Thursday', ['Biology']], ['Friday', ['Computer Science']]]], 'tree-table') },
+  { id: 'notes', title: 'Lecture Notes', description: '', category: 'Education', make: () => doc(['Lecture Topic', [
+    ['Key Concepts', ['…']], ['Examples', ['…']], ['Questions', ['…']], ['Homework', [['…', [], { task: { done: false } }]]]]], 'logic-right') },
+  { id: 'learn', title: 'Learning Plan', description: '', category: 'Education', make: () => doc(['Skill', [
+    ['Basics', ['Course', 'Book']], ['Practice', ['Project 1', 'Project 2']], ['Community', ['…']], ['Assessment', ['…']]]], 'timeline-h') },
+  { id: 'resume', title: 'Resume', description: '', category: 'Education', make: () => doc(['Full Name', [
+    ['Contacts', ['…']], ['Experience', ['Company 1', 'Company 2']], ['Education', ['…']], ['Skills', ['…']], ['Languages', ['…']]]], 'logic-right') },
 
-  { id: 'project', title: 'План проекта', description: '', category: 'Управление проектами', make: () => doc(['Проект', [
-    ['Инициация', [['Цели', [], { task: { done: false } }], ['Заинтересованные лица', [], { task: { done: false } }]]],
-    ['Планирование', [['Объём работ', [], { task: { done: false } }], ['Бюджет', [], { task: { done: false } }], ['Сроки', [], { task: { done: false } }]]],
-    ['Исполнение', [['Задача 1', [], { task: { done: false } }], ['Задача 2', [], { task: { done: false } }]]],
-    ['Контроль', ['Метрики', 'Риски']], ['Завершение', ['Итоги', 'Уроки']]]], 'logic-right') },
-  { id: 'roadmap', title: 'Дорожная карта', description: '', category: 'Управление проектами', make: () => doc(['Дорожная карта', [
-    ['Квартал 1', ['Цель']], ['Квартал 2', ['Цель']], ['Квартал 3', ['Цель']], ['Квартал 4', ['Цель']]]], 'timeline-h') },
-  { id: 'software', title: 'Разработка ПО', description: '', category: 'Управление проектами', make: () => doc(['Продукт', [
-    ['Требования', ['…']], ['Дизайн', ['…']], ['Разработка', ['Бэкенд', 'Фронтенд']], ['Тестирование', ['…']], ['Релиз', ['…']]]], 'org-down') },
-  { id: 'orgchart', title: 'Структура компании', description: '', category: 'Управление проектами', make: () => doc(['Руководитель', [
-    ['Отдел 1', ['Сотрудник', 'Сотрудник']], ['Отдел 2', ['Сотрудник']], ['Отдел 3', ['Сотрудник', 'Сотрудник']]]], 'org-down') },
+  { id: 'project', title: 'Project Plan', description: '', category: 'Project Management', make: () => doc(['Project', [
+    ['Initiation', [['Goals', [], { task: { done: false } }], ['Stakeholders', [], { task: { done: false } }]]],
+    ['Planning', [['Scope', [], { task: { done: false } }], ['Budget', [], { task: { done: false } }], ['Timeline', [], { task: { done: false } }]]],
+    ['Execution', [['Task 1', [], { task: { done: false } }], ['Task 2', [], { task: { done: false } }]]],
+    ['Monitoring', ['Metrics', 'Risks']], ['Closure', ['Results', 'Lessons Learned']]]], 'logic-right') },
+  { id: 'roadmap', title: 'Roadmap', description: '', category: 'Project Management', make: () => doc(['Roadmap', [
+    ['Q1', ['Goal']], ['Q2', ['Goal']], ['Q3', ['Goal']], ['Q4', ['Goal']]]], 'timeline-h') },
+  { id: 'software', title: 'Software Development', description: '', category: 'Project Management', make: () => doc(['Product', [
+    ['Requirements', ['…']], ['Design', ['…']], ['Development', ['Backend', 'Frontend']], ['Testing', ['…']], ['Release', ['…']]]], 'org-down') },
+  { id: 'orgchart', title: 'Company Structure', description: '', category: 'Project Management', make: () => doc(['CEO', [
+    ['Department 1', ['Employee', 'Employee']], ['Department 2', ['Employee']], ['Department 3', ['Employee', 'Employee']]]], 'org-down') },
 
-  { id: 'shopping', title: 'Список покупок', description: '', category: 'Досуг и жизнь', make: () => doc(['Покупки', [
-    ['Продукты', [['Молоко', [], { task: { done: false } }], ['Хлеб', [], { task: { done: false } }]]], ['Дом', ['…']], ['Аптека', ['…']]]], 'mindmap-cw') },
-  { id: 'travel', title: 'Поездка', description: '', category: 'Досуг и жизнь', make: () => doc(['Поездка', [
-    ['Билеты', ['…']], ['Жильё', ['…']], ['Маршрут', ['День 1', 'День 2']], ['Вещи', ['…']], ['Бюджет', ['…']]]], 'mindmap-cw') },
-  { id: 'goals', title: 'Цели на год', description: '', category: 'Досуг и жизнь', make: () => doc(['Цели на год', [
-    ['Здоровье', ['…']], ['Работа', ['…']], ['Финансы', ['…']], ['Отношения', ['…']], ['Хобби', ['…']]]], 'mindmap') },
+  { id: 'shopping', title: 'Shopping List', description: '', category: 'Life', make: () => doc(['Shopping', [
+    ['Groceries', [['Milk', [], { task: { done: false } }], ['Bread', [], { task: { done: false } }]]], ['Home', ['…']], ['Pharmacy', ['…']]]], 'mindmap-cw') },
+  { id: 'travel', title: 'Trip', description: '', category: 'Life', make: () => doc(['Trip', [
+    ['Tickets', ['…']], ['Accommodation', ['…']], ['Itinerary', ['Day 1', 'Day 2']], ['Packing List', ['…']], ['Budget', ['…']]]], 'mindmap-cw') },
+  { id: 'goals', title: 'Yearly Goals', description: '', category: 'Life', make: () => doc(['Yearly Goals', [
+    ['Health', ['…']], ['Work', ['…']], ['Finance', ['…']], ['Relationships', ['…']], ['Hobbies', ['…']]]], 'mindmap') },
 
-  { id: 'swot', title: 'SWOT-анализ', description: '', category: 'Анализ и решения', make: () => doc(['SWOT-анализ', [
-    ['Сильные стороны', ['…']], ['Слабые стороны', ['…']], ['Возможности', ['…']], ['Угрозы', ['…']]]], 'mindmap-cw') },
-  { id: 'causes', title: 'Анализ причин', description: '', category: 'Анализ и решения', make: () => doc(['Проблема', [
-    ['Люди', ['…']], ['Процессы', ['…']], ['Оборудование', ['…']], ['Материалы', ['…']], ['Среда', ['…']], ['Измерения', ['…']]]], 'fishbone-right') },
-  { id: 'decision', title: 'Принятие решения', description: '', category: 'Анализ и решения', make: () => doc(['Решение', [
-    ['Вариант А', [['За', ['…']], ['Против', ['…']]]], ['Вариант Б', [['За', ['…']], ['Против', ['…']]]], ['Критерии', ['Стоимость', 'Сроки', 'Риски']]]], 'mindmap') },
-  { id: 'vs', title: 'Сравнение', description: '', category: 'Анализ и решения', make: () => doc(['А против Б', [
-    ['А', ['Плюсы', 'Минусы']], ['Б', ['Плюсы', 'Минусы']]]], 'mindmap') },
+  { id: 'swot', title: 'SWOT Analysis', description: '', category: 'Analysis & Decisions', make: () => doc(['SWOT Analysis', [
+    ['Strengths', ['…']], ['Weaknesses', ['…']], ['Opportunities', ['…']], ['Threats', ['…']]]], 'mindmap-cw') },
+  { id: 'causes', title: 'Cause Analysis', description: '', category: 'Analysis & Decisions', make: () => doc(['Problem', [
+    ['People', ['…']], ['Process', ['…']], ['Equipment', ['…']], ['Materials', ['…']], ['Environment', ['…']], ['Measurement', ['…']]]], 'fishbone-right') },
+  { id: 'decision', title: 'Decision Making', description: '', category: 'Analysis & Decisions', make: () => doc(['Decision', [
+    ['Option A', [['Pros', ['…']], ['Cons', ['…']]]], ['Option B', [['Pros', ['…']], ['Cons', ['…']]]], ['Criteria', ['Cost', 'Timeline', 'Risks']]]], 'mindmap') },
+  { id: 'vs', title: 'Comparison', description: '', category: 'Analysis & Decisions', make: () => doc(['A vs B', [
+    ['A', ['Pros', 'Cons']], ['B', ['Pros', 'Cons']]]], 'mindmap') },
 ]

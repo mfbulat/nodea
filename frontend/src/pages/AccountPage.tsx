@@ -11,7 +11,7 @@ export default function AccountPage() {
     e.preventDefault()
     try {
       await api('/api/auth/change-password', { method: 'POST', json: { current_password: current, new_password: next } })
-      setMsg({ ok: true, text: 'Пароль изменён. Остальные сессии завершены.' })
+      setMsg({ ok: true, text: 'Password changed. Other sessions have been signed out.' })
       setCurrent(''); setNext('')
     } catch (err) { setMsg({ ok: false, text: (err as Error).message }) }
   }
@@ -20,11 +20,11 @@ export default function AccountPage() {
     <>
       <TopBar />
       <form className="auth" onSubmit={submit}>
-        <h1>Смена пароля</h1>
-        <input type="password" placeholder="Текущий пароль" value={current} onChange={e => setCurrent(e.target.value)} required />
-        <input type="password" placeholder="Новый пароль (от 8 символов)" value={next} onChange={e => setNext(e.target.value)} required minLength={8} />
+        <h1>Change Password</h1>
+        <input type="password" placeholder="Current password" value={current} onChange={e => setCurrent(e.target.value)} required />
+        <input type="password" placeholder="New password (8+ characters)" value={next} onChange={e => setNext(e.target.value)} required minLength={8} />
         {msg && <div className={msg.ok ? 'muted' : 'error'}>{msg.text}</div>}
-        <button className="primary">Сменить пароль</button>
+        <button className="primary">Change Password</button>
       </form>
     </>
   )

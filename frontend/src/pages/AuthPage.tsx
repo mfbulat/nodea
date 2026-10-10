@@ -22,15 +22,15 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <form className="auth" onSubmit={submit}>
-      <h1>{isLogin ? 'Вход в MindMap' : 'Регистрация'}</h1>
-      <input type="email" placeholder="Почта" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
-      <input type="password" placeholder={isLogin ? 'Пароль' : 'Пароль (от 8 символов)'} value={password}
+      <h1>{isLogin ? 'Log in to MindMap' : 'Sign Up'}</h1>
+      <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+      <input type="password" placeholder={isLogin ? 'Password' : 'Password (8+ characters)'} value={password}
         onChange={e => setPassword(e.target.value)} required minLength={isLogin ? 1 : 8} />
       {error && <div className="error">{error}</div>}
-      <button className="primary" disabled={busy}>{isLogin ? 'Войти' : 'Зарегистрироваться'}</button>
+      <button className="primary" disabled={busy}>{isLogin ? 'Log In' : 'Sign Up'}</button>
       <div className="muted">
-        {isLogin ? <>Нет аккаунта? <Link to="/register">Регистрация</Link></>
-          : <>Уже есть аккаунт? <Link to="/login">Войти</Link></>}
+        {isLogin ? <>Don't have an account? <Link to="/register">Sign Up</Link></>
+          : <>Already have an account? <Link to="/login">Log In</Link></>}
       </div>
     </form>
   )

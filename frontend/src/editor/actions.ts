@@ -42,7 +42,7 @@ export async function uploadToTopic(id: string, file: File, as?: 'image' | 'atta
       useEditor.getState().setTopic([id], { attachment: { url: up.url, name: up.name, size: up.size } })
     }
   } catch (e) {
-    alert('Не удалось загрузить файл: ' + (e as Error).message)
+    alert('Could not upload the file: ' + (e as Error).message)
   }
 }
 
@@ -50,7 +50,7 @@ export function followLink(href: string) {
   if (href.startsWith('topic:')) {
     const id = href.slice(6)
     if (useEditor.getState().revealTopic(id)) setTimeout(() => canvasApi.center(id), 50)
-    else alert('Тема, на которую указывает ссылка, не найдена')
+    else alert('The linked topic was not found')
   } else {
     window.open(/^[a-z]+:/i.test(href) ? href : 'https://' + href, '_blank', 'noopener')
   }

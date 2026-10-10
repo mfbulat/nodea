@@ -94,3 +94,18 @@ describe('перетаскивание как в веб-версии', () => {
     expect(sh().rootTopic.children![1].freePos).toBeUndefined()
   })
 })
+
+describe('пустая сторона центральной темы', () => {
+  it('все ветки справа — можно перенести тему влево', () => {
+    ed().setBalance(false)
+    // ставим все основные темы справа
+    useEditor.getState().setTopic(['m4', 'm5'], { side: 'r' })
+    expect(['m1', 'm2', 'm3', 'm4', 'm5'].map(side)).toEqual(['r', 'r', 'r', 'r', 'r'])
+    const r = center('r')
+    const t = findDrop(sh(), lay(), { x: r.b.x - 40, y: r.y }, ['m2'], { zoom: 1, meta: false })
+    expect(t).toMatchObject({ kind: 'insert', parentId: 'r', side: 'l' })
+    ed().drop(['m2'], t)
+    expect(side('m2')).toBe('l')
+    expect(['m1', 'm3', 'm4', 'm5'].map(side)).toEqual(['r', 'r', 'r', 'r'])
+  })
+})

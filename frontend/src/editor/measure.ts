@@ -108,19 +108,36 @@ export function taskDays(start: string, end: string, skipWeekends = false) {
 }
 export const pluralDays = (n: number) => {
   const m10 = n % 10, m100 = n % 100
-  return `${n} ${m10 === 1 && m100 !== 11 ? 'день' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'дня' : 'дней'}`
+  void m10; void m100
+  return `${n} ${n === 1 ? 'day' : 'days'}`
 }
-const longDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '')
+const longDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })
 
 const GAP = 4
 /** отступ между значками/маркерами и текстом */
 const ICON_GAP = 8
 
 /** Раскладка содержимого темы: изображение / [задача, маркеры, текст, значки] / формула / метки */
-export function layoutContent(t: Topic, s: FullStyle, showNotes = false, opts: { taskInTopic?: boolean; skipWeekends?: boolean } = {}): Content {
+/** «Numbering» как в веб-версии: формат задаётся у родителя, номер — по порядку ребёнка */
+export function numberPrefix(format: Topic['numbering'], i: number): string {
+  if (!format || format === 'none') return ''
+  const n = i + 1
+  if (format === '1') return n + '. '
+  if (format === 'A' || format === 'a') {
+    let k = n, out = ''
+    while (k > 0) { k--; out = String.fromCharCode(65 + (k % 26)) + out; k = Math.floor(k / 26) }
+    return (format === 'a' ? out.toLowerCase() : out) + '. '
+  }
+  const R: [number, string][] = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]
+  let k = n, out = ''
+  for (const [v, r] of R) while (k >= v) { out += r; k -= v }
+  return out + '. '
+}
+
+export function layoutContent(t: Topic, s: FullStyle, showNotes = false, opts: { taskInTopic?: boolean; skipWeekends?: boolean; prefix?: string } = {}): Content {
   const icon = Math.round(Math.max(14, s.fontSize * 1.1))
   const hasText = !!t.title || (!t.image && !t.equation)
-  const title = applyCase(t.title, s.textTransform)
+  const title = (opts.prefix ?? '') + applyCase(t.title, s.textTransform)
   // фиксированная ширина: текст переносится по ней
   const fs = s.width ? { ...s, maxWidth: Math.max(20, s.width - 32) } : s
   const tb = hasText ? measureText(title, fs) : null

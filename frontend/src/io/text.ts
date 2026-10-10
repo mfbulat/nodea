@@ -3,14 +3,14 @@ import type { MapDocument, Sheet, Topic } from '../editor/model'
 import { uid } from '../editor/model'
 import { escapeHtml } from './xmind'
 
-const doc1 = (root: Topic, title = 'Лист 1'): MapDocument =>
+const doc1 = (root: Topic, title = 'Sheet 1'): MapDocument =>
   ({ version: 1, sheets: [{ id: uid(), title, rootTopic: root, structure: 'mindmap' }] })
 const topic = (title: string): Topic => ({ id: uid(), title, children: [] })
 
 // ---------------- Markdown ----------------
 
 /** Заголовки (#) задают уровни, списки (-, *, 1.) вкладываются под последний заголовок */
-export function fromMarkdown(md: string, fallbackTitle = 'Центральная тема'): MapDocument {
+export function fromMarkdown(md: string, fallbackTitle = 'Central Topic'): MapDocument {
   const lines = md.replace(/\r\n?/g, '\n').split('\n')
   const roots: { level: number; t: Topic }[] = []
   const stack: { level: number; t: Topic }[] = []
@@ -77,7 +77,7 @@ export function toMarkdown(doc: MapDocument): string {
       if (depth < 3) out.push('', '#'.repeat(depth + 1) + ' ' + task + text)
       else out.push('  '.repeat(depth - 3) + '- ' + task + text)
       const extra: string[] = []
-      if (t.labels?.length) extra.push('Метки: ' + t.labels.join(', '))
+      if (t.labels?.length) extra.push('Labels: ' + t.labels.join(', '))
       if (t.equation) extra.push('$' + t.equation + '$')
       if (t.notes?.plain) extra.push(...t.notes.plain.split('\n').map(l => '> ' + l))
       if (extra.length) {
@@ -86,7 +86,7 @@ export function toMarkdown(doc: MapDocument): string {
       }
       t.children?.forEach(c => walk(c, depth + 1))
     }
-    if (doc.sheets.length > 1) out.push('', `<!-- Лист: ${sh.title} -->`)
+    if (doc.sheets.length > 1) out.push('', `<!-- Sheet: ${sh.title} -->`)
     walk(sh.rootTopic, 0)
     sh.floatingTopics?.forEach(f => walk(f, 1))
   }
@@ -113,9 +113,9 @@ export function toOpml(doc: MapDocument, title: string): string {
 
 export function fromOpml(xml: string): MapDocument {
   const dom = new DOMParser().parseFromString(xml, 'application/xml')
-  if (dom.querySelector('parsererror')) throw new Error('Некорректный OPML')
+  if (dom.querySelector('parsererror')) throw new Error('Invalid OPML file')
   const body = dom.querySelector('body')
-  if (!body) throw new Error('В OPML нет <body>')
+  if (!body) throw new Error('The OPML file has no <body>')
   const walk = (el: Element): Topic => {
     const t = topic(el.getAttribute('text') ?? el.getAttribute('title') ?? '')
     const note = el.getAttribute('_note')
@@ -127,7 +127,7 @@ export function fromOpml(xml: string): MapDocument {
   }
   const tops = [...body.children].filter(c => c.localName === 'outline').map(walk)
   if (tops.length === 1) return doc1(tops[0])
-  const root = topic(dom.querySelector('head > title')?.textContent || 'Центральная тема')
+  const root = topic(dom.querySelector('head > title')?.textContent || 'Central Topic')
   root.children = tops
   return doc1(root)
 }
@@ -145,9 +145,9 @@ const FM_ICONS: Record<string, string> = {
 
 export function fromFreeMind(xml: string): MapDocument {
   const dom = new DOMParser().parseFromString(xml, 'application/xml')
-  if (dom.querySelector('parsererror')) throw new Error('Некорректный файл FreeMind')
+  if (dom.querySelector('parsererror')) throw new Error('Invalid FreeMind file')
   const rootEl = dom.querySelector('map > node')
-  if (!rootEl) throw new Error('В файле FreeMind нет узлов')
+  if (!rootEl) throw new Error('The FreeMind file has no nodes')
   const walk = (el: Element): Topic => {
     let title = el.getAttribute('TEXT') ?? ''
     const rich = [...el.children].filter(c => c.localName === 'richcontent')

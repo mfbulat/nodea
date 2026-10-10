@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 
@@ -34,6 +35,11 @@ class Map(Base):
     hidden_from_recent: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    @property
+    def size(self) -> int:
+        """размер документа в байтах — для сортировки «Size» на главной"""
+        return len(json.dumps(self.document, ensure_ascii=False).encode())
 
 
 class MapVersion(Base):

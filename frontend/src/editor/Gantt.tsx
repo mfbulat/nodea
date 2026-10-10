@@ -12,13 +12,14 @@ import { pluralDays, taskDays } from './measure'
 import Icon from '../ui/Icon'
 import { avatarColor } from '../ui/avatar'
 import { Tip } from './Chrome'
+import { Select } from '../ui/Select'
 
 type Info = NonNullable<Topic['taskInfo']>
 const DAY = 86400000
 export const toDay = (iso?: string) => (iso ? Math.floor(new Date(iso + 'T00:00:00Z').getTime() / DAY) : NaN)
 export const fromDay = (d: number) => new Date(d * DAY).toISOString().slice(0, 10)
 const today = () => Math.floor(Date.now() / DAY - new Date().getTimezoneOffset() / 1440)
-const fmtDate = (iso?: string) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', '') : '')
+const fmtDate = (iso?: string) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return <button role="switch" aria-checked={on} aria-label={label} className={'tk-switch' + (on ? ' on' : '')} onClick={() => onChange(!on)}><i /></button>
@@ -27,8 +28,8 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 function DateField({ value, onChange, label }: { value?: string; onChange: (v?: string) => void; label: string }) {
   return (
     <div className={'tk-date' + (value ? ' has' : '')}>
-      <span className="tk-date-text">{value ? fmtDate(value) : 'Выберите дату'}</span>
-      {value && <button className="tk-clear" aria-label={`Очистить: ${label}`} onClick={() => onChange(undefined)}><Icon name="close" size={10} /></button>}
+      <span className="tk-date-text">{value ? fmtDate(value) : 'Select a date'}</span>
+      {value && <button className="tk-clear" aria-label={`Clear: ${label}`} onClick={() => onChange(undefined)}><Icon name="close" size={10} /></button>}
       <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
       <input type="date" aria-label={label} value={value ?? ''} onChange={e => onChange(e.target.value || undefined)} />
     </div>
@@ -42,17 +43,14 @@ function Links({ label, ids, options, onAdd, onRemove }: { label: string; ids: s
   return (
     <div className="tk-sec">
       <div className="tk-row"><span className="tk-lab">{label}</span><div className="spacer" />
-        <button className="tk-plus" aria-label={`Добавить: ${label}`} disabled={!free.length} onClick={() => setAdding(a => !a)}><Icon name="plus" size={14} /></button></div>
+        <button className="tk-plus" aria-label={`Add: ${label}`} disabled={!free.length} onClick={() => setAdding(a => !a)}><Icon name="plus" size={14} /></button></div>
       {adding && (
-        <select className="tk-select wide" autoFocus aria-label={label} value="" onBlur={() => setAdding(false)}
-          onChange={e => { if (e.target.value) onAdd(e.target.value); setAdding(false) }}>
-          <option value="">Выберите задачу</option>
-          {free.map(o => <option key={o.id} value={o.id}>{o.title || '(без названия)'}</option>)}
-        </select>
+        <Select className="tk-select wide" label={label} value="" minWidth={200} onChange={v => { if (v) onAdd(v); setAdding(false) }}
+          display="Select a task" options={free.map(o => ({ value: o.id, label: o.title || '(Untitled)' }))} />
       )}
       {ids.map(id => {
         const o = options.find(x => x.id === id)
-        return o ? <div key={id} className="tk-link"><span>{o.title || '(без названия)'}</span><button aria-label="Убрать связь" onClick={() => onRemove(id)}><Icon name="close" size={10} /></button></div> : null
+        return o ? <div key={id} className="tk-link"><span>{o.title || '(Untitled)'}</span><button aria-label="Remove link" onClick={() => onRemove(id)}><Icon name="close" size={10} /></button></div> : null
       })}
     </div>
   )
@@ -76,12 +74,12 @@ export function TaskPanel({ sheet }: { sheet: Sheet }) {
   if (!ref?.topic.taskInfo) {
     return (
       <div className="task-panel" data-testid="task-panel">
-        <div className="tk-head"><b>Задача</b><div className="spacer" /><button className="tk-x" aria-label="Закрыть" onClick={() => ed.setTaskDialog(null)}><Icon name="close" size={12} /></button></div>
+        <div className="tk-head"><b>Task</b><div className="spacer" /><button className="tk-x" aria-label="Close" onClick={() => ed.setTaskDialog(null)}><Icon name="close" size={12} /></button></div>
         <div className="tk-empty">
           <svg width={40} height={36} viewBox="0 0 40 36" fill="none" stroke="#878c92" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
             <rect x={2} y={4} width={28} height={22} rx={3} /><path d="M2 10h28M8 16h10M8 21h6" /><circle cx={30} cy={26} r={7} fill="#fafbfc" /><path d="M27 26l2 2 4-4" /></svg>
-          <span>В этой теме нет задачи.</span>
-          {ref && <button className="tk-insert" onClick={() => insertTask(taskDialog)}>Вставить</button>}
+          <span>This topic has no task.</span>
+          {ref && <button className="tk-insert" onClick={() => insertTask(taskDialog)}>Insert</button>}
         </div>
       </div>
     )
@@ -102,50 +100,47 @@ export function TaskPanel({ sheet }: { sheet: Sheet }) {
   const setDur = (n: number) => { const s = info.start ?? fromDay(today()); set({ start: s, end: fromDay(toDay(s) + Math.max(1, n) - 1) }) }
   return (
     <div className="task-panel" data-testid="task-panel" onKeyDown={e => e.stopPropagation()}>
-      <div className="tk-head"><b>Задача</b><div className="spacer" /><button className="tk-x" aria-label="Закрыть" onClick={close}><Icon name="close" size={12} /></button></div>
+      <div className="tk-head"><b>Task</b><div className="spacer" /><button className="tk-x" aria-label="Close" onClick={close}><Icon name="close" size={12} /></button></div>
       <div className="tk-body">
         <div className="tk-sec">
-          <div className="tk-row"><span className="tk-lab">Задача</span><span className="tk-val">{ref.topic.title || '(без названия)'}</span></div>
-          <div className="tk-row"><span className="tk-lab">Автор</span><span className="tk-val"><span className="cm-ava" style={{ width: 16, height: 16, fontSize: 9, background: avatarColor(info.creator ?? userName) }}>{(info.creator ?? userName ?? '?')[0]?.toUpperCase()}</span>{info.creator ?? userName}</span></div>
+          <div className="tk-row"><span className="tk-lab">Task</span><span className="tk-val">{ref.topic.title || '(Untitled)'}</span></div>
+          <div className="tk-row"><span className="tk-lab">Creator</span><span className="tk-val"><span className="cm-ava" style={{ width: 16, height: 16, fontSize: 9, background: avatarColor(info.creator ?? userName) }}>{(info.creator ?? userName ?? '?')[0]?.toUpperCase()}</span>{info.creator ?? userName}</span></div>
         </div>
         <div className="tk-sec">
-          <div className="tk-row"><span className="tk-lab">Прогресс</span>
-            <select className="tk-select" aria-label="Прогресс" value={info.progress ?? 0} onChange={e => set({ progress: +e.target.value })}>
-              {[0, 25, 50, 75, 100].map(p => <option key={p} value={p}>{p}%</option>)}
-              {![0, 25, 50, 75, 100].includes(info.progress ?? 0) && <option value={info.progress}>{info.progress}%</option>}
-            </select></div>
-          <div className="tk-row"><span className="tk-lab">Приоритет</span>
-            <select className="tk-select" aria-label="Приоритет" value={info.priority ?? -1} onChange={e => set({ priority: +e.target.value < 0 ? undefined : +e.target.value })}>
-              <option value={-1}>Нет</option>{Array.from({ length: 10 }, (_, p) => <option key={p} value={p}>P{p}</option>)}
-            </select></div>
+          <div className="tk-row"><span className="tk-lab">Progress</span>
+            <Select className="tk-select" label="Progress" value={info.progress ?? 0} onChange={v => set({ progress: v })}
+              options={[...new Set([0, 25, 50, 75, 100, info.progress ?? 0])].sort((x, y) => x - y).map(p => ({ value: p, label: p + '%' }))} /></div>
+          <div className="tk-row"><span className="tk-lab">Priority</span>
+            <Select className="tk-select" label="Priority" value={info.priority ?? -1} onChange={v => set({ priority: v < 0 ? undefined : v })}
+              options={[{ value: -1, label: 'None' }, ...Array.from({ length: 10 }, (_, p) => ({ value: p, label: 'P' + p }))]} /></div>
         </div>
         <div className="tk-sec">
-          <div className="tk-row"><span className="tk-lab">Длительность</span>
-            <span className="tk-dur"><input type="number" min={1} aria-label="Длительность" value={dur} onChange={e => setDur(+e.target.value || 1)} /><em>дн.</em></span>
-            <span className="tk-seg"><button className={fixed ? 'on' : ''} onClick={() => set({ durationMode: 'fixed' })}>Фикс.</button><button className={!fixed ? 'on' : ''} onClick={() => set({ durationMode: 'auto' })}>Авто</button></span></div>
-          <div className="tk-row"><span className="tk-lab">Начало</span><DateField label="Начало" value={info.start} onChange={setStart} /></div>
-          <div className="tk-row"><span className="tk-lab">Окончание</span><DateField label="Окончание" value={info.end} onChange={setEnd} /></div>
+          <div className="tk-row"><span className="tk-lab">Duration</span>
+            <span className="tk-dur"><input type="number" min={1} aria-label="Duration" value={dur} onChange={e => setDur(+e.target.value || 1)} /><em>days</em></span>
+            <span className="tk-seg"><button className={fixed ? 'on' : ''} onClick={() => set({ durationMode: 'fixed' })}>Fixed</button><button className={!fixed ? 'on' : ''} onClick={() => set({ durationMode: 'auto' })}>Auto</button></span></div>
+          <div className="tk-row"><span className="tk-lab">Start Date</span><DateField label="Start Date" value={info.start} onChange={setStart} /></div>
+          <div className="tk-row"><span className="tk-lab">End Date</span><DateField label="End Date" value={info.end} onChange={setEnd} /></div>
         </div>
-        <Links label="Предшественник" ids={info.dependsOn ?? []} options={tasks}
+        <Links label="Predecessor" ids={info.dependsOn ?? []} options={tasks}
           onAdd={id => set({ dependsOn: [...(info.dependsOn ?? []), id] })} onRemove={id => set({ dependsOn: (info.dependsOn ?? []).filter(x => x !== id) })} />
-        <Links label="Последователь" ids={successors} options={tasks}
+        <Links label="Successor" ids={successors} options={tasks}
           onAdd={id => { const t = idx.get(id)!.topic; ed.setTopic([id], { taskInfo: { ...t.taskInfo!, dependsOn: [...(t.taskInfo!.dependsOn ?? []), taskDialog] } }) }}
           onRemove={id => { const t = idx.get(id)!.topic; ed.setTopic([id], { taskInfo: { ...t.taskInfo!, dependsOn: (t.taskInfo!.dependsOn ?? []).filter(x => x !== taskDialog) } }) }} />
         <div className="tk-sec">
-          <div className="tk-row"><span className="tk-lab">Исполнитель</span>
-            <input className="tk-input" placeholder="Имя или e-mail" aria-label="Исполнитель" value={info.assignee ?? ''} onChange={e => set({ assignee: e.target.value || undefined })} /></div>
+          <div className="tk-row"><span className="tk-lab">Assignee</span>
+            <input className="tk-input" placeholder="Name or email" aria-label="Assignee" value={info.assignee ?? ''} onChange={e => set({ assignee: e.target.value || undefined })} /></div>
         </div>
         <div className="tk-sec">
-          <div className="tk-cap">Общие настройки задач</div>
-          <div className="tk-row"><span className="tk-lab wide">Показывать в теме</span><div className="spacer" />
-            <Toggle label="Показывать в теме" on={sheet.taskInTopic !== false} onChange={v => ed.setSheet({ taskInTopic: v })} /></div>
-          <div className="tk-row"><span className="tk-lab wide">Скрывать автора на карте</span><div className="spacer" />
-            <Toggle label="Скрывать автора на карте" on={sheet.taskHideCreator !== false} onChange={v => ed.setSheet({ taskHideCreator: v })} /></div>
-          <div className="tk-row"><span className="tk-lab wide">Пропускать выходные</span><div className="spacer" />
-            <Toggle label="Пропускать выходные" on={!!sheet.taskSkipWeekends} onChange={v => ed.setSheet({ taskSkipWeekends: v })} /></div>
+          <div className="tk-cap">General Task Settings</div>
+          <div className="tk-row"><span className="tk-lab wide">Show in Topic</span><div className="spacer" />
+            <Toggle label="Show in Topic" on={sheet.taskInTopic !== false} onChange={v => ed.setSheet({ taskInTopic: v })} /></div>
+          <div className="tk-row"><span className="tk-lab wide">Hide Creator on Map</span><div className="spacer" />
+            <Toggle label="Hide Creator on Map" on={sheet.taskHideCreator !== false} onChange={v => ed.setSheet({ taskHideCreator: v })} /></div>
+          <div className="tk-row"><span className="tk-lab wide">Skip Weekends</span><div className="spacer" />
+            <Toggle label="Skip Weekends" on={!!sheet.taskSkipWeekends} onChange={v => ed.setSheet({ taskSkipWeekends: v })} /></div>
         </div>
       </div>
-      <div className="tk-foot"><button className="tk-remove" onClick={() => ed.setTopic([taskDialog], { taskInfo: undefined })}>Удалить</button></div>
+      <div className="tk-foot"><button className="tk-remove" onClick={() => ed.setTopic([taskDialog], { taskInfo: undefined })}>Delete</button></div>
     </div>
   )
 }
@@ -225,34 +220,34 @@ export default function Gantt({ sheet }: { sheet: Sheet }) {
       onPointerMove={e => drag && setDrag({ ...drag, delta: Math.round((e.clientX - drag.x0) / dayW) })} onPointerUp={finish}
       onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') setLinking(false) }}>
       <div className="gantt-head" onPointerDown={startMove}>
-        <b>Диаграмма Ганта</b>
+        <b>Gantt Chart</b>
         <div className="gantt-tools">
-          <Tip title="Связать задачи" desc="Щёлкните две полосы: первая станет предшественником второй.">
-            <button className={'ibtn' + (linking !== false ? ' on' : '')} aria-label="Связать задачи" disabled={tasks.length < 2} onClick={() => setLinking(l => (l === false ? null : false))}>
+          <Tip title="Link Tasks" desc="Click two bars: the first becomes the predecessor of the second.">
+            <button className={'ibtn' + (linking !== false ? ' on' : '')} aria-label="Link Tasks" disabled={tasks.length < 2} onClick={() => setLinking(l => (l === false ? null : false))}>
               <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round"><rect x={1.5} y={2.5} width={5} height={3} rx={1} /><rect x={9.5} y={10.5} width={5} height={3} rx={1} /><path d="M4 5.5v6.5h5.5" /></svg>
             </button></Tip>
           <i />
-          <Tip title="Экспорт" desc="Сохранить диаграмму как PNG."><button className="ibtn" aria-label="Экспорт диаграммы" onClick={exportPng}><Icon name="upload" size={16} /></button></Tip>
-          <Tip title="Печать"><button className="ibtn" aria-label="Печать диаграммы" onClick={print}><Icon name="print" size={16} /></button></Tip>
+          <Tip title="Export" desc="Save the chart as PNG."><button className="ibtn" aria-label="Export chart" onClick={exportPng}><Icon name="upload" size={16} /></button></Tip>
+          <Tip title="Print"><button className="ibtn" aria-label="Print chart" onClick={print}><Icon name="print" size={16} /></button></Tip>
           <i />
-          <button className="ibtn" aria-label="Уменьшить масштаб" onClick={() => setDayW(w => Math.max(24, w - 16))}>
+          <button className="ibtn" aria-label="Zoom out" onClick={() => setDayW(w => Math.max(24, w - 16))}>
             <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3}><circle cx={8} cy={8} r={6} /><path d="M5.5 8h5" /></svg></button>
-          <input className="gantt-zoom" type="range" min={24} max={160} value={dayW} onChange={e => setDayW(+e.target.value)} aria-label="Масштаб шкалы" />
-          <button className="ibtn" aria-label="Увеличить масштаб" onClick={() => setDayW(w => Math.min(160, w + 16))}>
+          <input className="gantt-zoom" type="range" min={24} max={160} value={dayW} onChange={e => setDayW(+e.target.value)} aria-label="Timeline scale" />
+          <button className="ibtn" aria-label="Zoom in" onClick={() => setDayW(w => Math.min(160, w + 16))}>
             <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3}><circle cx={8} cy={8} r={6} /><path d="M5.5 8h5M8 5.5v5" /></svg></button>
-          <button className="gantt-close" aria-label="Закрыть" onClick={() => ed.setGantt(false)}><Icon name="close" size={10} /></button>
+          <button className="gantt-close" aria-label="Close" onClick={() => ed.setGantt(false)}><Icon name="close" size={10} /></button>
         </div>
       </div>
-      {linking !== false && <div className="gantt-hint">{linking ? 'Теперь щёлкните задачу-последователя.' : 'Щёлкните задачу-предшественника.'} Esc — отмена.</div>}
+      {linking !== false && <div className="gantt-hint">{linking ? 'Now click the successor task.' : 'Click the predecessor task.'} Esc to cancel.</div>}
       <div className="gantt-body" ref={body}>
         <div className="gantt-table">
-          <div className="gt-row head"><span>Задача</span><span>Начало</span><span>Длительность</span></div>
+          <div className="gt-row head"><span>Task</span><span>Start Date</span><span>Duration</span></div>
           {tasks.map(r => {
             const i = r.topic.taskInfo!
             const has = !!i.start, { s, e } = has ? span(i, r.topic.id) : { s: 0, e: 0 }
             return (
               <div key={r.topic.id} className={'gt-row' + (selection.includes(r.topic.id) ? ' on' : '')} onClick={() => ed.select([r.topic.id])} onDoubleClick={() => ed.setTaskDialog(r.topic.id)}>
-                <span className="name" title={r.topic.title}>{r.topic.title || '(без названия)'}</span>
+                <span className="name" title={r.topic.title}>{r.topic.title || '(Untitled)'}</span>
                 <span>{has ? fmtDate(fromDay(s)) : ''}</span>
                 <span>{has ? pluralDays(sheet.taskSkipWeekends ? taskDays(fromDay(s), fromDay(e), true) : e - s + 1) : ''}</span>
               </div>
@@ -265,7 +260,7 @@ export default function Gantt({ sheet }: { sheet: Sheet }) {
                 <path d="M10 25h10M10 34h10M10 43h10" stroke="#d6dade" strokeWidth={3} /><path d="M36 25h40" stroke="#a5a6f6" strokeWidth={3} /><path d="M50 34h20" stroke="#ff9f69" strokeWidth={3} /><path d="M36 43h22" stroke="#ff9f69" strokeWidth={3} />
                 <path d="M62 38l12 22 3-8 8-2z" fill="#fff" stroke="#1f2326" strokeWidth={2} />
               </svg>
-              <b>Нет задач</b><span>Выберите тему, чтобы добавить её как задачу.</span>
+              <b>No Tasks</b><span>Select a topic to add it as a task.</span>
             </div>
           )}
         </div>
@@ -274,7 +269,7 @@ export default function Gantt({ sheet }: { sheet: Sheet }) {
             <div className="gc-months">
               {months.map((d, i) => {
                 const next = months[i + 1] ?? to + 1
-                return <span key={d} style={{ left: (d - from) * dayW, width: (next - d) * dayW }}><em>{new Date(d * DAY).toLocaleDateString('ru', { month: 'long', year: 'numeric', timeZone: 'UTC' }).replace(' г.', '')}</em></span>
+                return <span key={d} style={{ left: (d - from) * dayW, width: (next - d) * dayW }}><em>{new Date(d * DAY).toLocaleDateString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</em></span>
               })}
             </div>
             <div className="gc-days">

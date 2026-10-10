@@ -42,7 +42,7 @@ export async function exportMap(fmt: ExportFormat, doc: MapDocument, sheet: Shee
     }
     case 'webm': { const { pitchToWebm } = await import('./video'); return download(await pitchToWebm(sheet), name + '.webm') }
     case 'textbundle': { const { toTextBundle } = await import('./bundle'); return download(await toTextBundle(doc), name + '.textpack') }
-    case 'tasks-xlsx': { const { tasksToXlsx } = await import('./tasks'); return download(await tasksToXlsx(doc), name + ' — задачи.xlsx') }
+    case 'tasks-xlsx': { const { tasksToXlsx } = await import('./tasks'); return download(await tasksToXlsx(doc), name + ' - tasks.xlsx') }
     case 'ics': { const { tasksToIcs } = await import('./tasks'); return download(text(tasksToIcs(doc, title), 'text/calendar'), name + '.ics') }
     case 'svg': { const { sheetToSvg } = await import('./image'); return download(text(await sheetToSvg(sheet), 'image/svg+xml'), name + '.svg') }
     case 'pdf': { const { sheetsToPdf } = await import('./image'); return download(await sheetsToPdf(doc.sheets), name + '.pdf') }
@@ -67,7 +67,7 @@ export async function importFile(file: File): Promise<{ title: string; document:
     if (ext === 'opml') document = t.fromOpml(txt)
     else if (ext === 'mm') document = t.fromFreeMind(txt)
     else if (ext === 'md' || ext === 'markdown' || ext === 'txt') document = t.fromMarkdown(txt, base)
-    else throw new Error('Неподдерживаемый формат: .' + ext)
+    else throw new Error('Unsupported format: .' + ext)
   }
   // гарантируем уникальные id тем (некоторые файлы содержат повторы)
   for (const sh of document.sheets) {
@@ -77,5 +77,5 @@ export async function importFile(file: File): Promise<{ title: string; document:
       seen.add(ref.topic.id)
     }
   }
-  return { title: base.slice(0, 200) || 'Импорт', document }
+  return { title: base.slice(0, 200) || 'Import', document }
 }

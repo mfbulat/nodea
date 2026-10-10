@@ -43,27 +43,27 @@ function LinkDialog({ topic, close, mode: initial }: { topic: Topic; close: () =
   // темы всех листов для ссылки на тему
   const options = useMemo(() => doc.sheets.flatMap(sh => [...indexSheet(sh).values()]
     .filter(r => r.topic.id !== topic.id)
-    .map(r => ({ id: r.topic.id, label: (doc.sheets.length > 1 ? sh.title + ' › ' : '') + (r.topic.title || '(без названия)') }))), [doc, topic.id])
+    .map(r => ({ id: r.topic.id, label: (doc.sheets.length > 1 ? sh.title + ' › ' : '') + (r.topic.title || '(Untitled)') }))), [doc, topic.id])
   const save = () => {
     ed.setTopic([topic.id], { href: mode === 'web' ? (url.trim() || undefined) : (target ? 'topic:' + target : undefined) })
     close()
   }
   return (
-    <Modal title="Ссылка" onClose={close}>
+    <Modal title="Link" onClose={close}>
       <div className="seg">
-        <button className={mode === 'web' ? 'on' : ''} onClick={() => setMode('web')}>Веб-адрес</button>
-        <button className={mode === 'topic' ? 'on' : ''} onClick={() => setMode('topic')}>Тема</button>
+        <button className={mode === 'web' ? 'on' : ''} onClick={() => setMode('web')}>Web Link</button>
+        <button className={mode === 'topic' ? 'on' : ''} onClick={() => setMode('topic')}>Topic</button>
       </div>
       {mode === 'web'
         ? <input autoFocus placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()} />
-        : <select value={target} onChange={e => setTarget(e.target.value)} size={8} aria-label="Тема">
+        : <select value={target} onChange={e => setTarget(e.target.value)} size={8} aria-label="Topic">
           {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>}
       <div className="modal-actions">
-        {topic.href && <button className="danger" onClick={() => { ed.setTopic([topic.id], { href: undefined }); close() }}>Удалить ссылку</button>}
+        {topic.href && <button className="danger" onClick={() => { ed.setTopic([topic.id], { href: undefined }); close() }}>Remove Link</button>}
         <div className="spacer" />
-        <button onClick={close}>Отмена</button>
-        <button className="primary" onClick={save}>Сохранить</button>
+        <button onClick={close}>Cancel</button>
+        <button className="primary" onClick={save}>Save</button>
       </div>
     </Modal>
   )
@@ -78,11 +78,11 @@ function LabelsDialog({ topic, close }: { topic: Topic; close: () => void }) {
     close()
   }
   return (
-    <Modal title="Метки" onClose={close}>
-      <input autoFocus placeholder="Через запятую: срочно, клиент" value={value} onChange={e => setValue(e.target.value)}
+    <Modal title="Labels" onClose={close}>
+      <input autoFocus placeholder="Separate with commas: urgent, client" value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && save()} />
       <div className="modal-actions"><div className="spacer" />
-        <button onClick={close}>Отмена</button><button className="primary" onClick={save}>Сохранить</button></div>
+        <button onClick={close}>Cancel</button><button className="primary" onClick={save}>Save</button></div>
     </Modal>
   )
 }
@@ -93,13 +93,13 @@ function EquationDialog({ topic, close }: { topic: Topic; close: () => void }) {
   const html = useMemo(() => { try { return katex.renderToString(tex, { throwOnError: false, displayMode: true }) } catch (e) { return String(e) } }, [tex])
   const save = () => { ed.setTopic([topic.id], { equation: tex.trim() || undefined }); close() }
   return (
-    <Modal title="Формула LaTeX" onClose={close}>
+    <Modal title="LaTeX Equation" onClose={close}>
       <textarea autoFocus rows={4} value={tex} onChange={e => setTex(e.target.value)} style={{ fontFamily: 'monospace' }} />
       <div className="eq-preview" dangerouslySetInnerHTML={{ __html: html }} />
       <div className="modal-actions">
-        {topic.equation && <button className="danger" onClick={() => { ed.setTopic([topic.id], { equation: undefined }); close() }}>Удалить</button>}
+        {topic.equation && <button className="danger" onClick={() => { ed.setTopic([topic.id], { equation: undefined }); close() }}>Delete</button>}
         <div className="spacer" />
-        <button onClick={close}>Отмена</button><button className="primary" onClick={save}>Сохранить</button></div>
+        <button onClick={close}>Cancel</button><button className="primary" onClick={save}>Save</button></div>
     </Modal>
   )
 }
@@ -107,13 +107,13 @@ function EquationDialog({ topic, close }: { topic: Topic; close: () => void }) {
 function StickerDialog({ topic, close }: { topic: Topic; close: () => void }) {
   const ed = useEditor.getState()
   return (
-    <Modal title="Стикер" onClose={close}>
+    <Modal title="Sticker" onClose={close}>
       <div className="sticker-grid">
         {STICKERS.map(s => <button key={s} onClick={() => { ed.setTopic([topic.id], { image: { src: 'emoji:' + s, width: 56, height: 56 } }); close() }}>{s}</button>)}
       </div>
       <div className="modal-actions">
-        {topic.image && <button className="danger" onClick={() => { ed.setTopic([topic.id], { image: undefined }); close() }}>Убрать изображение</button>}
-        <div className="spacer" /><button onClick={close}>Закрыть</button></div>
+        {topic.image && <button className="danger" onClick={() => { ed.setTopic([topic.id], { image: undefined }); close() }}>Remove Image</button>}
+        <div className="spacer" /><button onClick={close}>Close</button></div>
     </Modal>
   )
 }

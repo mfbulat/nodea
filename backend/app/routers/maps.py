@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/maps", tags=["maps"])
 def _own_map(map_id: uuid.UUID, user: User, db: Session) -> Map:
     m = db.get(Map, map_id)
     if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Карта не найдена")
+        raise HTTPException(404, "Map not found")
     return m
 
 
@@ -91,7 +91,7 @@ def restore_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Sessi
 
 @router.post("", response_model=MapOut)
 def create_map(data: MapCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    m = Map(owner_id=user.id, title=data.title, document=data.document or empty_document(data.title))
+    m = Map(owner_id=user.id, title=data.title, document=data.document or empty_document())
     db.add(m)
     db.flush()
     _snapshot(m, db)
@@ -127,7 +127,7 @@ def update_map(map_id: uuid.UUID, data: MapUpdate, user: User = Depends(current_
                db: Session = Depends(get_db)):
     m = _own_map(map_id, user, db)
     if data.base_revision is not None and data.base_revision != m.revision:
-        raise HTTPException(409, "Карта изменена в другом окне")
+        raise HTTPException(409, "The map was changed in another window")
     if data.title is not None:
         m.title = data.title
     if data.starred is not None:
@@ -149,7 +149,7 @@ def delete_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Sessio
 @router.post("/{map_id}/duplicate", response_model=MapOut)
 def duplicate_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
     src = _own_map(map_id, user, db)
-    m = Map(owner_id=user.id, title=f"{src.title} (копия)", document=copy.deepcopy(src.document))
+    m = Map(owner_id=user.id, title=f"Copy of {src.title}", document=copy.deepcopy(src.document))
     db.add(m)
     db.flush()
     _snapshot(m, db)
@@ -179,7 +179,7 @@ def get_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User = Depends(c
     _own_map(map_id, user, db)
     v = db.get(MapVersion, version_id)
     if not v or v.map_id != map_id:
-        raise HTTPException(404, "Версия не найдена")
+        raise HTTPException(404, "Version not found")
     return v
 
 
@@ -189,7 +189,7 @@ async def restore_version(map_id: uuid.UUID, version_id: uuid.UUID, user: User =
     m = _own_map(map_id, user, db)
     v = db.get(MapVersion, version_id)
     if not v or v.map_id != map_id:
-        raise HTTPException(404, "Версия не найдена")
+        raise HTTPException(404, "Version not found")
     _snapshot(m, db)  # сохраняем текущее состояние перед откатом
     m.document = copy.deepcopy(v.document)
     m.title = v.title

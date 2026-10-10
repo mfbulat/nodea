@@ -11,23 +11,23 @@ const PRIORITY = ['#ef5a5a', '#f5964a', '#f5c443', '#58bd7d', '#4f7cf6', '#6c4fd
 const colorNames = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray']
 /** символы веб-версии: цвет круга и белый знак (рисунки собственные) */
 const SYMBOLS: Record<string, [string, string]> = {
-  heart: ['red', 'Сердце'], like: ['orange', 'Нравится'], dislike: ['blue', 'Не нравится'], pin: ['red', 'Булавка'],
-  idea: ['yellow', 'Идея'], lightning: ['blue', 'Молния'], hourglass: ['orange', 'Песочные часы'], telephone: ['green', 'Телефон'],
-  pen: ['orange', 'Ручка'], music: ['purple', 'Музыка'], entertainment: ['yellow', 'Развлечения'], 100: ['pink', 'Сто'],
-  flight: ['blue', 'Перелёт'], run: ['green', 'Бег'], exclam: ['red', 'Важно'], question: ['blue', 'Вопрос'],
+  heart: ['red', 'Heart'], like: ['orange', 'Like'], dislike: ['blue', 'Dislike'], pin: ['red', 'Pin'],
+  idea: ['yellow', 'Idea'], lightning: ['blue', 'Lightning'], hourglass: ['orange', 'Hourglass'], telephone: ['green', 'Phone'],
+  pen: ['orange', 'Pen'], music: ['purple', 'Music'], entertainment: ['yellow', 'Entertainment'], 100: ['pink', 'Hundred'],
+  flight: ['blue', 'Flight'], run: ['green', 'Run'], exclam: ['red', 'Important'], question: ['blue', 'Question'],
 }
 
 const SYMBOL_ORDER = ['heart', 'like', 'dislike', 'pin', 'idea', 'lightning', 'hourglass', 'telephone', 'pen', 'music', 'entertainment', '100', 'flight', 'run', 'exclam', 'question']
 
 // панель показывает набор веб-версии; прочие маркеры (смайлы, стрелки, месяцы…) по-прежнему отображаются в темах
 export const MARKER_GROUPS: MarkerGroup[] = [
-  { id: 'tag', name: 'Тег', markers: colorNames.map(c => `tag-${c}`) },
-  { id: 'priority', name: 'Приоритет', markers: [...Array(7).keys()].map(i => `priority-${i + 1}`) },
-  { id: 'task', name: 'Задача', markers: [0, 1, 3, 4, 5, 7, 8].map(i => `task-${i}`) },
-  { id: 'flag', name: 'Флаг', markers: colorNames.map(c => `flag-${c}`) },
-  { id: 'star', name: 'Звезда', markers: colorNames.map(c => `star-${c}`) },
-  { id: 'person', name: 'Люди', markers: colorNames.map(c => `person-${c}`) },
-  { id: 'symbol', name: 'Символ', markers: SYMBOL_ORDER.map(s => `symbol-${s}`) },
+  { id: 'tag', name: 'Tag', markers: colorNames.map(c => `tag-${c}`) },
+  { id: 'priority', name: 'Priority', markers: [...Array(7).keys()].map(i => `priority-${i + 1}`) },
+  { id: 'task', name: 'Task', markers: [0, 1, 3, 4, 5, 7, 8].map(i => `task-${i}`) },
+  { id: 'flag', name: 'Flag', markers: colorNames.map(c => `flag-${c}`) },
+  { id: 'star', name: 'Star', markers: colorNames.map(c => `star-${c}`) },
+  { id: 'person', name: 'People', markers: colorNames.map(c => `person-${c}`) },
+  { id: 'symbol', name: 'Symbol', markers: SYMBOL_ORDER.map(s => `symbol-${s}`) },
 ]
 
 /** белые знаки символов в круге 16×16 */
@@ -48,20 +48,20 @@ const GLYPH: Record<string, JSX.Element> = {
   run: <><circle cx={9.6} cy={4.2} r={1.1} fill="#fff" /><path d="M5.2,7.2L7.4,5.8 9.4,6.4 10.2,8.2 11.6,8.6M8.6,6.2L7.6,9.2 9.4,10.6 8.8,12.6M7.6,9.2L6.4,11.2 4.6,11.4" stroke="#fff" strokeWidth={1.2} fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
 }
 
-const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
-const WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export const markerGroup = (id: string) => id.split('-')[0]
 
 export function markerName(id: string): string {
   const [g, v] = id.split('-')
   switch (g) {
-    case 'priority': return `Приоритет ${v}`
-    case 'tag': return ({ red: 'Красный', orange: 'Оранжевый', yellow: 'Жёлтый', green: 'Зелёный', blue: 'Синий', purple: 'Фиолетовый', gray: 'Серый' } as Record<string, string>)[v] ?? v
-    case 'task': return +v === 0 ? 'Начать' : +v === 8 ? 'Готово' : `Выполнено ${+v}/8`
-    case 'flag': return 'Флаг: ' + markerName('tag-' + v).toLowerCase()
-    case 'star': return 'Звезда: ' + markerName('tag-' + v).toLowerCase()
-    case 'person': return 'Человек: ' + markerName('tag-' + v).toLowerCase()
+    case 'priority': return `Priority ${v}`
+    case 'tag': return ({ red: 'Red', orange: 'Orange', yellow: 'Yellow', green: 'Green', blue: 'Blue', purple: 'Purple', gray: 'Gray' } as Record<string, string>)[v] ?? v
+    case 'task': return +v === 0 ? 'Start' : +v === 8 ? 'Done' : `${+v}/8 Done`
+    case 'flag': return 'Flag: ' + markerName('tag-' + v).toLowerCase()
+    case 'star': return 'Star: ' + markerName('tag-' + v).toLowerCase()
+    case 'person': return 'Person: ' + markerName('tag-' + v).toLowerCase()
     case 'symbol': return SYMBOLS[v]?.[1] ?? id
     case 'month': return MONTHS[+v - 1]
     case 'week': return WEEK[+v - 1]
@@ -160,18 +160,18 @@ export function MarkerIcon({ id, x = 0, y = 0, size = 16 }: { id: string; x?: nu
 
 /** Стикеры по категориям, как в веб-версии (системные эмодзи) */
 export const STICKER_CATEGORIES: { name: string; items: string[] }[] = [
-  { name: 'Бизнес', items: ['💵', '💼', '🧮', '💬', '☕', '📒', '🕐', '✉️', '🔍', '📁', '📽️', '📮', '📰', '📕', '📄', '🖨️', '📋', '📑', '🗒️', '🧾', '🖼️', '🔎', '🎯', '💲', '🎙️', '🪪', '✅', '🏅', '📊', '🧑‍💼', '👥', '📞', '📧', '📈', '📉', '📅', '🏆', '🗣️', '🧑‍🤝‍🧑', 'ℹ️', '❓', '🗑️', '🌐'] },
-  { name: 'Образование', items: ['🎓', '📚', '📖', '✏️', '🖊️', '📐', '📏', '🧪', '🔬', '🔭', '🧬', '🌍', '🧠', '🏫', '🎒', '📝', '🗂️', '📌', '📎', '✂️', '🖍️', '🧑‍🏫', '🧑‍🎓', '💡', '🔢', '🔤', '🧩', '🎨', '🎼', '🗺️'] },
-  { name: 'Технологии', items: ['💻', '🖥️', '⌨️', '🖱️', '📱', '⌚', '📷', '🎧', '🔋', '🔌', '💾', '💿', '📡', '🛰️', '🤖', '⚙️', '🛠️', '🔧', '🔩', '🧲', '🔒', '🔑', '🛡️', '☁️', '📶', '🕹️', '🎮', '🖨️', '🧑‍💻', '🚀'] },
-  { name: 'Настроение', items: ['😀', '😂', '🙂', '😉', '😍', '🤩', '😎', '🤔', '😐', '😴', '😮', '😢', '😭', '😡', '🤯', '🥳', '😇', '🤗', '🙄', '😬', '😷', '🤒', '😱', '🥰'] },
-  { name: 'Путешествия', items: ['✈️', '🧳', '🗺️', '🧭', '🏖️', '🏝️', '⛰️', '🏕️', '🚗', '🚆', '🚢', '🚲', '🛵', '🚌', '🏨', '🗽', '🗼', '🏰', '🎡', '📸', '🎫', '🛂', '⛽', '🚦'] },
-  { name: 'Праздники', items: ['🎉', '🎊', '🎂', '🎁', '🎈', '🎄', '🎃', '🎆', '🎇', '🕯️', '🥂', '🍾', '💝', '🌹', '🎀', '🪅'] },
-  { name: 'Быт', items: ['🏠', '🛋️', '🛏️', '🚿', '🧺', '🧹', '🧽', '🪴', '🕰️', '💡', '🔦', '🧴', '🪥', '👕', '👟', '👜', '🛒', '💊', '🧸', '🪑', '🚪', '🪟', '🧯', '🔨'] },
-  { name: 'Животные', items: ['🐶', '🐱', '🐭', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦉', '🐢', '🐟', '🐬', '🦋', '🐝', '🐞'] },
-  { name: 'Погода', items: ['☀️', '🌤️', '⛅', '☁️', '🌧️', '⛈️', '🌩️', '❄️', '🌨️', '🌪️', '🌫️', '🌈', '🌙', '⭐', '🌡️', '☔'] },
-  { name: 'Спорт', items: ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏓', '🏸', '🥊', '🏋️', '🚴', '🏊', '⛷️', '🏃', '🧘', '🏆'] },
-  { name: 'Еда и напитки', items: ['🍎', '🍌', '🍇', '🍓', '🍉', '🥑', '🥕', '🌽', '🍞', '🧀', '🥚', '🍕', '🍔', '🍟', '🌭', '🍣', '🍜', '🍰', '🍩', '🍪', '🍫', '☕', '🍵', '🥤', '🍺', '🍷'] },
-  { name: 'Жесты', items: ['👍', '👎', '👌', '✌️', '🤞', '👏', '🙌', '🙏', '🤝', '👋', '✋', '👉', '👈', '☝️', '💪', '✍️'] },
-  { name: 'Другое', items: ['❤️', '⭐', '🔥', '⚡', '💯', '✅', '❌', '⚠️', '❗', '❓', '🔔', '📍', '🏁', '🚩', '♻️', '🆕'] },
+  { name: 'Business', items: ['💵', '💼', '🧮', '💬', '☕', '📒', '🕐', '✉️', '🔍', '📁', '📽️', '📮', '📰', '📕', '📄', '🖨️', '📋', '📑', '🗒️', '🧾', '🖼️', '🔎', '🎯', '💲', '🎙️', '🪪', '✅', '🏅', '📊', '🧑‍💼', '👥', '📞', '📧', '📈', '📉', '📅', '🏆', '🗣️', '🧑‍🤝‍🧑', 'ℹ️', '❓', '🗑️', '🌐'] },
+  { name: 'Education', items: ['🎓', '📚', '📖', '✏️', '🖊️', '📐', '📏', '🧪', '🔬', '🔭', '🧬', '🌍', '🧠', '🏫', '🎒', '📝', '🗂️', '📌', '📎', '✂️', '🖍️', '🧑‍🏫', '🧑‍🎓', '💡', '🔢', '🔤', '🧩', '🎨', '🎼', '🗺️'] },
+  { name: 'Technology', items: ['💻', '🖥️', '⌨️', '🖱️', '📱', '⌚', '📷', '🎧', '🔋', '🔌', '💾', '💿', '📡', '🛰️', '🤖', '⚙️', '🛠️', '🔧', '🔩', '🧲', '🔒', '🔑', '🛡️', '☁️', '📶', '🕹️', '🎮', '🖨️', '🧑‍💻', '🚀'] },
+  { name: 'Mood', items: ['😀', '😂', '🙂', '😉', '😍', '🤩', '😎', '🤔', '😐', '😴', '😮', '😢', '😭', '😡', '🤯', '🥳', '😇', '🤗', '🙄', '😬', '😷', '🤒', '😱', '🥰'] },
+  { name: 'Travel', items: ['✈️', '🧳', '🗺️', '🧭', '🏖️', '🏝️', '⛰️', '🏕️', '🚗', '🚆', '🚢', '🚲', '🛵', '🚌', '🏨', '🗽', '🗼', '🏰', '🎡', '📸', '🎫', '🛂', '⛽', '🚦'] },
+  { name: 'Holidays', items: ['🎉', '🎊', '🎂', '🎁', '🎈', '🎄', '🎃', '🎆', '🎇', '🕯️', '🥂', '🍾', '💝', '🌹', '🎀', '🪅'] },
+  { name: 'Home', items: ['🏠', '🛋️', '🛏️', '🚿', '🧺', '🧹', '🧽', '🪴', '🕰️', '💡', '🔦', '🧴', '🪥', '👕', '👟', '👜', '🛒', '💊', '🧸', '🪑', '🚪', '🪟', '🧯', '🔨'] },
+  { name: 'Animals', items: ['🐶', '🐱', '🐭', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦉', '🐢', '🐟', '🐬', '🦋', '🐝', '🐞'] },
+  { name: 'Weather', items: ['☀️', '🌤️', '⛅', '☁️', '🌧️', '⛈️', '🌩️', '❄️', '🌨️', '🌪️', '🌫️', '🌈', '🌙', '⭐', '🌡️', '☔'] },
+  { name: 'Sports', items: ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏓', '🏸', '🥊', '🏋️', '🚴', '🏊', '⛷️', '🏃', '🧘', '🏆'] },
+  { name: 'Food & Drink', items: ['🍎', '🍌', '🍇', '🍓', '🍉', '🥑', '🥕', '🌽', '🍞', '🧀', '🥚', '🍕', '🍔', '🍟', '🌭', '🍣', '🍜', '🍰', '🍩', '🍪', '🍫', '☕', '🍵', '🥤', '🍺', '🍷'] },
+  { name: 'Gestures', items: ['👍', '👎', '👌', '✌️', '🤞', '👏', '🙌', '🙏', '🤝', '👋', '✋', '👉', '👈', '☝️', '💪', '✍️'] },
+  { name: 'Other', items: ['❤️', '⭐', '🔥', '⚡', '💯', '✅', '❌', '⚠️', '❗', '❓', '🔔', '📍', '🏁', '🚩', '♻️', '🆕'] },
 ]
 export const STICKERS = STICKER_CATEGORIES.flatMap(c => c.items)

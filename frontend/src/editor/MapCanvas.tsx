@@ -2,12 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CommentLayer, nearestTopic } from './Comments'
 import { openCanvasMenu, openTopicMenu, useCommentsHidden } from './ContextMenu'
 import type { Sheet, Topic, Zone } from './model'
-import { indexSheet, isAncestor, levelOf } from './model'
+import { indexSheet, isAncestor, levelOf, type TopicRef } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
 import { layoutSheet } from './layout'
 import { findDrop, type DropTarget } from './dnd'
 import { branchColor, FullStyle, isColored, MAP_FONT, resolveStyle, sheetBackground, WEIGHTS } from './themes'
-import { Content, IconKind, layoutContent, onFontsChanged } from './measure'
+import { Content, IconKind, layoutContent, numberPrefix, onFontsChanged } from './measure'
 import { edgePath } from './paths'
 import { currentLayout, setCurrentLayout, topLevel, useEditor } from './store'
 import { boxCenter, relGeometry } from './relations'
@@ -27,6 +27,7 @@ export function renderSheet(sheet: Sheet): Rendered {
   const styles = new Map<string, FullStyle>()
   const contents = new Map<string, Content>()
   const sizes = new Map<string, { w: number; h: number; shapeH: number; underline: boolean }>()
+  const prefixOf = (ref: TopicRef) => (ref.kind === 'child' && ref.parent ? numberPrefix(ref.parent.numbering, ref.index) : '')
   for (const [id, ref] of idx) {
     const st = resolveStyle(sheet, ref)
     // автоцвет плавающих тем: цвет из палитры по порядку
@@ -40,14 +41,14 @@ export function renderSheet(sheet: Sheet): Rendered {
     const maxW = new Map<string, number>()
     for (const [id, ref] of idx) {
       const lv = levelOf(ref)
-      const w = layoutContent(ref.topic, styles.get(id)!, false, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends }).shapeW
+      const w = layoutContent(ref.topic, styles.get(id)!, false, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends, prefix: prefixOf(ref) }).shapeW
       maxW.set(lv, Math.max(maxW.get(lv) ?? 0, w))
     }
     for (const [id, ref] of idx) { const st = styles.get(id)!; if (!st.width) st.width = maxW.get(levelOf(ref)) }
   }
   for (const [id, ref] of idx) {
     const st = styles.get(id)!
-    const c = layoutContent(ref.topic, st, !!sheet.showNotes, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends })
+    const c = layoutContent(ref.topic, st, !!sheet.showNotes, { taskInTopic: sheet.taskInTopic, skipWeekends: sheet.taskSkipWeekends, prefix: prefixOf(ref) })
     contents.set(id, c)
     sizes.set(id, { w: c.w, h: c.h, shapeH: c.shapeH, underline: st.shape === 'underline' })
   }
@@ -499,7 +500,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           {(sheet.zones ?? []).map(z0 => {
             const z = drag?.kind === 'zone' && drag.id === z0.id ? { ...z0, ...zoneRect(drag) } : z0
             const sel = element?.kind === 'zone' && element.id === z.id
-            const title = z.title ?? 'Зона'
+            const title = z.title ?? 'Zone'
             const tw = Math.max(36, measureLabel(title) + 20)
             const startZone = (e: React.PointerEvent, mode: string) => {
               if (e.button !== 0 || readOnly) return
@@ -633,8 +634,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
                 <path d="M-4.5,0H4.5M0,-4.5V4.5" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
               </g>)
             return <>
-              {plus(left ? b.x - 16 * k : b.x + sw + 16 * k, b.y + sh / 2, 'Подтема', () => ed().addChild())}
-              {ref.kind !== 'root' && ref.kind !== 'callout' && plus(b.x + sw / 2, up ? b.y - 16 * k : b.y + sh + 16 * k, 'Тема', () => ed().addSibling(false))}
+              {plus(left ? b.x - 16 * k : b.x + sw + 16 * k, b.y + sh / 2, 'Subtopic', () => ed().addChild())}
+              {ref.kind !== 'root' && ref.kind !== 'callout' && plus(b.x + sw / 2, up ? b.y - 16 * k : b.y + sh + 16 * k, 'Topic', () => ed().addSibling(false))}
             </>
           })()}
           {relating && pointer && r.layout.boxes.get(relating) && (
@@ -678,8 +679,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
         </g>
       </svg>
       {!focusIds && !commentsHidden && <CommentLayer sheet={sheet} boxes={r.layout.boxes} view={view} readOnly={readOnly} />}
-      {zoneDrawing && <div className="relating-hint">Протяните прямоугольник, чтобы создать зону. Esc — отмена.</div>}
-      {commenting && <div className="relating-hint">Щёлкните в любом месте карты, чтобы добавить комментарий. Esc — отмена.</div>}
+      {zoneDrawing && <div className="relating-hint">Drag a rectangle to create a zone. Press Esc to cancel.</div>}
+      {commenting && <div className="relating-hint">Click anywhere on the map to add a comment. Press Esc to cancel.</div>}
       {peers.filter(p => p.cursor).map(p => (
         <div key={'pc' + p.clientId} className="peer-cursor" data-testid="peer-cursor"
           style={{ left: p.cursor!.x * view.zoom + view.x, top: p.cursor!.y * view.zoom + view.y, color: p.color }}>
@@ -691,8 +692,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
         <MiniToolbar id={selection[0]} x={r.layout.boxes.get(selection[0])!.x * view.zoom + view.x}
           y={r.layout.boxes.get(selection[0])!.y * view.zoom + view.y} />
       )}
-      {useEditor.getState().painting && <div className="relating-hint">Щёлкните тему, к которой применить стиль. Esc — отмена.</div>}
-      {relating && <div className="relating-hint">Щёлкните тему, с которой нужно связать. Esc — отмена.</div>}
+      {useEditor.getState().painting && <div className="relating-hint">Click a topic to apply the style. Press Esc to cancel.</div>}
+      {relating && <div className="relating-hint">Click the topic to connect to. Press Esc to cancel.</div>}
       {editingId && r.layout.boxes.get(editingId) && (
         <TitleEditor key={editingId} id={editingId} box={r.layout.boxes.get(editingId)!}
           style={r.styles.get(editingId)!} content={r.contents.get(editingId)!}
@@ -701,7 +702,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       {labelEdit && (
         <input className="label-editor" autoFocus defaultValue={labelEdit.value}
           style={{ left: labelEdit.x * view.zoom + view.x - (labelEdit.kind === 'relationship' ? 80 : 0), top: labelEdit.y * view.zoom + view.y - 14 }}
-          placeholder={labelEdit.kind === 'relationship' ? 'Подпись связи' : labelEdit.kind === 'zone' ? 'Название зоны' : 'Заголовок границы'}
+          placeholder={labelEdit.kind === 'relationship' ? 'Relationship label' : labelEdit.kind === 'zone' ? 'Zone title' : 'Boundary title'}
           onKeyDown={e => {
             e.stopPropagation()
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -710,7 +711,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           onBlur={e => {
             const v = e.target.value
             if (labelEdit.kind === 'relationship') ed().updateRelationship(labelEdit.id, { title: v })
-            else if (labelEdit.kind === 'zone') ed().updateZone(labelEdit.id, { title: v || 'Зона' })
+            else if (labelEdit.kind === 'zone') ed().updateZone(labelEdit.id, { title: v || 'Zone' })
             else ed().updateBoundary(labelEdit.id, { title: v })
             setLabelEdit(null)
           }} />
@@ -747,12 +748,12 @@ function MiniToolbar({ id, x, y }: { id: string; x: number; y: number }) {
       onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); fn() }}><Icon name={icon} size={18} /></button>)
   return (
     <div className="island mini-toolbar" style={{ left: Math.max(8, x), top: Math.max(8, y - 50) }} onPointerDown={e => e.stopPropagation()}>
-      {btn('relationship', 'Связь', () => ed().startRelating())}
-      {btn('link', 'Ссылка', () => ed().setDialog({ kind: 'link', id }), !!t.href)}
-      {btn('image', 'Изображение', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, !!t.image)}
-      {btn('note', 'Заметка', () => ed().setPanel('notes'), !!t.notes)}
+      {btn('relationship', 'Relationship', () => ed().startRelating())}
+      {btn('link', 'Link', () => ed().setDialog({ kind: 'link', id }), !!t.href)}
+      {btn('image', 'Image', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, !!t.image)}
+      {btn('note', 'Note', () => ed().setPanel('notes'), !!t.notes)}
       {btn('task', 'To-Do', () => ed().setTopic([id], { task: t.task ? undefined : { done: false } }), !!t.task)}
-      {btn('brush', 'Копировать формат (кисть)', () => {
+      {btn('brush', 'Format Painter', () => {
         const ref = indexSheet(ed().sheet()!).get(id)
         if (ref) { ed().copyStyle(resolveStyle(ed().sheet()!, ref)); useEditor.setState({ painting: true }) }
       }, useEditor.getState().painting)}

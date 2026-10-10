@@ -126,14 +126,14 @@ export default function Outliner({ sheet: realSheet, readOnly = false }: { sheet
             style={{ paddingLeft: row.kind === 'root' ? 22 : 30 + (row.depth - 1) * 24 }}>
             {row.kind !== 'root' && (n
               ? <button className="ol-slot ol-toggle" onClick={() => { ed().select([t.id]); ed().toggleCollapse() }}
-                aria-label={t.collapsed ? 'Развернуть' : 'Свернуть'}>
+                aria-label={t.collapsed ? 'Expand' : 'Collapse'}>
                 <svg width={10} height={10} style={{ transform: t.collapsed ? 'rotate(-90deg)' : undefined }}><path d="M1,3L9,3L5,8Z" fill="currentColor" /></svg></button>
               : <span className="ol-slot"><span className="ol-bullet" /></span>)}
             {t.task && <input type="checkbox" checked={t.task.done} onChange={() => ed().toggleTask(t.id)} />}
             {t.markers?.map(m => <svg key={m} width={16} height={16} className="ol-marker"><MarkerIcon id={m} size={16} /></svg>)}
             <textarea rows={1} readOnly={readOnly} ref={el => { if (el) inputs.current.set(t.id, el); else inputs.current.delete(t.id) }}
               defaultValue={t.title} key={t.id + '|' + t.title} spellCheck={false}
-              placeholder={row.kind === 'root' ? 'Центральная тема' : ''}
+              placeholder={row.kind === 'root' ? 'Central Topic' : ''}
               onFocus={() => { if (current !== t.id) ed().select([t.id]) }}
               onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }}
               onBlur={e => { if (e.target.value !== t.title) ed().setTitle(t.id, e.target.value) }}

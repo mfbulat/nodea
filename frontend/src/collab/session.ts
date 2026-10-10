@@ -61,7 +61,7 @@ export class CollabSession {
 
     const aw = this.provider.awareness
     const color = COLORS[this.ydoc.clientID % COLORS.length]
-    aw.setLocalStateField('user', { name: user || 'Гость', color })
+    aw.setLocalStateField('user', { name: user || 'Guest', color })
     aw.on('change', () => {
       const peers: Peer[] = []
       aw.getStates().forEach((st, clientId) => {

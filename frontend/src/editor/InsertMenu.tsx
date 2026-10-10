@@ -20,32 +20,32 @@ export default function InsertMenu() {
 
   return (
     <Dropdown align="left" trigger={(open, toggle) => (
-      <Tip title="Вставить" desc="Добавить другие элементы к выбранным темам.">
-        <button onClick={toggle} className={'ibtn insert-btn' + (open ? ' on' : '')} aria-label="Вставить">
+      <Tip title="Insert" desc="Add other elements to selected topics.">
+        <button onClick={toggle} className={'ibtn insert-btn' + (open ? ' on' : '')} aria-label="Insert">
           <Icon name="plus" /><Icon name="chevron" size={12} /></button>
       </Tip>
     )}>
       {close => <>
-        {item('summary', 'Сводка', ed.addSummary, none || !isChild)(close)}
-        {item('zone', 'Зона', ed.createZone, false, '⌘ ⌥ Z')(close)}
+        {item('summary', 'Summary', ed.addSummary, none || !isChild)(close)}
+        {item('zone', 'Zone', ed.createZone, false, '⌘ ⌥ Z')(close)}
         <div className="menu-sep" />
-        {item('note', 'Заметка', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
-        {item('label', 'Метка', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}
-        {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'callout')(close)}
-        {item('comment', 'Комментарий', () => { ed.setPanel('comments'); ed.setThread({ id }) })(close)}
+        {item('note', 'Note', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
+        {item('label', 'Label', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}
+        {item('callout', 'Callout', ed.addCallout, none || ref?.kind === 'callout')(close)}
+        {item('comment', 'Comment', () => { ed.setPanel('comments'); ed.setThread({ id }) })(close)}
         {item('task', 'To-Do', () => ed.setTopic(selection, { task: ref?.topic.task ? undefined : { done: false } }), none, '⌥ ⌘ T')(close)}
-        {item('gantt', 'Задача', () => insertTask(id))(close)}
-        <SubMenu icon="link" label="Ссылка">
-          <MenuItem icon="link" label="Веб-ссылка" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
-          <MenuItem icon="topic" label="Ссылка на тему" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id, mode: 'topic' }) }} />
+        {item('gantt', 'Task', () => insertTask(id))(close)}
+        <SubMenu icon="link" label="Link">
+          <MenuItem icon="link" label="Web Link" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
+          <MenuItem icon="topic" label="Topic Link" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id, mode: 'topic' }) }} />
         </SubMenu>
         <div className="menu-sep" />
-        {item('attach', 'Вложение', async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') })(close)}
+        {item('attach', 'Attachment', async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') })(close)}
         <div className="menu-sep" />
-        {item('sticker', 'Стикер', () => { ed.setPanel('markers'); ed.setMarkerTab('stickers') })(close)}
-        {item('illustration', 'Иллюстрация', () => { ed.setPanel('markers'); ed.setMarkerTab('illustrations') })(close)}
-        {item('image', 'Изображение', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, none, '⌘ ⇧ I')(close)}
-        {item('equation', 'Формула', () => ed.setDialog({ kind: 'equation', id }))(close)}
+        {item('sticker', 'Sticker', () => { ed.setPanel('markers'); ed.setMarkerTab('stickers') })(close)}
+        {item('illustration', 'Illustration', () => { ed.setPanel('markers'); ed.setMarkerTab('illustrations') })(close)}
+        {item('image', 'Local Image', async () => { const f = await pickFile('image/*'); if (f) uploadToTopic(id, f, 'image') }, none, '⌘ ⇧ I')(close)}
+        {item('equation', 'Equation', () => ed.setDialog({ kind: 'equation', id }))(close)}
       </>}
     </Dropdown>
   )

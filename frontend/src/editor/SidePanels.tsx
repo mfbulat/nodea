@@ -5,13 +5,14 @@ import { MARKER_GROUPS, MarkerIcon, markerName, STICKER_CATEGORIES } from './mar
 import { useDoc } from '../store/doc'
 import { MenuItem } from './Chrome'
 import { api } from '../api/client'
+import { Select } from '../ui/Select'
 import { ILLUSTRATION_CATEGORIES, ILLUSTRATIONS, illustrationSrc } from './illustrations'
 
 function Header({ title }: { title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
       <h3 style={{ margin: 0 }}>{title}</h3><div className="spacer" />
-      <button onClick={() => useEditor.getState().setPanel(null)} aria-label="Закрыть">×</button>
+      <button onClick={() => useEditor.getState().setPanel(null)} aria-label="Close">×</button>
     </div>
   )
 }
@@ -30,13 +31,13 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
   return (
     <div className="side-panel markers-panel" data-testid="markers-panel">
       <div className="seg-tabs">
-        <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Маркер</button>
-        <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Стикер</button>
-        <button className={tab === 'illustrations' ? 'on' : ''} onClick={() => setTab('illustrations')}>Иллюстрация</button>
+        <button className={tab === 'markers' ? 'on' : ''} onClick={() => setTab('markers')}>Marker</button>
+        <button className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}>Sticker</button>
+        <button className={tab === 'illustrations' ? 'on' : ''} onClick={() => setTab('illustrations')}>Illustration</button>
       </div>
       {tab === 'markers' && <button className="wide legend-btn" onClick={() => ed.setSheet({ legend: !sheet.legend })}>
-        {sheet.legend ? 'Скрыть легенду' : 'Показать легенду'}</button>}
-      {!id && <p className="muted">Выберите тему.</p>}
+        {sheet.legend ? 'Hide Legend' : 'Show Legend'}</button>}
+      {!id && <p className="muted">Select a topic.</p>}
       {tab === 'markers' && MARKER_GROUPS.map(g => (
         <div key={g.id}>
           <button className="group-head" onClick={() => toggleGroup(g.id)}>
@@ -53,11 +54,9 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
         </div>
       ))}
       {tab !== 'markers' && (
-        <div className="cat-row"><span>Категория</span><div className="spacer" />
-          <select value={cat} onChange={e => setCat(e.target.value)} aria-label="Категория">
-            <option value="">Все</option>
-            {(tab === 'stickers' ? STICKER_CATEGORIES.map(c => c.name) : [...ILLUSTRATION_CATEGORIES]).map(n => <option key={n} value={n}>{n}</option>)}
-          </select></div>
+        <div className="cat-row"><span>Category</span><div className="spacer" />
+          <Select label="Category" value={cat} onChange={setCat} minWidth={160}
+            options={[{ value: '', label: 'All' }, ...(tab === 'stickers' ? STICKER_CATEGORIES.map(c => c.name) : [...ILLUSTRATION_CATEGORIES]).map(n => ({ value: n, label: n }))]} /></div>
       )}
       {tab === 'stickers' && STICKER_CATEGORIES.filter(c => !cat || c.name === cat).map(c => (
         <div key={c.name}>
@@ -65,7 +64,7 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
             <span className={'caret' + (closed.has('s:' + c.name) ? ' closed' : '')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{c.name}
           </button>
           {!closed.has('s:' + c.name) && <div className="sticker-grid panel">
-            {c.items.map(st => <button key={st} disabled={!id} aria-label={'Стикер ' + st} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
+            {c.items.map(st => <button key={st} disabled={!id} aria-label={'Sticker ' + st} onClick={() => ed.setTopic(selection, { image: { src: 'emoji:' + st, width: 56, height: 56 } })}>{st}</button>)}
           </div>}
         </div>
       ))}
@@ -75,7 +74,7 @@ export function MarkersPanel({ sheet }: { sheet: Sheet }) {
             <span className={'caret' + (closed.has('i:' + c) ? ' closed' : '')}><svg width={8} height={8}><path d="M0,1.5L8,1.5L4,6.5Z" fill="currentColor" /></svg></span>{c}
           </button>
           {!closed.has('i:' + c) && <div className="illus-grid">
-            {ILLUSTRATIONS.filter(il => il.category === c).map(il => <button key={il.id} disabled={!id} title={il.name} aria-label={'Иллюстрация ' + il.name}
+            {ILLUSTRATIONS.filter(il => il.category === c).map(il => <button key={il.id} disabled={!id} title={il.name} aria-label={'Illustration ' + il.name}
               onClick={() => ed.setTopic(selection, { image: { src: illustrationSrc(il.svg), width: 120, height: 90 } })}>
               <img src={illustrationSrc(il.svg)} alt="" /></button>)}
           </div>}
@@ -91,8 +90,8 @@ export function NotesPanel({ sheet }: { sheet: Sheet }) {
   const topic = id ? indexSheet(sheet).get(id)?.topic : undefined
   return (
     <div className="side-panel notes-panel" data-testid="notes-panel">
-      <Header title="Заметка" />
-      {!topic ? <p className="muted">Выберите тему.</p> : <NoteEditor key={topic.id} id={topic.id} html={topic.notes?.html ?? ''} />}
+      <Header title="Note" />
+      {!topic ? <p className="muted">Select a topic.</p> : <NoteEditor key={topic.id} id={topic.id} html={topic.notes?.html ?? ''} />}
     </div>
   )
 }
@@ -113,20 +112,20 @@ function NoteEditor({ id, html }: { id: string; html: string }) {
   return (
     <>
       <div className="note-toolbar">
-        <button title="Жирный" onMouseDown={e => { e.preventDefault(); cmd('bold') }}><b>Ж</b></button>
-        <button title="Курсив" onMouseDown={e => { e.preventDefault(); cmd('italic') }}><i>К</i></button>
-        <button title="Подчёркнутый" onMouseDown={e => { e.preventDefault(); cmd('underline') }}><u>Ч</u></button>
-        <button title="Зачёркнутый" onMouseDown={e => { e.preventDefault(); cmd('strikeThrough') }}><s>З</s></button>
-        <button title="Заголовок" onMouseDown={e => { e.preventDefault(); cmd('formatBlock', 'h3') }}>H</button>
-        <button title="Абзац" onMouseDown={e => { e.preventDefault(); cmd('formatBlock', 'p') }}>¶</button>
-        <button title="Маркированный список" onMouseDown={e => { e.preventDefault(); cmd('insertUnorderedList') }}>•</button>
-        <button title="Нумерованный список" onMouseDown={e => { e.preventDefault(); cmd('insertOrderedList') }}>1.</button>
-        <button title="Ссылка" onMouseDown={e => { e.preventDefault(); const u = prompt('Адрес ссылки'); if (u) cmd('createLink', u) }}>🔗</button>
-        <input type="color" title="Цвет текста" onChange={e => cmd('foreColor', e.target.value)} />
-        <button title="Очистить форматирование" onMouseDown={e => { e.preventDefault(); cmd('removeFormat') }}>⌫</button>
+        <button title="Bold" onMouseDown={e => { e.preventDefault(); cmd('bold') }}><b>B</b></button>
+        <button title="Italic" onMouseDown={e => { e.preventDefault(); cmd('italic') }}><i>I</i></button>
+        <button title="Underline" onMouseDown={e => { e.preventDefault(); cmd('underline') }}><u>U</u></button>
+        <button title="Strikethrough" onMouseDown={e => { e.preventDefault(); cmd('strikeThrough') }}><s>S</s></button>
+        <button title="Heading" onMouseDown={e => { e.preventDefault(); cmd('formatBlock', 'h3') }}>H</button>
+        <button title="Paragraph" onMouseDown={e => { e.preventDefault(); cmd('formatBlock', 'p') }}>¶</button>
+        <button title="Bulleted List" onMouseDown={e => { e.preventDefault(); cmd('insertUnorderedList') }}>•</button>
+        <button title="Numbered List" onMouseDown={e => { e.preventDefault(); cmd('insertOrderedList') }}>1.</button>
+        <button title="Link" onMouseDown={e => { e.preventDefault(); const u = prompt('Link URL'); if (u) cmd('createLink', u) }}>🔗</button>
+        <input type="color" title="Text Color" onChange={e => cmd('foreColor', e.target.value)} />
+        <button title="Clear Formatting" onMouseDown={e => { e.preventDefault(); cmd('removeFormat') }}>⌫</button>
       </div>
       <div ref={ref} className="note-editor" contentEditable suppressContentEditableWarning
-        onInput={schedule} onBlur={save} onKeyDown={e => e.stopPropagation()} data-placeholder="Текст заметки…" />
+        onInput={schedule} onBlur={save} onKeyDown={e => e.stopPropagation()} data-placeholder="Note text…" />
     </>
   )
 }
@@ -149,22 +148,22 @@ export function SheetTabs() {
     window.addEventListener('pointerdown', close)
     return () => window.removeEventListener('pointerdown', close)
   }, [menu])
-  const rename = (id: string, title: string) => { const t = prompt('Название листа', title)?.trim(); if (t) ed.renameSheet(id, t) }
+  const rename = (id: string, title: string) => { const t = prompt('Sheet name', title)?.trim(); if (t) ed.renameSheet(id, t) }
   const editable = role !== 'view'
   const items = (id: string) => {
     const sh = sheets.find(x => x.id === id)!
     const run = (fn: () => void) => () => { setMenu(null); fn() }
     return <>
       <i className="mm-main" hidden />
-      <MenuItem icon="link" label="Копировать ссылку" disabled={!mapId} onClick={run(() => navigator.clipboard?.writeText(`${location.origin}/map/${mapId}?sheet=${id}`).catch(() => {}))} />
+      <MenuItem icon="link" label="Copy Link" disabled={!mapId} onClick={run(() => navigator.clipboard?.writeText(`${location.origin}/map/${mapId}?sheet=${id}`).catch(() => {}))} />
       {editable && <>
         <div className="menu-sep" />
-        <MenuItem icon="edit" label="Переименовать" onClick={run(() => rename(id, sh.title))} />
-        <MenuItem icon="duplicate" label="Дублировать" onClick={run(() => ed.duplicateSheet(id))} />
+        <MenuItem icon="edit" label="Rename" onClick={run(() => rename(id, sh.title))} />
+        <MenuItem icon="duplicate" label="Duplicate" onClick={run(() => ed.duplicateSheet(id))} />
         <div className="menu-sep" />
-        <MenuItem icon="trash" label="Удалить" disabled={sheets.length < 2} onClick={run(() => { if (confirm('Удалить лист?')) ed.removeSheet(id) })} />
+        <MenuItem icon="trash" label="Delete" disabled={sheets.length < 2} onClick={run(() => { if (confirm('Delete this sheet?')) ed.removeSheet(id) })} />
         <div className="menu-sep" />
-        <MenuItem icon="file" label="Сохранить лист как карту" onClick={run(async () => {
+        <MenuItem icon="file" label="Save Sheet as Map" onClick={run(async () => {
           const m = await api<{ id: string }>('/api/maps', { method: 'POST', json: { title: sh.title, document: { version: 1, sheets: [structuredClone(sh)] } } })
           window.open(`/map/${m.id}`, '_blank')
         })} />
@@ -180,12 +179,12 @@ export function SheetTabs() {
           onDrop={e => { e.preventDefault(); if (dragId && dragId !== s.id) ed.moveSheet(dragId, i - sheets.findIndex(x => x.id === dragId)); setDragId(null) }}
           onContextMenu={e => { e.preventDefault(); setMenu({ id: s.id, x: e.clientX, y: e.clientY }) }}>
           <button className="sheet-name" onClick={() => ed.setSheetId(s.id)} onDoubleClick={() => editable && rename(s.id, s.title)}>{s.title}</button>
-          <button className="sheet-more" aria-label={`Меню листа ${s.title}`} onClick={e => { const r = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect(); setMenu(m => (m?.id === s.id ? null : { id: s.id, x: r.left, y: r.top })) }}>
+          <button className="sheet-more" aria-label={`Sheet menu ${s.title}`} onClick={e => { const r = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect(); setMenu(m => (m?.id === s.id ? null : { id: s.id, x: r.left, y: r.top })) }}>
             <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
           </button>
         </div>
       ))}
-      {editable && <button className="sheet-add" onClick={ed.addSheet} title="Новый лист" aria-label="Новый лист">+</button>}
+      {editable && <button className="sheet-add" onClick={ed.addSheet} title="New Sheet" aria-label="New Sheet">+</button>}
       {menu && sheets.some(x => x.id === menu.id) && (
         <div ref={menuRef} className="menu" role="menu" style={{ position: 'fixed', left: menu.x, bottom: window.innerHeight - menu.y + 6, top: 'auto', zIndex: 1000 }}>
           {items(menu.id)}
@@ -202,13 +201,13 @@ export function Legend({ sheet, readOnly }: { sheet: Sheet; readOnly: boolean })
   const used = [...new Set([...indexSheet(sheet).values()].flatMap(r => r.topic.markers ?? []))]
   return (
     <div className="island legend" data-testid="legend">
-      <div className="legend-head"><b>Легенда</b>
-        {!readOnly && <button className="ibtn" aria-label="Скрыть легенду" onClick={() => ed.setSheet({ legend: false })}>×</button>}</div>
-      {!used.length && <span className="muted">Маркеров пока нет</span>}
+      <div className="legend-head"><b>Legend</b>
+        {!readOnly && <button className="ibtn" aria-label="Hide Legend" onClick={() => ed.setSheet({ legend: false })}>×</button>}</div>
+      {!used.length && <span className="muted">No markers yet</span>}
       {used.map(m => (
         <div key={m} className="legend-row">
           <svg width={18} height={18}><MarkerIcon id={m} x={1} y={1} size={16} /></svg>
-          <input value={sheet.markerNames?.[m] ?? markerName(m)} readOnly={readOnly} aria-label="Подпись маркера"
+          <input value={sheet.markerNames?.[m] ?? markerName(m)} readOnly={readOnly} aria-label="Marker name"
             onChange={e => ed.setSheet({ markerNames: { ...(sheet.markerNames ?? {}), [m]: e.target.value } })}
             onKeyDown={e => e.stopPropagation()} />
         </div>

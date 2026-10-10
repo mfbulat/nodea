@@ -9,7 +9,7 @@ import AccountPage from './pages/AccountPage'
 export default function App() {
   const { user, loaded, load } = useAuth()
   useEffect(() => { load() }, [load])
-  if (!loaded) return <div className="page muted">Загрузка…</div>
+  if (!loaded) return <div className="page muted">Loading…</div>
   if (!user) {
     return (
       <Routes>

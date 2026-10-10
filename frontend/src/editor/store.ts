@@ -236,7 +236,7 @@ export const useEditor = create<EditorState>((set, get) => {
   // как в XMind: новые темы нумеруются («Подтема 3», «Основная тема 5»)
   const childTitle = (sheet: Sheet, parentId: string) => {
     const n = (locate(sheet, parentId)?.topic.children?.length ?? 0) + 1
-    return (sheet.rootTopic.id === parentId ? 'Основная тема ' : 'Подтема ') + n
+    return (sheet.rootTopic.id === parentId ? 'Main Topic ' : 'Subtopic ') + n
   }
 
   return {
@@ -255,7 +255,7 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     addZone: z => {
       const id = uid()
-      mutate(sh => { (sh.zones ??= []).push({ id, title: 'Зона', ...z }) })
+      mutate(sh => { (sh.zones ??= []).push({ id, title: 'Zone', ...z }) })
       set({ zoneDrawing: false, selection: [], element: { kind: 'zone', id } })
     },
     updateZone: (id, patch) => mutate(sh => { const z = sh.zones?.find(x => x.id === id); if (z) Object.assign(z, patch) }),
@@ -310,7 +310,7 @@ export const useEditor = create<EditorState>((set, get) => {
       if (!loc) return
       if ((!loc.parent && !loc.floating) || loc.kind === 'summary') return get().addChild()
       if (loc.kind === 'callout') return
-      const t = newTopic(loc.floating ? 'Плавающая тема' : childTitle(sheet, loc.parent!.id))
+      const t = newTopic(loc.floating ? 'Floating Topic' : childTitle(sheet, loc.parent!.id))
       mutate(sh => {
         const l = locate(sh, id)!
         if (l.floating) {
@@ -324,7 +324,7 @@ export const useEditor = create<EditorState>((set, get) => {
       get().startEdit(t.id)
     },
     addFloating: (x, y) => {
-      const t: Topic = { ...newTopic('Плавающая тема'), position: { x, y } }
+      const t: Topic = { ...newTopic('Floating Topic'), position: { x, y } }
       mutate(sh => { (sh.floatingTopics ??= []).push(t) })
       get().startEdit(t.id)
     },
@@ -633,7 +633,7 @@ export const useEditor = create<EditorState>((set, get) => {
       // сводка охватывает непрерывный диапазон от первой до последней выбранной темы
       const pos = same.map(i => idx.get(i)!.index)
       const range = (parent.children ?? []).slice(Math.min(...pos), Math.max(...pos) + 1).map(c => c.id)
-      const topic: Topic = { id: uid(), title: 'Сводка', children: [] }
+      const topic: Topic = { id: uid(), title: 'Summary', children: [] }
       mutate(sh => {
         const t = locate(sh, parent.id)!.topic
         ;(t.summaries ??= []).push({ id: uid(), ids: range, topic })
@@ -643,7 +643,7 @@ export const useEditor = create<EditorState>((set, get) => {
     addCallout: () => {
       const id = primary()
       if (!id) return
-      const topic: Topic = { id: uid(), title: 'Выноска', children: [] }
+      const topic: Topic = { id: uid(), title: 'Callout', children: [] }
       mutate(sh => { const t = locate(sh, id)?.topic; if (t) (t.callouts ??= []).push(topic) })
       get().startEdit(topic.id)
     },
@@ -681,8 +681,8 @@ export const useEditor = create<EditorState>((set, get) => {
       if (sh) set({ sheetId: id, selection: [sh.rootTopic.id], element: null, editingId: null, relating: null, drillId: null })
     },
     addSheet: () => {
-      const sh: Sheet = { id: uid(), title: `Карта ${doc().sheets.length + 1}`, structure: 'mindmap-cw',
-        rootTopic: { id: uid(), title: 'Центральная тема', children: [1, 2, 3, 4].map(i => ({ id: uid(), title: `Основная тема ${i}`, children: [] })) } }
+      const sh: Sheet = { id: uid(), title: `Sheet ${doc().sheets.length + 1}`, structure: 'mindmap-cw',
+        rootTopic: { id: uid(), title: 'Central Topic', children: [1, 2, 3, 4].map(i => ({ id: uid(), title: `Main Topic ${i}`, children: [] })) } }
       mutateDoc(d => { d.sheets.push(sh) })
       get().setSheetId(sh.id)
     },
@@ -695,14 +695,14 @@ export const useEditor = create<EditorState>((set, get) => {
       if (!t) return
       const root = cloneWithNewIds(t)
       delete root.offset
-      const sh: Sheet = { id: uid(), title: t.title || `Карта ${doc().sheets.length + 1}`, structure: 'mindmap-cw', rootTopic: root }
+      const sh: Sheet = { id: uid(), title: t.title || `Sheet ${doc().sheets.length + 1}`, structure: 'mindmap-cw', rootTopic: root }
       mutateDoc(d => { d.sheets.push(sh) })
       get().setSheetId(sh.id)
     },
     duplicateSheet: id => {
       const src = doc().sheets.find(s => s.id === id)
       if (!src) return
-      const copy: Sheet = { ...structuredClone(src), id: uid(), title: src.title + ' (копия)' }
+      const copy: Sheet = { ...structuredClone(src), id: uid(), title: src.title + ' (Copy)' }
       // новые id тем и пересчёт связей
       const oldIdx = indexSheet(src)
       copy.rootTopic = cloneWithNewIds(src.rootTopic)
@@ -749,7 +749,7 @@ export const useEditor = create<EditorState>((set, get) => {
       const id = primary()
       const l = sheet && id ? locate(sheet, id) : null
       if (!l || (l.kind !== 'child' && l.kind !== 'floating')) return
-      const t = newTopic(l.kind === 'floating' ? 'Плавающая тема' : childTitle(sheet!, l.parent!.id))
+      const t = newTopic(l.kind === 'floating' ? 'Floating Topic' : childTitle(sheet!, l.parent!.id))
       mutate(sh => {
         const loc = locate(sh, id)!
         const [moved] = loc.siblings.splice(loc.index, 1, t)

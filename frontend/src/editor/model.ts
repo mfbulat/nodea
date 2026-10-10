@@ -44,6 +44,8 @@ export interface TopicStyle {
 }
 
 export interface Topic {
+  /** «Numbering» подтем: 1.2.3. / A.B.C. / a.b.c. / I.II.III. */
+  numbering?: 'none' | '1' | 'A' | 'a' | 'I'
   id: string
   title: string
   children?: Topic[]
@@ -139,6 +141,10 @@ export interface Sheet {
   taskHideCreator?: boolean
   taskSkipWeekends?: boolean
   legend?: boolean
+  /** «Flexible Floating Topic»: плавающие темы ставятся без привязки */
+  flexibleFloating?: boolean
+  /** «Topic Overlap» (по умолчанию включено) */
+  topicOverlap?: boolean
   /** подписи маркеров в легенде */
   markerNames?: Record<string, string>
   relationships?: Relationship[]

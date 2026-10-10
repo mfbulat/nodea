@@ -32,7 +32,7 @@ export async function toDocx(doc: MapDocument, title: string): Promise<Blob> {
       children.push(depth < H.length
         ? new Paragraph({ heading: H[depth], children: runs })
         : new Paragraph({ bullet: { level: Math.min(depth - H.length, 8) }, children: runs }))
-      if (t.labels?.length) children.push(new Paragraph({ children: [new TextRun({ text: 'Метки: ' + t.labels.join(', '), italics: true, color: '666666' })] }))
+      if (t.labels?.length) children.push(new Paragraph({ children: [new TextRun({ text: 'Labels: ' + t.labels.join(', '), italics: true, color: '666666' })] }))
       if (t.equation) children.push(new Paragraph({ children: [new TextRun({ text: t.equation, font: 'Cambria Math' })] }))
       if (t.notes?.plain) for (const line of t.notes.plain.split('\n')) children.push(new Paragraph({ text: line, style: 'Quote' }))
       t.children?.forEach(c => walk(c, depth + 1))
@@ -52,12 +52,12 @@ export async function toXlsx(doc: MapDocument): Promise<Blob> {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'MindMap'
   for (const sh of doc.sheets) {
-    const ws = wb.addWorksheet(sh.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' ') || 'Лист')
+    const ws = wb.addWorksheet(sh.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' ') || 'Sheet')
     const depth = maxDepth(sh)
     ws.columns = [
-      ...[...Array(depth).keys()].map(i => ({ header: i === 0 ? 'Центральная тема' : `Уровень ${i}`, width: 24 })),
-      { header: 'Заметка', width: 40 }, { header: 'Метки', width: 18 }, { header: 'Маркеры', width: 18 },
-      { header: 'Ссылка', width: 28 }, { header: 'Задача', width: 10 },
+      ...[...Array(depth).keys()].map(i => ({ header: i === 0 ? 'Central Topic' : `Level ${i}`, width: 24 })),
+      { header: 'Note', width: 40 }, { header: 'Labels', width: 18 }, { header: 'Markers', width: 18 },
+      { header: 'Link', width: 28 }, { header: 'To-Do', width: 10 },
     ]
     ws.getRow(1).font = { bold: true }
     // каждая тема — строка; уровень вложенности задаёт столбец (как структура дерева)
@@ -65,7 +65,7 @@ export async function toXlsx(doc: MapDocument): Promise<Blob> {
       const row: (string | null)[] = Array(depth).fill(null)
       row[d] = plain(t)
       row.push(t.notes?.plain ?? null, t.labels?.join(', ') ?? null, t.markers?.map(markerName).join(', ') ?? null,
-        t.href && !t.href.startsWith('topic:') ? t.href : null, t.task ? (t.task.done ? 'выполнено' : 'не выполнено') : null)
+        t.href && !t.href.startsWith('topic:') ? t.href : null, t.task ? (t.task.done ? 'done' : 'not done') : null)
       const r = ws.addRow(row)
       if (d === 0) r.font = { bold: true, size: 13 }
       else if (d === 1) r.font = { bold: true }

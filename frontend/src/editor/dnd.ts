@@ -51,6 +51,10 @@ export function findDrop(sheet: Sheet, layout: LayoutResult, p: Pt, ids: string[
         ? (dir > 0 ? p.x >= b.x + b.w && p.x <= b.x + b.w + cz : p.x <= b.x && p.x >= b.x - cz) && p.y >= b.y - m && p.y <= b.y + b.h + m
         : (dir > 0 ? p.y >= b.y + b.h && p.y <= b.y + b.h + cz : p.y <= b.y && p.y >= b.y - cz) && p.x >= b.x - m && p.x <= b.x + b.w + m
       if (inZone && ct.kind === 'insert') cand.push({ t: ct, d: dist(p, ct.ph) })
+      if (ref.kind === 'root' && axis === 'y' && (sheet.structure ?? 'mindmap').startsWith('mindmap')) {
+        const lt = childTarget(ref, b, layout, idx, false, -1)
+        if (p.x <= b.x && p.x >= b.x - cz * 2.5 && p.y >= b.y - m * 2 && p.y <= b.y + b.h + m * 2 && lt.kind === 'insert') cand.push({ t: lt, d: dist(p, lt.ph) })
+      }
       continue
     }
     // колонки детей по сторонам
@@ -64,6 +68,16 @@ export function findDrop(sheet: Sheet, layout: LayoutResult, p: Pt, ids: string[
     for (const col of cols.values()) {
       const t = colTarget(col, p, m, idx, sheet)
       if (t) cand.push({ t, d: dist(p, t.ph) })
+    }
+    // у центральной темы интеллект-карты пустая сторона тоже принимает темы (все ветки справа → можно перенести влево)
+    if (ref.kind === 'root' && axis === 'y' && (sheet.structure ?? 'mindmap').startsWith('mindmap')) {
+      for (const dir of [1, -1] as const) {
+        if (cols.has(dir)) continue
+        const ct = childTarget(ref, b, layout, idx, false, dir)
+        const zone = cz * 2.5
+        const inZone = (dir > 0 ? p.x >= b.x + b.w && p.x <= b.x + b.w + zone : p.x <= b.x && p.x >= b.x - zone) && p.y >= b.y - m * 2 && p.y <= b.y + b.h + m * 2
+        if (inZone && ct.kind === 'insert') cand.push({ t: ct, d: dist(p, ct.ph) })
+      }
     }
   }
   if (cand.length) return cand.sort((a, b) => a.d - b.d)[0].t
@@ -89,9 +103,9 @@ function growDir(ref: TopicRef, b: Box, layout: LayoutResult, idx: Map<string, T
   return cy(b) >= cy(par) ? 1 : -1
 }
 
-function childTarget(ref: TopicRef, b: Box, layout: LayoutResult, idx: Map<string, TopicRef>, append: boolean): DropTarget {
+function childTarget(ref: TopicRef, b: Box, layout: LayoutResult, idx: Map<string, TopicRef>, append: boolean, forceDir?: 1 | -1): DropTarget {
   const axis = layout.childAxis.get(b.id) ?? 'y'
-  const dir = growDir(ref, b, layout, idx)
+  const dir = forceDir ?? growDir(ref, b, layout, idx)
   const ph: Box = axis === 'y'
     ? { id: 'ph', x: dir > 0 ? b.x + b.w + CHILD_GAP : b.x - CHILD_GAP - PH_W, y: cy(b) - PH_H / 2, w: PH_W, h: PH_H }
     : { id: 'ph', x: cx(b) - PH_W / 2, y: dir > 0 ? b.y + b.h + CHILD_GAP : b.y - CHILD_GAP - PH_H, w: PH_W, h: PH_H }

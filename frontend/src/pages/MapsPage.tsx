@@ -14,7 +14,7 @@ import { sheetSvgMarkup } from '../io/image'
 import ShareDialog from '../collab/ShareDialog'
 
 type View = 'recent' | 'all' | 'starred' | 'shared' | 'trash'
-const TITLES: Record<View, string> = { recent: 'Недавние', all: 'Все карты', starred: 'Избранное', shared: 'Общие', trash: 'Корзина' }
+const TITLES: Record<View, string> = { recent: 'Recents', all: 'All Maps', starred: 'Starred', shared: 'Shared', trash: 'Trash' }
 
 const thumbCache = new Map<string, string>()
 
@@ -39,11 +39,11 @@ function Thumb({ id, share }: { id: string; share?: string }) {
 function ago(iso?: string | null) {
   if (!iso) return ''
   const s = (Date.now() - new Date(iso).getTime()) / 1000
-  if (s < 60) return 'только что'
-  if (s < 3600) return `${Math.floor(s / 60)} мин назад`
-  if (s < 86400) return `${Math.floor(s / 3600)} ч назад`
-  if (s < 86400 * 7) return `${Math.floor(s / 86400)} дн назад`
-  return new Date(iso).toLocaleDateString('ru')
+  if (s < 60) return 'just now'
+  if (s < 3600) { const n = Math.floor(s / 60); return `${n} minute${n > 1 ? 's' : ''} ago` }
+  if (s < 86400) { const n = Math.floor(s / 3600); return `${n} hour${n > 1 ? 's' : ''} ago` }
+  if (s < 86400 * 7) { const n = Math.floor(s / 86400); return `${n} day${n > 1 ? 's' : ''} ago` }
+  return new Date(iso).toLocaleDateString('en')
 }
 
 export default function MapsPage() {
@@ -55,7 +55,7 @@ export default function MapsPage() {
   const [gallery, setGallery] = useState(false)
   const [query, setQuery] = useState('')
   const [layout, setLayout] = useState<'grid' | 'list'>(() => (localStorage.getItem('home-layout') as 'grid') || 'grid')
-  const [sort, setSort] = useState<'opened' | 'updated' | 'name'>('opened')
+  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'opened', desc: true })
   const { user, logout } = useAuth()
   const nav = useNavigate()
   const searchRef = useRef<HTMLInputElement>(null)
@@ -76,14 +76,14 @@ export default function MapsPage() {
     nav(`/map/${m.id}`)
   })
   const rename = (m: MapSummary) => {
-    const title = prompt('Новое название', m.title)?.trim()
+    const title = prompt('Rename Map', m.title)?.trim()
     if (title) guard(() => api(`/api/maps/${m.id}`, { method: 'PATCH', json: { title } }))
   }
   const star = (m: MapSummary) => guard(() => api(`/api/maps/${m.id}`, { method: 'PATCH', json: { starred: !m.starred } }))
   const toTrash = (m: MapSummary) => guard(() => api(`/api/maps/${m.id}/trash`, { method: 'POST' }))
   const restore = (m: MapSummary) => guard(() => api(`/api/maps/${m.id}/restore`, { method: 'POST' }))
   const remove = (m: MapSummary) => {
-    if (confirm(`Удалить карту «${m.title}» навсегда? Это действие необратимо.`)) guard(() => api(`/api/maps/${m.id}`, { method: 'DELETE' }))
+    if (confirm(`Delete "${m.title}" permanently? This action cannot be undone.`)) guard(() => api(`/api/maps/${m.id}`, { method: 'DELETE' }))
   }
   const [shareFor, setShareFor] = useState<string | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
@@ -96,9 +96,16 @@ export default function MapsPage() {
   const doImport = () => guard(async () => { const id = await importAsNewMap(); if (id) nav(`/map/${id}`) })
 
   const q = query.trim().toLowerCase()
-  const list = (maps ?? []).filter(m => m.title.toLowerCase().includes(q)).sort((a, b) =>
-    sort === 'name' ? a.title.localeCompare(b.title, 'ru') : sort === 'updated' ? b.updated_at.localeCompare(a.updated_at)
-      : (b.last_opened_at ?? b.updated_at).localeCompare(a.last_opened_at ?? a.updated_at))
+  // в корзине «последнее открытие» заменяет «дата удаления»
+  const key: SortKey = view === 'trash' && sort.key === 'opened' ? 'deleted' : view !== 'trash' && sort.key === 'deleted' ? 'opened' : sort.key
+  const list = (maps ?? []).filter(m => m.title.toLowerCase().includes(q)).sort((a, b) => {
+    const c = key === 'name' ? a.title.localeCompare(b.title) : key === 'size' ? (a.size ?? 0) - (b.size ?? 0)
+      : key === 'deleted' ? (a.deleted_at ?? '').localeCompare(b.deleted_at ?? '')
+        : (a.last_opened_at ?? a.updated_at).localeCompare(b.last_opened_at ?? b.updated_at)
+    return sort.desc ? -c : c
+  })
+  const sortMenu = <SortMenu keys={view === 'trash' ? ['name', 'deleted'] : view === 'all' ? ['name', 'size', 'opened'] : ['name', 'opened']}
+    cur={key} desc={sort.desc} onPick={k => setSort(s => (s.key === k || (k === 'deleted' && s.key === 'opened') ? { key: k, desc: !s.desc } : { key: k, desc: k !== 'name' }))} />
   const sharedList = shared.filter(m => m.title.toLowerCase().includes(q))
 
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('mm.sideCollapsed') === '1' } catch { return false } })
@@ -113,21 +120,21 @@ export default function MapsPage() {
     <div className={'home' + (collapsed ? ' side-collapsed' : '')}>
       <aside className="home-side">
         <div className="side-top">
-          {collapsed && <button className="side-item side-expand" aria-label="Развернуть боковую панель" title="Развернуть" onClick={toggleSide}><Icon name="chevronsRight" size={18} /></button>}
+          {collapsed && <button className="side-item side-expand" aria-label="Expand sidebar" title="Expand" onClick={toggleSide}><Icon name="chevronsRight" size={18} /></button>}
           <div className="workspace-row">
             <Dropdown trigger={(open, toggle) => (
-              <button className={'workspace' + (open ? ' on' : '')} onClick={toggle} aria-label="Рабочее пространство">
-                <span className="ws-icon"><Icon name="folder" size={16} /></span>{!collapsed && <>Мои карты<Icon name="chevron" size={14} /></>}
+              <button className={'workspace' + (open ? ' on' : '')} onClick={toggle} aria-label="Workspace">
+                <span className="ws-icon"><Icon name="folder" size={16} /></span>{!collapsed && <>My Works<Icon name="chevron" size={14} /></>}
               </button>
             )}>
               {close => <div className="ws-menu">
-                <div className="ws-head"><span className="ws-icon big"><Icon name="folder" size={22} /></span><span><b>Мои карты</b><small>{user?.email}</small></span></div>
-                <MenuItem icon="settings" label="Настройки" onClick={() => { close(); nav('/account') }} />
+                <div className="ws-head"><span className="ws-icon big"><Icon name="folder" size={22} /></span><span><b>My Works</b><small>{user?.email}</small></span></div>
+                <MenuItem icon="settings" label="Settings" onClick={() => { close(); nav('/account') }} />
                 <div className="menu-sep" />
-                <MenuItem label="Мои карты" checked onClick={close} />
+                <MenuItem label="My Works" checked onClick={close} />
               </div>}
             </Dropdown>
-            {!collapsed && <button className="ibtn side-collapse" aria-label="Свернуть боковую панель" title="Свернуть" onClick={toggleSide}><Icon name="chevronsLeft" size={18} /></button>}
+            {!collapsed && <button className="ibtn side-collapse" aria-label="Collapse sidebar" title="Collapse" onClick={toggleSide}><Icon name="chevronsLeft" size={18} /></button>}
           </div>
           <nav>
             {item('recent', 'clock')}
@@ -138,15 +145,15 @@ export default function MapsPage() {
           <nav>
             {item('starred', 'star')}
             {item('shared', 'users')}
-            <button className="side-item" title={collapsed ? 'Шаблоны' : undefined} onClick={() => setGallery(true)}><Icon name="template" size={18} />{!collapsed && <span>Шаблоны</span>}</button>
+            <button className="side-item" title={collapsed ? 'More Templates' : undefined} onClick={() => setGallery(true)}><Icon name="template" size={18} />{!collapsed && <span>More Templates</span>}</button>
             {item('trash', 'trash')}
           </nav>
         </div>
         <div className="side-user">
           <Dropdown up align="right" trigger={(open, toggle) => (
-            <button className={'ibtn bell-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Уведомления" title="Уведомления"><Icon name="bell" size={18} /></button>
+            <button className={'ibtn bell-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Notifications" title="Notifications"><Icon name="bell" size={18} /></button>
           )}>
-            {() => <div className="bell-pop"><b>Уведомления</b><span>Новых уведомлений нет.</span></div>}
+            {() => <div className="bell-pop"><b>Notifications</b><span>No new notifications.</span></div>}
           </Dropdown>
           <Dropdown up trigger={(_, toggle) => (
             <button className="user-btn" onClick={toggle}>
@@ -155,8 +162,8 @@ export default function MapsPage() {
             </button>
           )}>
             {close => <>
-              <MenuItem icon="settings" label="Аккаунт" onClick={() => { close(); nav('/account') }} />
-              <MenuItem icon="close" label="Выйти" onClick={() => { close(); logout() }} />
+              <MenuItem icon="settings" label="Account" onClick={() => { close(); nav('/account') }} />
+              <MenuItem icon="close" label="Log Out" onClick={() => { close(); logout() }} />
             </>}
           </Dropdown>
         </div>
@@ -166,80 +173,74 @@ export default function MapsPage() {
           <div className="home-head single">
             <h1>{TITLES[view]}</h1>
             <div className="spacer" />
-            <button className="ibtn" aria-label="Настройки" title="Настройки" onClick={() => nav('/account')}><Icon name="settings" size={18} /></button>
+            <button className="ibtn" aria-label="Settings" title="Settings" onClick={() => nav('/account')}><Icon name="settings" size={18} /></button>
           </div>
         </> : <div className="home-head">
           <h1>{TITLES[view]}</h1>
           <div className="spacer" />
           <label className="search"><Icon name="search" size={16} />
-            <input ref={searchRef} placeholder="Поиск файлов" value={query} onChange={e => setQuery(e.target.value)} /></label>
+            <input ref={searchRef} placeholder="Search file" value={query} onChange={e => setQuery(e.target.value)} /></label>
           {view === 'recent' && <>
           <Dropdown align="right" trigger={(_, toggle) => (
-            <button className="btn-create" onClick={toggle}><Icon name="plus" size={16} />Создать</button>
+            <button className="btn-create" onClick={toggle}><Icon name="plus" size={16} />Create New</button>
           )}>
             {close => <div className="create-menu">
-              <button onClick={() => { close(); create('Мозговой штурм', brainstormDoc()) }}>
-                <span className="cm-icon"><Icon name="bulb" size={22} /></span>
-                <span><b>Мозговой штурм</b><small>Генерируйте идеи и исследуйте новые возможности</small></span></button>
+              <button onClick={() => { close(); create('Brainstorming', brainstormDoc()) }}>
+                <span className="cm-icon" style={{ color: '#ca8a04' }}><Icon name="bulb" size={28} /></span>
+                <span className="cm-text"><b>Brainstorming</b><small>Generate creative ideas and explore new possibilities effortlessly</small></span></button>
+              <i />
               <button onClick={() => { close(); setGallery(true) }}>
-                <span className="cm-icon"><Icon name="mindmap" size={22} /></span>
-                <span><b>Интеллект-карта</b><small>Начните с шаблона или с нуля, чтобы наглядно упорядочить идеи</small></span></button>
+                <span className="cm-icon" style={{ color: '#2a77bf' }}><Icon name="mindmap" size={28} /></span>
+                <span className="cm-text"><b>Mind Map</b><small>Start your map with a template or from scratch to organize ideas visually.</small></span></button>
+              <i />
               <button onClick={() => { close(); doImport() }}>
-                <span className="cm-icon"><Icon name="importFile" size={22} /></span>
-                <span><b>Импорт</b><small>Откройте файл .xmind, Markdown, OPML или FreeMind</small></span></button>
+                <span className="cm-icon"><Icon name="importFile" size={28} /></span>
+                <span className="cm-text"><b>Import</b><small>Bring your existing files or content into a mind map for better clarity</small></span></button>
             </div>}
           </Dropdown>
           </>}
-          <button className="ibtn" aria-label={layout === 'grid' ? 'Списком' : 'Сеткой'} title={layout === 'grid' ? 'Списком' : 'Сеткой'}
+          <button className="ibtn" aria-label={layout === 'grid' ? 'List View' : 'Grid View'} title={layout === 'grid' ? 'List View' : 'Grid View'}
             onClick={() => setLayout(l => (l === 'grid' ? 'list' : 'grid'))}><Icon name={layout === 'grid' ? 'grid' : 'list'} size={18} /></button>
           <span className="head-sep" />
-          <Dropdown align="right" trigger={(_, toggle) => <button className="ibtn" aria-label="Сортировка" title="Сортировка" onClick={toggle}><Icon name="sort" size={18} /></button>}>
-            {close => <>
-              {([['opened', 'По дате открытия'], ['updated', 'По дате изменения'], ['name', 'По названию']] as const).map(([v, l]) =>
-                <MenuItem key={v} label={l} checked={sort === v} onClick={() => { close(); setSort(v) }} />)}
-            </>}
-          </Dropdown>
+          {sortMenu}
         </div>}
         <div className="home-body">
           {error && <p className="error">{error}</p>}
-          {maps === null ? <p className="muted">Загрузка…</p> : (
+          {maps === null ? <p className="muted">Loading…</p> : (
             <>
               {view === 'all' && <>
                 <QuickCreate onCreate={create} onAll={() => setGallery(true)} />
                 <div className="home-head inline">
-                  <span className="all-label">Все</span>
+                  <span className="all-label">All</span>
           <div className="spacer" />
-                  <button className="btn-outline wide-only" onClick={() => create('Мозговой штурм', brainstormDoc())}><Icon name="bulb" size={16} />Мозговой штурм</button>
+                  <button className="btn-outline wide-only" onClick={() => create('Brainstorming', brainstormDoc())}><Icon name="bulb" size={16} />Brainstorming</button>
                   <label className="search"><Icon name="search" size={16} />
-                    <input ref={searchRef} placeholder="Поиск файлов" value={query} onChange={e => setQuery(e.target.value)} /></label>
+                    <input ref={searchRef} placeholder="Search file" value={query} onChange={e => setQuery(e.target.value)} /></label>
                   <Dropdown align="right" trigger={(_, toggle) => (
-                    <button className="btn-create" onClick={toggle}><Icon name="plus" size={16} />Создать</button>
+                    <button className="btn-create" onClick={toggle}><Icon name="plus" size={16} />Create New</button>
                   )}>
                     {close => <div className="create-menu">
-                      <button onClick={() => { close(); create('Мозговой штурм', brainstormDoc()) }}>
-                        <span className="cm-icon"><Icon name="bulb" size={22} /></span>
-                        <span><b>Мозговой штурм</b><small>Генерируйте идеи и исследуйте новые возможности</small></span></button>
+                      <button onClick={() => { close(); create('Brainstorming', brainstormDoc()) }}>
+                        <span className="cm-icon" style={{ color: '#ca8a04' }}><Icon name="bulb" size={28} /></span>
+                        <span className="cm-text"><b>Brainstorming</b><small>Generate creative ideas and explore new possibilities effortlessly</small></span></button>
+                      <i />
                       <button onClick={() => { close(); setGallery(true) }}>
-                        <span className="cm-icon"><Icon name="mindmap" size={22} /></span>
-                        <span><b>Интеллект-карта</b><small>Начните с шаблона или с нуля, чтобы наглядно упорядочить идеи</small></span></button>
+                        <span className="cm-icon" style={{ color: '#2a77bf' }}><Icon name="mindmap" size={28} /></span>
+                        <span className="cm-text"><b>Mind Map</b><small>Start your map with a template or from scratch to organize ideas visually.</small></span></button>
+                      <i />
                       <button onClick={() => { close(); doImport() }}>
-                        <span className="cm-icon"><Icon name="importFile" size={22} /></span>
-                        <span><b>Импорт</b><small>Откройте файл .xmind, Markdown, OPML или FreeMind</small></span></button>
+                        <span className="cm-icon"><Icon name="importFile" size={28} /></span>
+                        <span className="cm-text"><b>Import</b><small>Bring your existing files or content into a mind map for better clarity</small></span></button>
                     </div>}
                   </Dropdown>
-                  <button className="ibtn" aria-label={layout === 'grid' ? 'Списком' : 'Сеткой'} title={layout === 'grid' ? 'Списком' : 'Сеткой'}
+                  <button className="ibtn" aria-label={layout === 'grid' ? 'List View' : 'Grid View'} title={layout === 'grid' ? 'List View' : 'Grid View'}
                     onClick={() => setLayout(l => (l === 'grid' ? 'list' : 'grid'))}><Icon name={layout === 'grid' ? 'grid' : 'list'} size={18} /></button>
                   <span className="head-sep" />
-                  <Dropdown align="right" trigger={(_, toggle) => <button className="ibtn" aria-label="Сортировка" title="Сортировка" onClick={toggle}><Icon name="sort" size={18} /></button>}>
-                    {close => <>
-                      {([['opened', 'По дате открытия'], ['updated', 'По дате изменения'], ['name', 'По названию']] as const).map(([v, l]) =>
-                        <MenuItem key={v} label={l} checked={sort === v} onClick={() => { close(); setSort(v) }} />)}
-                    </>}
-                  </Dropdown>
+                  {sortMenu}
                 </div>
               </>}
-              {view === 'trash' && <div className="trash-note">Карты хранятся в корзине 30 дней, после этого удаляются навсегда.</div>}
-              {(view === 'shared' ? sharedList.length : list.length) > 0 && <div className="section-label">Карты</div>}
+              {view === 'trash' && <div className="trash-note">Files and folders are available for 30 days. After that time, they will be permanently deleted.</div>}
+              {(view === 'shared' ? sharedList.length : list.length) > 0 && <div className="section-label">Maps</div>}
               {view === 'shared' ? (
                 sharedList.length ? <div className={'file-grid ' + layout}>
                   {sharedList.map(m => (
@@ -249,45 +250,45 @@ export default function MapsPage() {
                         <span className="name">{m.title}</span><span className="caption">{m.owner_email} · {ago(m.visited_at)}</span></div></div>
                     </div>
                   ))}
-                </div> : <Empty icon="users" title="Нет общих карт." text="Недавно открытые общие карты появятся здесь." />
+                </div> : <Empty icon="users" title="No Shared maps." text="Recently shared maps will appear here." />
               ) : list.length ? (
                 <div className={'file-grid ' + layout}>
                   {list.map(m => (
                     <div className={'file-card' + (focusId === m.id ? ' focused' : '')} key={m.id} data-testid="map-card" ref={el => { if (el && focusId === m.id) el.scrollIntoView({ block: 'nearest' }) }}
                       onClick={() => view !== 'trash' && nav(`/map/${m.id}`)}>
                       <Thumb id={m.id} />
-                      {view !== 'trash' && view !== 'starred' && <button className={'star-badge' + (m.starred ? ' on' : '')} title={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'}
-                        aria-label={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'} onClick={e => { e.stopPropagation(); star(m) }}><Icon name="star" size={14} /></button>}
+                      {view !== 'trash' && view !== 'starred' && <button className={'star-badge' + (m.starred ? ' on' : '')} title={m.starred ? 'Remove from Starred' : 'Add to Starred'}
+                        aria-label={m.starred ? 'Remove from Starred' : 'Add to Starred'} onClick={e => { e.stopPropagation(); star(m) }}><Icon name="star" size={14} /></button>}
                       <div className="card-foot">
                         <div className="card-text">
                           <span className="name">{m.title}</span>
-                          <span className="caption">{view === 'trash' ? `Удалена: ${ago(m.deleted_at)}` : `Открыта: ${ago(m.last_opened_at ?? m.updated_at)}`}</span>
+                          <span className="caption">{view === 'trash' ? `Deleted: ${ago(m.deleted_at)}` : `Last opened: ${ago(m.last_opened_at ?? m.updated_at)}`}</span>
                         </div>
                         <div onClick={e => e.stopPropagation()}>
                           <Dropdown align="right" trigger={(open, toggle) => (
-                            <button className={'ibtn card-more' + (open ? ' on' : '')} onClick={toggle} aria-label="Действия"><Icon name="more" size={18} /></button>
+                            <button className={'ibtn card-more' + (open ? ' on' : '')} onClick={toggle} aria-label="More"><Icon name="more" size={18} /></button>
                           )}>
                             {close => view === 'trash' ? <>
                               <i className="mm-main" hidden />
-                              <MenuItem icon="restore" label="Восстановить" onClick={() => { close(); restore(m) }} />
-                              <MenuItem icon="trash" label="Удалить навсегда" onClick={() => { close(); remove(m) }} />
+                              <MenuItem icon="restore" label="Restore" onClick={() => { close(); restore(m) }} />
+                              <MenuItem icon="trash" label="Delete Permanently" onClick={() => { close(); remove(m) }} />
                             </> : <>
                               <i className="mm-main" hidden />
-                              <MenuItem icon="shareNodes" label="Поделиться" onClick={() => { close(); setShareFor(m.id) }} />
-                              <MenuItem icon="link" label="Копировать ссылку" onClick={() => { close(); navigator.clipboard?.writeText(`${location.origin}/map/${m.id}`).catch(() => {}) }} />
-                              <MenuItem icon="star" label={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'} onClick={() => { close(); star(m) }} />
-                              {view === 'recent' && <MenuItem icon="folder" label="Показать расположение" onClick={() => { close(); setFocusId(m.id); nav('/home/all') }} />}
+                              <MenuItem icon="shareNodes" label="Share" onClick={() => { close(); setShareFor(m.id) }} />
+                              <MenuItem icon="link" label="Copy Link" onClick={() => { close(); navigator.clipboard?.writeText(`${location.origin}/map/${m.id}`).catch(() => {}) }} />
+                              <MenuItem icon="star" label={m.starred ? 'Remove from Starred' : 'Add to Starred'} onClick={() => { close(); star(m) }} />
+                              {view === 'recent' && <MenuItem icon="folder" label="Show Map Location" onClick={() => { close(); setFocusId(m.id); nav('/home/all') }} />}
                               <div className="menu-sep" />
-                              <MenuItem icon="edit" label="Переименовать" onClick={() => { close(); rename(m) }} />
+                              <MenuItem icon="edit" label="Rename" onClick={() => { close(); rename(m) }} />
                               {view !== 'recent' && <>
                                 <div className="menu-sep" />
-                                <MenuItem icon="duplicate" label="Дублировать" onClick={() => { close(); duplicate(m) }} />
-                                <MenuItem icon="upload" label="Скачать" onClick={() => { close(); download(m) }} />
+                                <MenuItem icon="duplicate" label="Duplicate" onClick={() => { close(); duplicate(m) }} />
+                                <MenuItem icon="upload" label="Download" onClick={() => { close(); download(m) }} />
                               </>}
                               <div className="menu-sep" />
                               {view === 'recent'
-                                ? <MenuItem icon="clock" label="Убрать из недавних" onClick={() => { close(); guard(() => api(`/api/maps/${m.id}/remove-recent`, { method: 'POST' })) }} />
-                                : <MenuItem icon="trash" label="В корзину" onClick={() => { close(); toTrash(m) }} />}
+                                ? <MenuItem icon="clock" label="Remove from Recents" onClick={() => { close(); guard(() => api(`/api/maps/${m.id}/remove-recent`, { method: 'POST' })) }} />
+                                : <MenuItem icon="trash" label="Move to Trash" onClick={() => { close(); toTrash(m) }} />}
                             </>}
                           </Dropdown>
                         </div>
@@ -296,8 +297,8 @@ export default function MapsPage() {
                   ))}
                 </div>
               ) : <Empty icon={view === 'trash' ? 'trash' : view === 'starred' ? 'star' : 'folder'}
-                title={view === 'trash' ? 'Корзина пуста' : view === 'starred' ? 'Нет избранных карт.' : 'Карт пока нет.'}
-                text={view === 'trash' ? 'Недавно удалённые карты появятся здесь.' : view === 'starred' ? 'Отмеченные звёздочкой карты появятся здесь.' : 'Нажмите «Создать», чтобы начать новую карту.'} />}
+                title={view === 'trash' ? 'No Trash' : view === 'starred' ? 'No Starred maps.' : 'No maps yet.'}
+                text={view === 'trash' ? 'Recently deleted maps will appear here.' : view === 'starred' ? 'Starred maps will appear here.' : 'Click Create New to start a new map.'} />}
             </>
           )}
         </div>
@@ -310,19 +311,19 @@ export default function MapsPage() {
 
 /** Полоса быстрого создания во «Всех картах»: пустая карта, базовые структуры и «Все шаблоны» */
 function QuickCreate({ onCreate, onAll }: { onCreate: (title: string, doc: MapDocument) => void; onAll: () => void }) {
-  const basics = TEMPLATES.filter(t => ['blank', 'logic', 'brace', 'org'].includes(t.id))
+  const basics = TEMPLATES.filter(t => ['blank', 'logic', 'brace'].includes(t.id))
   return (
     <div className="quick-create">
-      <button className="qc-tile" onClick={() => onCreate('Новая карта', TEMPLATES[0].make())}>
-        <span className="qc-thumb plus"><Icon name="plus" size={22} /></span><span className="qc-name">Создать</span></button>
+      <button className="qc-tile" onClick={() => onCreate('Mind Map', TEMPLATES[0].make())}>
+        <span className="qc-thumb plus"><Icon name="plus" size={22} /></span><span className="qc-name">Create New</span></button>
       <div className="qc-mid">
         {basics.map(t => (
-          <button key={t.id} className="qc-tile" onClick={() => onCreate(t.id === 'blank' ? 'Новая карта' : t.title, t.make())}>
+          <button key={t.id} className="qc-tile" onClick={() => onCreate(t.title, t.make())}>
             <span className="qc-thumb"><QcPreview t={t} /></span><span className="qc-name">{t.title}</span></button>
         ))}
       </div>
       <button className="qc-tile" onClick={onAll}>
-        <span className="qc-thumb stack"><QcPreview t={TEMPLATES.find(t => t.id === 'meeting') ?? TEMPLATES[0]} /></span><span className="qc-name">Все шаблоны <Icon name="chevronRight" size={14} /></span></button>
+        <span className="qc-thumb stack"><QcPreview t={TEMPLATES.find(t => t.id === 'meeting') ?? TEMPLATES[0]} /></span><span className="qc-name">See All <Icon name="chevronRight" size={14} /></span></button>
     </div>
   )
 }
@@ -333,12 +334,32 @@ function QcPreview({ t }: { t: { id: string; make: () => MapDocument } }) {
   return <img src={src} alt="" />
 }
 
+type SortKey = 'name' | 'size' | 'opened' | 'deleted'
+const SORT_NAMES: Record<SortKey, string> = { name: 'Name', size: 'Size', opened: 'Last opened', deleted: 'Deleted' }
+/** «Sort» как в веб-версии: подпись, пункты раздела, стрелка направления у активного; повторный щелчок меняет направление */
+function SortMenu({ keys, cur, desc, onPick }: { keys: SortKey[]; cur: SortKey; desc: boolean; onPick: (k: SortKey) => void }) {
+  return (
+    <Dropdown align="right" trigger={(open, toggle) => <button className={'ibtn' + (open ? ' on' : '')} aria-label="Sort" title="Sort" onClick={toggle}><Icon name="sort" size={18} /></button>}>
+      {close => <div className="sort-menu">
+        <span className="menu-caption">Sort</span>
+        {keys.map(k => (
+          <button key={k} role="menuitemradio" aria-checked={k === cur} onClick={() => { close(); onPick(k) }}>
+            <span className="mi-label">{SORT_NAMES[k]}</span>
+            {k === cur && <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: desc ? undefined : 'rotate(180deg)' }}><path d="M8 3v10M4 9l4 4 4-4" /></svg>}
+          </button>
+        ))}
+      </div>}
+    </Dropdown>
+  )
+}
+
 function Empty({ icon, title, text }: { icon: IconName; title: string; text: string }) {
   return <div className="empty"><Icon name={icon} size={72} /><b>{title}</b><p>{text}</p></div>
 }
 
 function brainstormDoc(): MapDocument {
   const id = () => Math.random().toString(36).slice(2, 12)
-  return { version: 1, sheets: [{ id: id(), title: 'Карта 1', structure: 'mindmap-cw', rootTopic: { id: id(), title: 'Тема мозгового штурма', children: [
-    { id: id(), title: 'Идея 1', children: [] }, { id: id(), title: 'Идея 2', children: [] }, { id: id(), title: 'Идея 3', children: [] }, { id: id(), title: 'Вопросы', children: [] }] } }] }
+  return { version: 1, sheets: [{ id: id(), title: 'Map 1', structure: 'mindmap-cw', rootTopic: { id: id(), title: 'Central Topic', children: [
+    { id: id(), title: 'Idea 1', children: [] }, { id: id(), title: 'Idea 2', children: [] }, { id: id(), title: 'Idea 3', children: [] }, { id: id(), title: 'Questions', children: [] }] } }] }
 }
