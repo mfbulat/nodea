@@ -1,6 +1,7 @@
 // Панель «Формат» (как в XMind): вкладки «Стиль / Презентация / Карта».
 import { SlideView, type Slide } from './Presentation'
-import { ReactNode, useEffect, useRef, useState } from 'react'
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { indexSheet, levelOf } from './model'
 import { STRUCTURES } from './layout'
@@ -56,30 +57,50 @@ export function Color({ value, onChange, allowNone }: { value: string; onChange:
 }
 
 /** Выпадающий список с картинками (фигура, структура, линия ветки) */
-function Picker<T extends string>({ value, options, render, onChange, label, cols = 3 }: {
+function Picker<T extends string>({ value, options, render, onChange, label, cols = 3, button, className = '' }: {
   value: T; options: [T, string][]; render: (v: T) => ReactNode; onChange: (v: T) => void; label: string; cols?: number
+  /** своё содержимое кнопки (широкий список, карточка структуры) */
+  button?: ReactNode; className?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useEffect(() => {
     if (!open) return
-    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const close = (e: PointerEvent) => { const t = e.target as Node; if (!ref.current?.contains(t) && !pop.current?.contains(t)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const away = () => setOpen(false)
     window.addEventListener('pointerdown', close)
-    return () => window.removeEventListener('pointerdown', close)
+    window.addEventListener('keydown', esc)
+    window.addEventListener('resize', away)
+    // прокрутка панели уводит кнопку — закрываем, как обычный выпадающий список
+    const scroller = ref.current?.closest('.fp-scroll')
+    scroller?.addEventListener('scroll', away)
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); window.removeEventListener('resize', away); scroller?.removeEventListener('scroll', away) }
+  }, [open])
+  // список поверх интерфейса (портал): под кнопкой по правому краю, у краёв окна — сдвиг и переворот вверх
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    const r = ref.current!.getBoundingClientRect(), w = pop.current!.offsetWidth, h = pop.current!.offsetHeight
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8))
+    let top = r.bottom + 4
+    if (top + h > window.innerHeight - 8) top = r.top - h - 4 >= 8 ? r.top - h - 4 : Math.max(8, window.innerHeight - h - 8)
+    setPos({ left, top })
   }, [open])
   return (
-    <div className="picker" ref={ref}>
-      <button className="picker-btn" onClick={() => setOpen(o => !o)} aria-label={label} title={options.find(o => o[0] === value)?.[1] ?? label}>
-        {render(value)}<Icon name="chevron" size={12} />
+    <div className={'picker ' + className} ref={ref}>
+      <button className={'picker-btn' + (open ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-label={label} aria-expanded={open} title={options.find(o => o[0] === value)?.[1] ?? label}>
+        {button ?? <>{render(value)}<Icon name="chevron" size={12} /></>}
       </button>
-      {open && (
-        <div className="picker-pop" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }} role="listbox" aria-label={label}>
+      {open && createPortal(
+        <div ref={pop} className="picker-pop" role="listbox" aria-label={label}
+          style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, position: 'fixed', zIndex: 1000, right: 'auto', left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
           {options.map(([v, name]) => (
             <button key={v} role="option" aria-selected={v === value} className={v === value ? 'on' : ''} title={name}
               onClick={() => { onChange(v); setOpen(false) }}>{render(v)}<span>{name}</span></button>
           ))}
-        </div>
-      )}
+        </div>, document.body)}
     </div>
   )
 }
@@ -256,12 +277,10 @@ function TopicStyleTab({ sheet }: { sheet: Sheet }) {
         </div>
       </Section>
 
-      <Section title="Структура" right={<Picker label="Структура" cols={3} value={structure as StructureId} options={[...(isRoot ? [] : [['' as StructureId, 'Как у родителя'] as [StructureId, string]]), ...STRUCT_OPTS]}
-        render={v => <StructureIcon s={v} />} onChange={v => ed.setStructure((v || undefined) as StructureId | undefined)} />}>
-        <select className="wide" value={structure} onChange={e => ed.setStructure((e.target.value || undefined) as StructureId | undefined)} aria-label="Структура">
-          {!isRoot && <option value="">Как у родителя</option>}
-          {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-        </select>
+      <Section title="Структура">
+        <Picker label="Структура" className="wide" cols={3} value={structure as StructureId} options={[...(isRoot ? [] : [['' as StructureId, 'Как у родителя'] as [StructureId, string]]), ...STRUCT_OPTS]}
+          render={v => <StructureIcon s={v} />} onChange={v => ed.setStructure((v || undefined) as StructureId | undefined)}
+          button={<><StructureIcon s={structure as StructureId} /><span className="picker-name">{structure ? STRUCTURES.find(x => x.id === structure)?.name : 'Как у родителя'}</span><Icon name="chevron" size={12} /></>} />
       </Section>
 
       <Section title="Ветка" right={<Picker label="Форма линии" value={s.lineShape} options={LINES} render={v => <LineIcon s={v} />} onChange={v => set({ lineShape: v })} />}>
@@ -354,17 +373,16 @@ function StructureCard({ sheet }: { sheet: Sheet }) {
   const ed = useEditor.getState()
   const cur = STRUCTURES.find(st => st.id === (sheet.structure ?? 'mindmap')) ?? STRUCTURES[0]
   return (
-    <label className="struct-card">
-      <svg width={64} height={32} viewBox="0 0 64 32" fill="none" stroke="#bdc2c7" strokeWidth={1.2} strokeLinecap="round">
-        <rect x={24} y={13} width={16} height={6} rx={2} /><path d="M24 16C18 16 18 8 12 8M24 16C18 16 18 24 12 24M40 16C46 16 46 8 52 8M40 16C46 16 46 24 52 24" />
-        <path d="M4 8h8M4 24h8M52 8h8M52 24h8" />
-      </svg>
-      <span>{cur.name}</span>
-      <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
-      <select value={cur.id} aria-label="Структура карты" onChange={e => ed.setSheet({ structure: e.target.value as StructureId })}>
-        {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-      </select>
-    </label>
+    <Picker label="Структура карты" className="struct-card" cols={3} value={cur.id} options={STRUCT_OPTS}
+      render={v => <StructureIcon s={v} />} onChange={v => ed.setSheet({ structure: v })}
+      button={<>
+        <svg width={64} height={32} viewBox="0 0 64 32" fill="none" stroke="#bdc2c7" strokeWidth={1.2} strokeLinecap="round">
+          <rect x={24} y={13} width={16} height={6} rx={2} /><path d="M24 16C18 16 18 8 12 8M24 16C18 16 18 24 12 24M40 16C46 16 46 8 52 8M40 16C46 16 46 24 52 24" />
+          <path d="M4 8h8M4 24h8M52 8h8M52 24h8" />
+        </svg>
+        <span>{cur.name}</span>
+        <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
+      </>} />
   )
 }
 
@@ -407,8 +425,8 @@ function TopicElements({ topic }: { topic: Topic }) {
 
 function MapTab({ sheet }: { sheet: Sheet }) {
   const ed = useEditor.getState()
-  const tog = (label: string, key: keyof Sheet, val?: boolean) => (
-    <label className="fp-toggle"><span>{label}</span><Toggle label={label} on={val ?? !!sheet[key]} onChange={v => ed.setSheet({ [key]: v } as Partial<Sheet>)} /></label>
+  const tog = (label: string, key: keyof Sheet, val?: boolean, set?: (v: boolean) => void) => (
+    <label className="fp-toggle"><span>{label}</span><Toggle label={label} on={val ?? !!sheet[key]} onChange={v => set ? set(v) : ed.setSheet({ [key]: v } as Partial<Sheet>)} /></label>
   )
   return (
     <>
@@ -439,18 +457,18 @@ function MapTab({ sheet }: { sheet: Sheet }) {
       </div>
       <div className="fp-section">
         <div className="fp-title">Стиль карты</div>
-        {tog('Баланс карты', 'balance', sheet.balance !== false)}
+        {tog('Баланс карты', 'balance', sheet.balance !== false, v => ed.setBalance(v))}
         {tog('Компактная карта', 'compact')}
       </div>
       <div className="fp-section">
         <div className="fp-title">Отображение тем</div>
         {tog('Одинаковая длина тем', 'uniformWidth')}
         {tog('Показывать все заметки', 'showNotes')}
-        {tog('Автоцвет плавающих тем', 'autoColorFloating')}
+        {tog('Автоцвет плавающих тем', 'autoColorFloating', sheet.autoColorFloating !== false)}
       </div>
       <div className="fp-section">
         <div className="fp-title">Связи</div>
-        {tog('Цвет линии как у темы', 'relColorFollowTopic')}
+        {tog('Цвет линии как у темы', 'relColorFollowTopic', sheet.relColorFollowTopic !== false)}
       </div>
       <div className="fp-section">
         <div className="fp-title">Дополнительно</div>

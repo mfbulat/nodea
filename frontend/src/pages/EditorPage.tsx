@@ -165,7 +165,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
         <TopLeft guest={!user} mapId={id} mainMenu={<MainMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)}
           onShare={role === 'owner' ? () => setShareOpen(true) : undefined} onExport={doExport} onImport={doImport} onSaveTemplate={saveTemplate} />} />
         {!readOnly && (viewMode === 'map' ? <TopCenter /> : <OutlineCenter />)}
-        <TopRight onShare={role === 'owner' ? () => setShareOpen(true) : undefined} isOwner={role === 'owner'} outline={viewMode !== 'map'} />
+        <TopRight onShare={role === 'owner' ? () => setShareOpen(true) : undefined} isOwner={role === 'owner'} outline={viewMode !== 'map'} readOnly={readOnly} />
       </div>}
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}

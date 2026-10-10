@@ -70,6 +70,10 @@ export interface Topic {
   audio?: { url: string; duration: number }
   /** свободное положение ветки: смещение блока относительно места по раскладке */
   offset?: { x: number; y: number }
+  /** сторона основной ветки при выключенном «балансе карты» (r — справа, l — слева) */
+  side?: 'r' | 'l'
+  /** свободное положение основной ветки: центр темы относительно центра центральной темы */
+  freePos?: { x: number; y: number }
   /** настройки слайда в режиме презентации */
   pitch?: { slide?: 'auto' | 'yes' | 'no'; subSlides?: 'auto' | 'yes' | 'no'; delivery?: 'all' | 'one' | 'drill'; layout?: 'list' | 'bullets' | 'indent' | 'branch' | 'columns' }
   comments?: Comment[]

@@ -26,17 +26,17 @@ export default function Dialogs() {
   if (!topic) return null
   const close = () => ed.setDialog(null)
   switch (dialog.kind) {
-    case 'link': return <LinkDialog topic={topic} close={close} />
+    case 'link': return <LinkDialog topic={topic} close={close} mode={dialog.mode} />
     case 'labels': return <LabelsDialog topic={topic} close={close} />
     case 'equation': return <EquationDialog topic={topic} close={close} />
     case 'sticker': return <StickerDialog topic={topic} close={close} />
   }
 }
 
-function LinkDialog({ topic, close }: { topic: Topic; close: () => void }) {
+function LinkDialog({ topic, close, mode: initial }: { topic: Topic; close: () => void; mode?: 'web' | 'topic' }) {
   const ed = useEditor.getState()
   const isTopic = topic.href?.startsWith('topic:')
-  const [mode, setMode] = useState<'web' | 'topic'>(isTopic ? 'topic' : 'web')
+  const [mode, setMode] = useState<'web' | 'topic'>(initial ?? (isTopic ? 'topic' : 'web'))
   const [url, setUrl] = useState(isTopic ? '' : topic.href ?? '')
   const [target, setTarget] = useState(isTopic ? topic.href!.slice(6) : '')
   const doc = useDoc(s => s.doc)!

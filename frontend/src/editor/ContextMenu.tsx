@@ -66,7 +66,7 @@ export default function ContextMenu() {
   const run = (fn: () => void) => () => { close(); fn() }
   const hasKids = !!t.children?.length
   return (
-    <div ref={ref} className={'menu ctx-menu' + ((pos?.left ?? at.x) > window.innerWidth / 2 ? ' flip' : '')} role="menu" aria-label="Меню темы" onContextMenu={e => e.preventDefault()}
+    <div ref={ref} className="menu ctx-menu" role="menu" aria-label="Меню темы" onContextMenu={e => e.preventDefault()}
       style={style}>
       <i className="mm-main" hidden />
       <SubMenu label="Вставить">
@@ -75,8 +75,8 @@ export default function ContextMenu() {
         <MenuItem icon="task" label="To-Do" onClick={run(() => ed.setTopic([id], { task: t.task ? undefined : { done: false } }))} />
         <MenuItem icon="gantt" label="Задача" onClick={run(() => insertTask(id))} />
         <MenuItem icon="link" label="Веб-ссылка" onClick={run(() => ed.setDialog({ kind: 'link', id }))} />
-        <MenuItem icon="topic" label="Ссылка на тему" onClick={run(() => ed.setDialog({ kind: 'link', id }))} />
-        <MenuItem icon="callout" label="Выноска" disabled={isRoot} onClick={run(() => ed.addCallout())} />
+        <MenuItem icon="topic" label="Ссылка на тему" onClick={run(() => ed.setDialog({ kind: 'link', id, mode: 'topic' }))} />
+        <MenuItem icon="callout" label="Выноска" disabled={ref0.kind === 'callout'} onClick={run(() => ed.addCallout())} />
         <div className="menu-sep" />
         <MenuItem icon="attach" label="Вложение" onClick={run(async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') })} />
         <div className="menu-sep" />
@@ -104,7 +104,7 @@ export default function ContextMenu() {
       <div className="menu-sep" />
       <MenuItem label="Показать только ветку" hint="⌘ ;" disabled={isRoot} onClick={run(() => ed.drillDown(id))} />
       <div className="menu-sep" />
-      <MenuItem label="Сбросить положение" disabled={!t.offset} onClick={run(() => ed.resetPosition())} />
+      <MenuItem label="Сбросить положение" disabled={!t.offset && !t.freePos} onClick={run(() => ed.resetPosition())} />
       <MenuItem label="Новый лист из темы" onClick={run(() => ed.newSheetFromTopic(id))} />
     </div>
   )

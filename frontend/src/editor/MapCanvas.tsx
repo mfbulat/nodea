@@ -5,6 +5,7 @@ import type { Sheet, Topic, Zone } from './model'
 import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
 import { layoutSheet } from './layout'
+import { findDrop, type DropTarget } from './dnd'
 import { branchColor, FullStyle, isColored, MAP_FONT, resolveStyle, sheetBackground, WEIGHTS } from './themes'
 import { Content, IconKind, layoutContent, onFontsChanged } from './measure'
 import { edgePath } from './paths'
@@ -31,7 +32,7 @@ export function renderSheet(sheet: Sheet): Rendered {
     // автоцвет плавающих тем: цвет из палитры по порядку
     // центральная тема без заливки закрашивается фоном, чтобы начало веток было скрыто (как в XMind)
     if (ref.kind === 'root' && st.fill === 'transparent') st.fill = sheetBackground(sheet)
-    if (sheet.autoColorFloating && ref.kind === 'floating' && !ref.topic.style?.fill) { st.fill = branchColor(sheet, ref.index + 2); st.textColor = '#000000' }
+    if (sheet.autoColorFloating !== false && ref.kind === 'floating' && !ref.topic.style?.fill) { st.fill = branchColor(sheet, ref.index + 2); st.textColor = '#000000' }
     styles.set(id, st)
   }
   // одинаковая длина тем: ширина по самой широкой теме того же уровня
@@ -58,7 +59,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'marquee'; a: Pt; b: Pt; additive: boolean; base: string[] }
   | { kind: 'topic'; ids: string[]; start: Pt; cur: Pt; active: boolean; grab: Pt;
-      target: { id: string; mode: 'child' | 'before' | 'after' } | null }
+      target: DropTarget | null; alt: boolean; meta: boolean; client: Pt }
   | { kind: 'cp'; relId: string; which: 1 | 2; cur: Pt }
   | { kind: 'zone-new'; a: Pt; b: Pt }
   | { kind: 'zone'; id: string; mode: string; start: Pt; cur: Pt; orig: Zone }
@@ -222,7 +223,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     const p = toWorld(e.clientX, e.clientY)
     const box = r.layout.boxes.get(id)!
     const ids = ed().selection.includes(id) ? ed().selection : [id]
-    updateDrag({ kind: 'topic', ids, start: p, cur: p, active: false, grab: { x: p.x - box.x, y: p.y - box.y }, target: null })
+    updateDrag({ kind: 'topic', ids, start: p, cur: p, active: false, grab: { x: p.x - box.x, y: p.y - box.y }, target: null, alt: false, meta: false, client: { x: e.clientX, y: e.clientY } })
   }
 
   const lastCursor = useRef(0)
@@ -247,9 +248,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     } else if (d.kind === 'zone') {
       updateDrag({ ...d, cur: toWorld(e.clientX, e.clientY) })
     } else {
-      const cur = toWorld(e.clientX, e.clientY)
-      const active = d.active || Math.hypot(cur.x - d.start.x, cur.y - d.start.y) * ed().view.zoom > 4
-      updateDrag({ ...d, cur, active, target: active ? findDropTarget(cur, d.ids) : null })
+      dragTopicTo(d, e.clientX, e.clientY, e.altKey, e.metaKey || e.ctrlKey)
     }
   }
 
@@ -303,37 +302,50 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       ed().setPosition(ids[0], { x: pos.x - (ob.x + ob.w), y: pos.y - ob.y })
       return
     }
-    if (d.target) { ed().move(ids, d.target.id, d.target.mode); return }
-    // свободное положение веток: перенос на пустое место сдвигает ветку
-    if (sheet.freeBranch && ids.length === 1 && one?.kind === 'child') {
-      const prev = one.topic.offset ?? { x: 0, y: 0 }
-      ed().setTopic([ids[0]], { offset: { x: prev.x + d.cur.x - d.start.x, y: prev.y + d.cur.y - d.start.y } })
-      return
+    const t = d.target
+    if (!t) return
+    const gb = r.layout.boxes.get(ids[0])
+    if (t.kind === 'insert') ed().drop(ids, t, d.alt)
+    else if (t.kind === 'free') {
+      // центр ветки относительно центра центральной темы
+      const rb = r.layout.boxes.get(sheet.rootTopic.id)!
+      const c = boxCenter(rb)
+      ed().drop(ids, { kind: 'free', pos: { x: pos.x + (gb?.w ?? 0) / 2 - c.x, y: pos.y + (gb?.h ?? 0) / 2 - c.y } }, d.alt)
     }
-    // отпущено на пустом месте: плавающая тема двигается, обычная — становится плавающей
-    if (ids.length === 1 && one?.kind === 'floating') ed().setPosition(ids[0], pos)
-    else ed().detach(ids, pos)
+    // плавающая тема просто переезжает; остальные становятся плавающими (Alt — копией)
+    else if (!d.alt && ids.length === 1 && one?.kind === 'floating') ed().setPosition(ids[0], pos)
+    else ed().drop(ids, { kind: 'floating', pos }, d.alt, gb ? { w: gb.w, h: gb.h } : undefined)
   }
 
-  function findDropTarget(p: Pt, ids: string[]): { id: string; mode: 'child' | 'before' | 'after' } | null {
-    const idx = indexSheet(sheet)
-    const excluded = (id: string) => ids.some(m => m === id || isAncestor(idx, m, id)) || idx.get(id)?.kind === 'callout'
-    let best: { box: Box; dist: number } | null = null
-    for (const box of r.layout.boxes.values()) {
-      if (excluded(box.id)) continue
-      const dx = Math.max(box.x - p.x, 0, p.x - box.x - box.w)
-      const dy = Math.max(box.y - p.y, 0, p.y - box.y - box.h)
-      const dist = Math.hypot(dx, dy)
-      if (dist < 40 && (!best || dist < best.dist)) best = { box, dist }
-    }
-    if (!best) return null
-    const { box } = best
-    const ref = idx.get(box.id)!
-    if (!ref.parent || best.dist > 0 || ref.kind !== 'child') return { id: box.id, mode: 'child' }
-    const axis = r.layout.childAxis.get(ref.parent.id) ?? 'y'
-    const rel = axis === 'y' ? (p.y - box.y) / box.h : (p.x - box.x) / box.w
-    return { id: box.id, mode: rel < 0.25 ? 'before' : rel > 0.75 ? 'after' : 'child' }
+  /** перетаскивание темы: точка курсора, цель отпускания, модификаторы */
+  function dragTopicTo(d: Drag & { kind: 'topic' }, clientX: number, clientY: number, alt: boolean, meta: boolean) {
+    const cur = toWorld(clientX, clientY)
+    const active = d.active || Math.hypot(cur.x - d.start.x, cur.y - d.start.y) * ed().view.zoom > 4
+    const callout = d.ids.length === 1 && indexSheet(sheet).get(d.ids[0])?.kind === 'callout'
+    const target = active && !callout ? findDrop(sheet, r.layout, cur, d.ids.filter(id => id !== sheet.rootTopic.id), { zoom: ed().view.zoom, meta }) : null
+    updateDrag({ ...d, cur, active, target, alt, meta, client: { x: clientX, y: clientY } })
   }
+
+  // автопрокрутка у краёв холста во время перетаскивания темы
+  const dragActive = drag?.kind === 'topic' && drag.active
+  useEffect(() => {
+    if (!dragActive) return
+    let raf = 0
+    const tick = () => {
+      raf = requestAnimationFrame(tick)
+      const d = dragRef.current, el = wrap.current
+      if (!d || d.kind !== 'topic' || !el) return
+      const rc = el.getBoundingClientRect(), E = 40, V = 12
+      const dx = d.client.x < rc.left + E ? V : d.client.x > rc.right - E ? -V : 0
+      const dy = d.client.y < rc.top + E ? V : d.client.y > rc.bottom - E ? -V : 0
+      if (!dx && !dy) return
+      const v = ed().view
+      ed().setView({ x: v.x + dx, y: v.y + dy })
+      dragTopicTo(d, d.client.x, d.client.y, d.alt, d.meta)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [dragActive])
 
   function zoomAt(z: number, sx: number, sy: number) {
     const v = ed().view
@@ -569,7 +581,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           })}
           {relGeoms.map(({ rel, g }) => {
             if (!g) return null
-            const color = rel.color ?? (sheet.relColorFollowTopic ? r.styles.get(rel.end1)?.lineColor ?? relColor : relColor)
+            const color = rel.color ?? (sheet.relColorFollowTopic !== false ? r.styles.get(rel.end1)?.lineColor ?? relColor : relColor)
             const w = rel.width ?? 2
             const sel = element?.kind === 'relationship' && element.id === rel.id
             return (
@@ -631,15 +643,26 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           )}
           {drag?.kind === 'topic' && drag.active && (
             <>
+              {drag.target?.kind === 'insert' && <DropIndicator t={drag.target} />}
+              {drag.target?.kind === 'free' && (() => {
+                const rb = r.layout.boxes.get(sheet.rootTopic.id)!, gb = r.layout.boxes.get(dragIds[0])
+                if (!gb) return null
+                const c = boxCenter(rb), gx = drag.cur.x - drag.grab.x, gy = drag.cur.y - drag.grab.y
+                const right = gx + gb.w / 2 >= c.x, ex = right ? gx : gx + gb.w, ey = gy + gb.h / 2
+                const mx = (c.x + ex) / 2
+                return <path d={`M${c.x},${c.y} C${mx},${c.y} ${mx},${ey} ${ex},${ey}`} fill="none" stroke="#2EBDFF" strokeWidth={2} pointerEvents="none" />
+              })()}
               {dragIds.map(id => {
-                const b = r.layout.boxes.get(id)
-                if (!b) return null
+                const b = r.layout.boxes.get(id), ref = idx.get(id)
+                if (!b || !ref) return null
                 const dx = drag.cur.x - drag.start.x, dy = drag.cur.y - drag.start.y
-                return <rect key={'g' + id} x={b.x + dx} y={b.y + dy} width={b.w} height={b.h} rx={6}
-                  fill="var(--color-selection)" opacity={0.25} stroke="var(--color-selection)" strokeDasharray="4 3" />
+                // полупрозрачная копия темы следует за курсором
+                return <g key={'g' + id} transform={`translate(${dx},${dy})`} opacity={0.6} pointerEvents="none">
+                  <TopicNode box={b} topic={ref.topic} style={r.styles.get(id)!} content={r.contents.get(id)!}
+                    selected={false} dim={false} hidden={false} highlight={false} current={false} central={levelOf(ref) === 'central'} relTarget={false}
+                    onPointerDown={() => {}} onDoubleClick={() => {}} onIcon={() => {}} onMarker={() => {}} />
+                </g>
               })}
-              {drag.target && <DropIndicator box={r.layout.boxes.get(drag.target.id)!} mode={drag.target.mode}
-                axis={(() => { const p = idx.get(drag.target!.id)?.parent; return p ? r.layout.childAxis.get(p.id) ?? 'y' : 'y' })()} />}
             </>
           )}
           {peers.flatMap(p => (p.selection ?? []).map(id => {
@@ -772,16 +795,15 @@ export function isTyping(e: Event) {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 }
 
-function DropIndicator({ box, mode, axis }: { box: Box; mode: 'child' | 'before' | 'after'; axis: 'x' | 'y' }) {
-  if (mode === 'child') return <rect x={box.x - 4} y={box.y - 4} width={box.w + 8} height={box.h + 8} rx={8}
-    fill="none" stroke="var(--color-selection)" strokeWidth={2} strokeDasharray="5 3" />
-  const before = mode === 'before'
-  if (axis === 'y') {
-    const y = before ? box.y - 5 : box.y + box.h + 5
-    return <line x1={box.x} x2={box.x + box.w} y1={y} y2={y} stroke="var(--color-selection)" strokeWidth={3} strokeLinecap="round" />
-  }
-  const x = before ? box.x - 5 : box.x + box.w + 5
-  return <line x1={x} x2={x} y1={box.y} y2={box.y + box.h} stroke="var(--color-selection)" strokeWidth={3} strokeLinecap="round" />
+/** индикатор вставки как в веб-версии: линия от края родителя до плашки 50×18 */
+function DropIndicator({ t }: { t: DropTarget & { kind: 'insert' } }) {
+  const c = '#2EBDFF'
+  return <g pointerEvents="none">
+    <path d={Math.abs(t.to.x - t.from.x) >= Math.abs(t.to.y - t.from.y)
+      ? `M${t.from.x},${t.from.y} C${(t.from.x + t.to.x) / 2},${t.from.y} ${(t.from.x + t.to.x) / 2},${t.to.y} ${t.to.x},${t.to.y}`
+      : `M${t.from.x},${t.from.y} C${t.from.x},${(t.from.y + t.to.y) / 2} ${t.to.x},${(t.from.y + t.to.y) / 2} ${t.to.x},${t.to.y}`} fill="none" stroke={c} strokeWidth={2} />
+    <rect x={t.ph.x} y={t.ph.y} width={t.ph.w} height={t.ph.h} rx={4} fill={c} />
+  </g>
 }
 
 function TitleEditor({ id, box, style: s, content: c, title }: { id: string; box: Box; style: FullStyle; content: Content; title: string }) {

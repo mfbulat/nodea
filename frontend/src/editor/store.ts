@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import { useDoc } from '../store/doc'
+import type { DropTarget } from './dnd'
 import type { Boundary, MapDocument, Relationship, Sheet, StructureId, Topic, TopicStyle, Zone } from './model'
 import { cloneWithNewIds, indexSheet, isAncestor, uid } from './model'
 import { markerGroup } from './markers'
@@ -129,7 +130,7 @@ interface EditorState {
   element: ElementSel
   panel: PanelId
   relating: string | null
-  dialog: { kind: 'link' | 'labels' | 'equation' | 'sticker'; id: string } | null
+  dialog: { kind: 'link' | 'labels' | 'equation' | 'sticker'; id: string; mode?: 'web' | 'topic' } | null
   userName: string
   viewMode: 'map' | 'outline'
   zen: boolean
@@ -154,6 +155,10 @@ interface EditorState {
   removeSelected: () => void
   toggleCollapse: () => void
   move: (ids: string[], targetId: string, mode: 'child' | 'before' | 'after') => void
+  /** перетаскивание как в веб-версии: вставка в колонку детей, плавающая тема или свободное положение; copy — копия (Alt) */
+  drop: (ids: string[], target: DropTarget, copy?: boolean, size?: { w: number; h: number }) => void
+  /** «баланс карты»: выключение фиксирует текущие стороны основных веток */
+  setBalance: (on: boolean) => void
   detach: (ids: string[], pos: { x: number; y: number }) => void
   setPosition: (id: string, pos: { x: number; y: number }) => void
   copy: () => Topic[]
@@ -313,6 +318,7 @@ export const useEditor = create<EditorState>((set, get) => {
           const box = layoutRef?.boxes.get(id)
           t.position = { x: p.x, y: p.y + (before ? -1 : 1) * ((box?.h ?? 40) + 30) }
         }
+        if (l.topic.side) t.side = l.topic.side
         l.siblings.splice(before ? l.index : l.index + 1, 0, t)
       })
       get().startEdit(t.id)
@@ -350,6 +356,65 @@ export const useEditor = create<EditorState>((set, get) => {
       const collapse = !locate(sheet, ids[0])!.topic.collapsed
       mutate(sh => { for (const id of ids) locate(sh, id)!.topic.collapsed = collapse })
     },
+    drop: (ids, target, copy = false, size) => {
+      const sheet = get().sheet()!
+      const idx = indexSheet(sheet)
+      let moving = topLevel(sheet, ids).filter(id => id !== sheet.rootTopic.id && ['child', 'floating'].includes(idx.get(id)?.kind ?? ''))
+      if (target.kind === 'insert') moving = moving.filter(id => id !== target.parentId && !isAncestor(idx, id, target.parentId))
+      if (!moving.length) return
+      const newIds: string[] = []
+      mutate(sh => {
+        // берём темы (или их копии) — удаление по свежим положениям, по одной
+        const taken: Topic[] = moving.map(id => {
+          const l = locate(sh, id)!
+          if (copy) return cloneWithNewIds(JSON.parse(JSON.stringify(l.topic)) as Topic)
+          l.siblings.splice(l.siblings.indexOf(l.topic), 1)
+          return l.topic
+        })
+        for (const t of taken) { delete t.position; delete t.freePos; delete t.offset; delete t.side; newIds.push(t.id) }
+        if (target.kind === 'insert') {
+          const pl = locate(sh, target.parentId)
+          if (!pl) return
+          const kids = (pl.topic.children ??= [])
+          const at = target.beforeId ? kids.findIndex(k => k.id === target.beforeId) : -1
+          kids.splice(at >= 0 ? at : kids.length, 0, ...taken)
+          if (pl.topic.collapsed) pl.topic.collapsed = false
+          // без баланса сторона основной ветки фиксируется явно
+          if (pl.kind === 'root' && sh.balance === false && target.side) taken.forEach(t => { t.side = target.side })
+        } else if (target.kind === 'free') {
+          const t = taken[0]
+          t.freePos = { x: target.pos.x, y: target.pos.y }
+          if (copy) sh.rootTopic.children!.push(t)
+          else {
+            // ветка остаётся основной на прежнем месте в массиве
+            const l = locate(sheet, moving[0])!
+            sh.rootTopic.children!.splice(Math.min(l.index, sh.rootTopic.children!.length), 0, t)
+          }
+        } else {
+          const h = (size?.h ?? 40) + 20
+          taken.forEach((t, i) => { t.position = { x: target.pos.x, y: target.pos.y + i * h }; (sh.floatingTopics ??= []).push(t) })
+        }
+      })
+      set({ selection: newIds, element: null })
+    },
+    setBalance: on => mutate(sh => {
+      const kids = sh.rootTopic.children ?? []
+      if (on) { delete sh.balance; kids.forEach(k => { delete k.side }) ; return }
+      // фиксируем текущее (сбалансированное) разбиение
+      // стороны берём из текущей раскладки (как видит пользователь), иначе — делением по количеству
+      const l = currentLayout(), rb = l?.boxes.get(sh.rootTopic.id)
+      const st = sh.structure ?? 'mindmap'
+      const n = kids.filter(k => !k.freePos).length, k0 = Math.ceil(n / 2)
+      const first = st === 'mindmap-acw' ? 'l' : 'r', second = first === 'r' ? 'l' : 'r'
+      let j = 0
+      kids.forEach(k => {
+        if (k.freePos) return
+        const b = rb && l!.boxes.get(k.id)
+        k.side = b ? (b.x + b.w / 2 >= rb.x + rb.w / 2 ? 'r' : 'l') : j < k0 ? first : second
+        j++
+      })
+      sh.balance = false
+    }),
     move: (ids, targetId, mode) => {
       const sheet = get().sheet()!
       const idx = indexSheet(sheet)
@@ -623,7 +688,7 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     resetPosition: () => {
       const ids = get().selection
-      mutate(sh => { for (const id of ids) { const t = locate(sh, id)?.topic; if (t) delete t.offset } })
+      mutate(sh => { for (const id of ids) { const t = locate(sh, id)?.topic; if (t) { delete t.offset; delete t.freePos } } })
     },
     newSheetFromTopic: id => {
       const t = get().sheet() && locate(get().sheet()!, id)?.topic

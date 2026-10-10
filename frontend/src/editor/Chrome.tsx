@@ -91,15 +91,32 @@ export function MenuItem({ label, hint, onClick, disabled, icon, checked }: { la
   )
 }
 
-/** Пункт с вложенным меню (раскрывается при наведении) */
+/** Пункт с вложенным меню: открывается наведением или щелчком/стрелкой вправо, закрывается с задержкой
+ * (мелкий промах курсора не закрывает), у края окна переворачивается влево и сдвигается вверх */
 export function SubMenu({ label, icon, children }: { label: string; icon?: IconName; children: ReactNode }) {
   const [open, setOpen] = useState(false)
+  const [place, setPlace] = useState<{ flip: boolean; dy: number } | null>(null)
+  const timer = useRef(0)
+  const sub = useRef<HTMLDivElement>(null)
+  const show = () => { clearTimeout(timer.current); setOpen(true) }
+  const hide = () => { clearTimeout(timer.current); timer.current = window.setTimeout(() => setOpen(false), 250) }
+  useEffect(() => () => clearTimeout(timer.current), [])
+  useLayoutEffect(() => {
+    if (!open || !sub.current) { setPlace(null); return }
+    const host = sub.current.parentElement!.getBoundingClientRect(), w = sub.current.offsetWidth, h = sub.current.offsetHeight
+    const flip = host.right + 4 + w > window.innerWidth - 8 && host.left - 4 - w >= 8
+    const top = host.top - 8
+    const dy = Math.min(0, window.innerHeight - 8 - (top + h)) + Math.max(0, 8 - top)
+    setPlace({ flip, dy })
+  }, [open])
   return (
-    <div className="submenu" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button role="menuitem" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+    <div className="submenu" onMouseEnter={show} onMouseLeave={hide}
+      onKeyDown={e => { if (e.key === 'ArrowRight') { e.preventDefault(); show() } else if (e.key === 'ArrowLeft' || e.key === 'Escape') { if (open) { e.stopPropagation(); e.preventDefault(); setOpen(false) } } }}>
+      <button role="menuitem" aria-haspopup="menu" aria-expanded={open} className={open ? 'on' : ''} onClick={() => (open ? setOpen(false) : show())}>
         {icon && <Icon name={icon} size={16} />}<span className="mi-label">{label}</span><Icon name="chevronRight" size={14} />
       </button>
-      {open && <div className="menu sub" role="menu">{children}</div>}
+      {open && <div ref={sub} className="menu sub" role="menu"
+        style={{ visibility: place ? 'visible' : 'hidden', ...(place?.flip ? { left: 'auto', right: 'calc(100% + 4px)' } : {}), top: -8 + (place?.dy ?? 0) }}>{children}</div>}
     </div>
   )
 }
@@ -196,7 +213,7 @@ export function OutlineCenter() {
 }
 
 /** Справа: участники, «Поделиться», Гант, презентация, комментарии, маркеры, формат */
-export function TopRight({ onShare, isOwner, outline }: { onShare?: () => void; isOwner: boolean; outline: boolean }) {
+export function TopRight({ onShare, isOwner, outline, readOnly = false }: { onShare?: () => void; isOwner: boolean; outline: boolean; readOnly?: boolean }) {
   const { panel, gantt } = useEditor()
   const ed = useEditor.getState()
   const toggle = (p: typeof panel) => ed.setPanel(panel === p ? null : p)
@@ -209,8 +226,8 @@ export function TopRight({ onShare, isOwner, outline }: { onShare?: () => void; 
         {!outline && fit.gantt && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта в отдельном окне." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
         {fit.present && <IconButton icon="present" label="Презентация" keys="⌥ ⌘ P" desc="Перейти в режим презентации." onClick={() => ed.setPresenting(true)} />}
         {!outline && fit.present && <IconButton icon="comment" label="Комментарии" desc="Открыть панель комментариев." onClick={() => toggle('comments')} active={panel === 'comments'} />}
-        {isOwner !== undefined && <IconButton icon="marker" label="Маркер" desc="Добавить маркер к выбранным темам." onClick={() => toggle('markers')} active={panel === 'markers'} />}
-        {!outline && <IconButton icon="panel" label="Формат" keys="⌘ ]" desc="Показать или скрыть параметры стиля и формата." onClick={() => toggle('format')} active={panel === 'format'} />}
+        {!readOnly && <IconButton icon="marker" label="Маркер" desc="Добавить маркер к выбранным темам." onClick={() => toggle('markers')} active={panel === 'markers'} />}
+        {!outline && !readOnly && <IconButton icon="panel" label="Формат" keys="⌘ ]" desc="Показать или скрыть параметры стиля и формата." onClick={() => toggle('format')} active={panel === 'format'} />}
       </div>
     </div>
   )

@@ -1,11 +1,10 @@
 // Меню «Вставить» (как в веб-версии): сводка, зона | заметка, метка, выноска, комментарий,
-// to-do, задача, ссылка ▸ | вложение, аудиозаметка | стикер, иллюстрация, изображение, формула.
+// to-do, задача, ссылка ▸ | вложение | стикер, иллюстрация, изображение, формула.
 import { useEditor } from './store'
 import Icon, { IconName } from '../ui/Icon'
 import { pickFile, uploadToTopic } from './actions'
 import { indexSheet } from './model'
 import { Dropdown, MenuItem, SubMenu, Tip } from './Chrome'
-import { recordAudio } from './audio'
 import { insertTask } from './Gantt'
 
 export default function InsertMenu() {
@@ -32,17 +31,16 @@ export default function InsertMenu() {
         <div className="menu-sep" />
         {item('note', 'Заметка', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
         {item('label', 'Метка', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}
-        {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'root')(close)}
+        {item('callout', 'Выноска', ed.addCallout, none || ref?.kind === 'callout')(close)}
         {item('comment', 'Комментарий', () => { ed.setPanel('comments'); ed.setThread({ id }) })(close)}
         {item('task', 'To-Do', () => ed.setTopic(selection, { task: ref?.topic.task ? undefined : { done: false } }), none, '⌥ ⌘ T')(close)}
         {item('gantt', 'Задача', () => insertTask(id))(close)}
         <SubMenu icon="link" label="Ссылка">
           <MenuItem icon="link" label="Веб-ссылка" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
-          <MenuItem icon="topic" label="Ссылка на тему" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id }) }} />
+          <MenuItem icon="topic" label="Ссылка на тему" disabled={none} onClick={() => { close(); ed.setDialog({ kind: 'link', id, mode: 'topic' }) }} />
         </SubMenu>
         <div className="menu-sep" />
         {item('attach', 'Вложение', async () => { const f = await pickFile(); if (f) uploadToTopic(id, f, 'attachment') })(close)}
-        {item('mic', 'Аудиозаметка', () => recordAudio(id))(close)}
         <div className="menu-sep" />
         {item('sticker', 'Стикер', () => { ed.setPanel('markers'); ed.setMarkerTab('stickers') })(close)}
         {item('illustration', 'Иллюстрация', () => { ed.setPanel('markers'); ed.setMarkerTab('illustrations') })(close)}

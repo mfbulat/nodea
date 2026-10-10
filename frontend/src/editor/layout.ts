@@ -38,6 +38,11 @@ let ROOT_GAP = 50
 let V_GAP = 36
 let MAIN_GAP = 40
 let BALANCE = false
+/** «баланс карты» выключен: стороны основных веток заданы явно (Topic.side) */
+let UNBALANCED = false
+/** «свободное положение веток»: основные ветки с freePos стоят там, куда их перенесли */
+let FREE = false
+let ROOT_ID = ''
 
 export const STRUCTURES: { id: StructureId; name: string }[] = [
   { id: 'mindmap', name: 'Mind Map (сбалансированная)' },
@@ -194,26 +199,38 @@ class Engine {
     this.addToggle(b, t, s.w + 8, s.h / 2)
     if (!kids.length) return b
     const right: number[] = [], left: number[] = []
-    const n = kids.length
-    if (variant === 'mindmap') {
+    // основные ветки со свободным положением раскладываются отдельно и не занимают место в колонках
+    const freeIdx = FREE && t.id === ROOT_ID ? kids.map((k, i) => (k.freePos ? i : -1)).filter(i => i >= 0) : []
+    const norm = kids.map((_, i) => i).filter(i => !freeIdx.includes(i))
+    const n = norm.length
+    if (UNBALANCED && t.id === ROOT_ID) {
+      // как в веб-версии без баланса: каждая основная ветка на своей стороне, порядок — по массиву (по часовой)
+      const anySide = norm.some(i => kids[i].side)
+      const k = Math.ceil(n / 2)
+      const firstSide = variant !== 'mindmap-acw' ? 'r' : 'l'
+      const sideOf = (i: number, j: number) => kids[i].side ?? (anySide ? (firstSide === 'r' ? 'l' : 'r') : (j < k ? firstSide : (firstSide === 'r' ? 'l' : 'r')))
+      const first = norm.filter((i, j) => sideOf(i, j) === firstSide), second = norm.filter((i, j) => sideOf(i, j) !== firstSide).reverse()
+      if (firstSide === 'r') { right.push(...first); left.push(...second) }
+      else { left.push(...first); right.push(...second) }
+    } else if (variant === 'mindmap') {
       const blocks = kids.map(k => this.layout(k, 'logic-right'))
       const hs = blocks.map(c => c.maxY - c.minY)
       const total = hs.reduce((a, c) => a + c, 0)
       let acc = 0
-      kids.forEach((_, i) => { if (i === 0 || (acc < total / 2 && i < n - (n > 1 ? 1 : 0))) { right.push(i); acc += hs[i] } else left.push(i) })
+      norm.forEach((i, j) => { if (j === 0 || (acc < total / 2 && j < n - (n > 1 ? 1 : 0))) { right.push(i); acc += hs[i] } else left.push(i) })
       left.reverse()
     } else {
       // «баланс карты»: делим по суммарной высоте веток, а не по количеству
       let k = Math.ceil(n / 2)
       if (BALANCE && n > 1) {
-        const hs = kids.map(kk => { const c = this.layout(kk, 'logic-right'); return c.maxY - c.minY })
+        const hs = norm.map(i => { const c = this.layout(kids[i], 'logic-right'); return c.maxY - c.minY })
         const total = hs.reduce((a, c) => a + c, 0)
         let acc = 0
         k = 0
         while (k < n - 1 && acc + hs[k] / 2 < total / 2) { acc += hs[k]; k++ }
         k = Math.max(1, k)
       }
-      const first = [...Array(k).keys()], second = [...Array(n - k).keys()].map(i => i + k).reverse()
+      const first = norm.slice(0, k), second = norm.slice(k).reverse()
       if (variant === 'mindmap-cw') { right.push(...first); left.push(...second) }
       else { left.push(...first); right.push(...second) }
     }
@@ -242,6 +259,16 @@ class Engine {
     }
     side(right, 1)
     side(left, -1)
+    for (const i of freeIdx) {
+      const k = kids[i], ks = this.size(k), fp = k.freePos!
+      const dir = fp.x >= 0 ? 1 : -1
+      const cb = this.layout(k, dir > 0 ? 'logic-right' : 'logic-left')
+      const dx = s.w / 2 + fp.x - ks.w / 2, dy = s.h / 2 + fp.y - ks.h / 2
+      merge(b, cb, dx, dy)
+      const end = { x: dir > 0 ? dx : dx + ks.w, y: dy + this.anchorY(k) }
+      const start = { x: s.w / 2 + dir * (s.w / 2) * (2 / 3), y: s.h / 2 }
+      b.edges.push({ from: t.id, to: k.id, kind: 'h', fromRoot: true, pts: [start, end] })
+    }
     return b
   }
 
@@ -515,8 +542,12 @@ export function countAll(t: Topic): number {
 export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
   const c = !!sheet.compact
   SIB_GAP = c ? 2 : 6; H_GAP = c ? 16 : 27; ROOT_GAP = c ? 32 : 51; V_GAP = c ? 22 : 36; MAIN_GAP = c ? 14 : 35
-  // как в веб-версии: «баланс карты» делит основные темы поровну по сторонам (по умолчанию включён)
+  // как в веб-версии: при «балансе» основные темы делятся поровну по сторонам (по умолчанию включён),
+  // без баланса сторона каждой основной ветки хранится в теме
   BALANCE = false
+  UNBALANCED = sheet.balance === false
+  FREE = !!sheet.freeBranch
+  ROOT_ID = sheet.rootTopic.id
   const eng = new Engine(size)
   const root = sheet.rootTopic
   const rs = size(root)
@@ -530,23 +561,6 @@ export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
     const fb = eng.layout(f, 'logic-right')
     const p = f.position ?? { x: 0, y: 0 }
     merge(all, fb, p.x, p.y)
-  }
-  // свободное положение веток: сдвигаем поддерево темы вместе со всем содержимым
-  if (sheet.freeBranch) {
-    const shiftTopic = (t: Topic) => {
-      t.children?.forEach(shiftTopic)
-      if (!t.offset || t === root) return
-      const ids = subtreeIds(t)
-      const { x: ox, y: oy } = t.offset
-      for (const b of all.boxes) if (ids.has(b.id)) { b.x += ox; b.y += oy }
-      for (const e of all.edges) {
-        if (ids.has(e.from)) e.pts = e.pts.map(p => ({ x: p.x + ox, y: p.y + oy }))
-        else if (e.to === t.id) e.pts = e.pts.map((p, i) => (i === e.pts.length - 1 ? { x: p.x + ox, y: p.y + oy } : p))
-      }
-      for (const tg of all.toggles) if (ids.has(tg.id)) { tg.x += ox; tg.y += oy }
-      for (const d of all.decos) if (ids.has(d.owner)) d.pts = d.pts.map(p => ({ x: p.x + ox, y: p.y + oy }))
-    }
-    shiftTopic(root)
   }
   const boxes = new Map(all.boxes.map(b => [b.id, b]))
   for (const b of all.boxes) {
