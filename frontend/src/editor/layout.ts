@@ -515,7 +515,8 @@ export function countAll(t: Topic): number {
 export function layoutSheet(sheet: Sheet, size: SizeFn): LayoutResult {
   const c = !!sheet.compact
   SIB_GAP = c ? 2 : 6; H_GAP = c ? 16 : 27; ROOT_GAP = c ? 32 : 51; V_GAP = c ? 22 : 36; MAIN_GAP = c ? 14 : 35
-  BALANCE = !!sheet.balance
+  // как в веб-версии: «баланс карты» делит основные темы поровну по сторонам (по умолчанию включён)
+  BALANCE = false
   const eng = new Engine(size)
   const root = sheet.rootTopic
   const rs = size(root)

@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react'
 import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { indexSheet, levelOf } from './model'
 import { STRUCTURES } from './layout'
-import { COLOR_THEMES, ColorTheme, FullStyle, getColorTheme, isColored, MAP_FONT, resolveStyle, sheetBackground } from './themes'
+import { COLOR_THEMES, ColorTheme, FullStyle, WEIGHTS, getColorTheme, isColored, MAP_FONT, resolveStyle, sheetBackground } from './themes'
 import { shapePath, edgePath } from './paths'
 import { currentLayout, useEditor } from './store'
 import Icon from '../ui/Icon'
@@ -120,8 +120,50 @@ const STRUCT_OPTS: [StructureId, string][] = STRUCTURES.map(s => [s.id, s.name])
 
 // ---------- вкладка «Стиль» для темы ----------
 
-function StylePreview({ s, label, bg }: { s: FullStyle; label: string; bg?: string }) {
+/** Готовые стили темы (как в веб-версии): «Очень важно», «Важно», «Зачёркнуто», «По умолчанию» */
+function presets(s: FullStyle): [string, TopicStyle | null, Partial<FullStyle>][] {
+  return [
+    ['Очень важно', { fill: '#7f00ac', textColor: '#ffffff', fontWeight: 'bold', borderStyle: 'none', borderWidth: 0, textDecoration: 'none' }, {}],
+    ['Важно', { fill: '#82004a', textColor: '#ffffff', fontWeight: 'bold', borderStyle: 'none', borderWidth: 0, textDecoration: 'none' }, {}],
+    ['Зачёркнуто', { fill: '#ffffff', textColor: '#000000', borderStyle: 'solid', borderWidth: 2, borderColor: s.lineColor, textDecoration: 'line-through' }, {}],
+    ['По умолчанию', null, {}],
+  ]
+}
+
+function StylePreview({ s, label, bg, base }: { s: FullStyle; label: string; bg?: string; base?: FullStyle }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [open])
+  const ed = useEditor.getState()
+  const pill = (st: FullStyle, text: string) => (
+    <span className="sp-topic" style={{
+      background: st.fill === 'transparent' ? 'transparent' : st.fill, color: st.textColor,
+      border: st.borderStyle === 'none' || !st.borderWidth ? '1px solid transparent' : `${Math.min(3, st.borderWidth)}px ${st.borderStyle} ${st.borderColor}`,
+      fontWeight: WEIGHTS[st.fontWeight], textDecoration: st.textDecoration,
+    }}>{text}</span>
+  )
   return (
+    <div className="style-preview-wrap" ref={ref}>
+      <button className="style-preview-btn" aria-label="Готовые стили" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
+      </button>
+      {open && base && (
+        <div className="style-presets" role="menu">
+          {presets(base).map(([n, st]) => (
+            <button key={n} role="menuitem" aria-label={'Стиль ' + n} onClick={() => {
+              const sel = useEditor.getState().selection
+              if (st) ed.setStyle(st)
+              else ed.setTopic(sel, { style: undefined })
+              setOpen(false)
+            }}>{pill(st ? { ...base, ...st } as FullStyle : base, n)}</button>
+          ))}
+        </div>
+      )}
     <div className="style-preview" style={bg ? { background: bg } : undefined}>
       <div className="sp-topic" style={{
         background: s.fill === 'transparent' ? 'transparent' : s.fill, color: s.textColor,
@@ -130,6 +172,7 @@ function StylePreview({ s, label, bg }: { s: FullStyle; label: string; bg?: stri
         fontWeight: ({ normal: 400, medium: 500, bold: 700, extrabold: 800 } as Record<string, number>)[s.fontWeight],
         fontStyle: s.fontStyle, borderBottom: s.shape === 'underline' ? `2px solid ${s.borderColor}` : undefined,
       }}>{label}</div>
+    </div>
     </div>
   )
 }
@@ -153,7 +196,7 @@ function TopicStyleTab({ sheet }: { sheet: Sheet }) {
   return (
     <>
       {selection.length > 1 && <p className="muted" style={{ margin: '0 0 8px' }}>Выбрано тем: {selection.length}</p>}
-      <StylePreview s={s} label={LEVEL_NAME[level]} bg={sheetBackground(sheet)} />
+      <StylePreview s={s} label={LEVEL_NAME[level]} bg={sheetBackground(sheet)} base={resolveStyle(sheet, { ...ref, topic: { ...ref.topic, style: undefined } })} />
 
       <Section title="Фигура" right={<Picker label="Фигура" value={s.shape} options={SHAPES} render={v => <ShapeIcon s={v} />} onChange={v => set({ shape: v })} />}>
         <Row label="Заливка">
@@ -396,7 +439,7 @@ function MapTab({ sheet }: { sheet: Sheet }) {
       </div>
       <div className="fp-section">
         <div className="fp-title">Стиль карты</div>
-        {tog('Баланс карты', 'balance')}
+        {tog('Баланс карты', 'balance', sheet.balance !== false)}
         {tog('Компактная карта', 'compact')}
       </div>
       <div className="fp-section">
@@ -556,7 +599,7 @@ export default function FormatPanel({ sheet }: { sheet: Sheet }) {
   const [tab, setTab] = useState<'style' | 'pitch' | 'map'>('style')
   const none = !useEditor(s => s.selection.length)
   // как в веб-версии: без выделения — вкладка «Карта», «Стиль» и «Презентация» недоступны
-  useEffect(() => { setTab(t => (none ? 'map' : t === 'map' && prevNone.current ? 'style' : t)); prevNone.current = none }, [none])
+  useEffect(() => { const was = prevNone.current; setTab(t => (none ? 'map' : t === 'map' && was ? 'style' : t)); prevNone.current = none }, [none])
   const prevNone = useRef(none)
   useEffect(() => {
     const f = (e: Event) => setTab((e as CustomEvent).detail)
