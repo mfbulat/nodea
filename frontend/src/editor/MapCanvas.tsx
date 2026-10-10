@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CommentLayer, nearestTopic } from './Comments'
-import { openTopicMenu } from './ContextMenu'
-import type { Sheet, Topic } from './model'
+import { openCanvasMenu, openTopicMenu, useCommentsHidden } from './ContextMenu'
+import type { Sheet, Topic, Zone } from './model'
 import { indexSheet, isAncestor, levelOf } from './model'
 import type { Box, LayoutResult, Pt } from './layout'
 import { layoutSheet } from './layout'
-import { branchColor, FullStyle, isColored, resolveStyle, sheetBackground, WEIGHTS } from './themes'
+import { branchColor, FullStyle, isColored, MAP_FONT, resolveStyle, sheetBackground, WEIGHTS } from './themes'
 import { Content, IconKind, layoutContent, onFontsChanged } from './measure'
 import { edgePath } from './paths'
 import { currentLayout, setCurrentLayout, topLevel, useEditor } from './store'
@@ -60,8 +60,29 @@ type Drag =
   | { kind: 'topic'; ids: string[]; start: Pt; cur: Pt; active: boolean; grab: Pt;
       target: { id: string; mode: 'child' | 'before' | 'after' } | null }
   | { kind: 'cp'; relId: string; which: 1 | 2; cur: Pt }
+  | { kind: 'zone-new'; a: Pt; b: Pt }
+  | { kind: 'zone'; id: string; mode: string; start: Pt; cur: Pt; orig: Zone }
 
-type LabelEdit = { kind: 'relationship' | 'boundary'; id: string; x: number; y: number; value: string }
+/** прямоугольник зоны с учётом перетаскивания (перемещение или изменение размера за ручку) */
+function zoneRect(d: { mode: string; start: Pt; cur: Pt; orig: Zone }) {
+  const dx = d.cur.x - d.start.x, dy = d.cur.y - d.start.y, o = d.orig
+  if (d.mode === 'move') return { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h }
+  let { x, y, w, h } = o
+  if (d.mode.includes('w')) { x = Math.min(o.x + dx, o.x + o.w - 20); w = o.w - (x - o.x) }
+  if (d.mode.includes('e')) w = Math.max(20, o.w + dx)
+  if (d.mode.includes('n')) { y = Math.min(o.y + dy, o.y + o.h - 20); h = o.h - (y - o.y) }
+  if (d.mode.includes('s')) h = Math.max(20, o.h + dy)
+  return { x, y, w, h }
+}
+let labelCanvas: CanvasRenderingContext2D | null = null
+function measureLabel(t: string) {
+  labelCanvas ??= document.createElement('canvas').getContext('2d')
+  if (!labelCanvas) return t.length * 7
+  labelCanvas.font = `12px ${MAP_FONT}`
+  return labelCanvas.measureText(t).width
+}
+
+type LabelEdit = { kind: 'relationship' | 'boundary' | 'zone'; id: string; x: number; y: number; value: string }
 
 /** Лист для показа: при «только ветке» центральной становится выбранная тема */
 export function displaySheet(sheet: Sheet, drillId: string | null): Sheet {
@@ -91,7 +112,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
   focusIds?: Set<string> | null
 }) {
   const wrap = useRef<HTMLDivElement>(null)
-  const { view, selection, editingId, element, relating, drillId, filter, search, commenting } = useEditor()
+  const { view, selection, editingId, element, relating, drillId, filter, search, commenting, zoneDrawing } = useEditor()
+  const commentsHidden = useCommentsHidden(s => s.hidden)
   const sheet = useMemo(() => displaySheet(realSheet, drillId), [realSheet, drillId])
   const ed = useEditor.getState
   const [fontEpoch, setFontEpoch] = useState(0)
@@ -150,6 +172,13 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
 
   // режим комментирования: щелчок в любом месте — новое обсуждение у ближайшей темы
   function onCommentPointerDown(e: React.PointerEvent) {
+    if (ed().zoneDrawing && e.button === 0) {
+      e.stopPropagation(); e.preventDefault()
+      ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+      const p = toWorld(e.clientX, e.clientY)
+      updateDrag({ kind: 'zone-new', a: p, b: p })
+      return
+    }
     if (!ed().commenting || e.button !== 0 || (e.target as Element).closest('.cm-pop, .cm-pin')) return
     e.stopPropagation(); e.preventDefault()
     const p = toWorld(e.clientX, e.clientY)
@@ -213,6 +242,10 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       updateDrag({ ...d, b })
     } else if (d.kind === 'cp') {
       updateDrag({ ...d, cur: toWorld(e.clientX, e.clientY) })
+    } else if (d.kind === 'zone-new') {
+      updateDrag({ ...d, b: toWorld(e.clientX, e.clientY) })
+    } else if (d.kind === 'zone') {
+      updateDrag({ ...d, cur: toWorld(e.clientX, e.clientY) })
     } else {
       const cur = toWorld(e.clientX, e.clientY)
       const active = d.active || Math.hypot(cur.x - d.start.x, cur.y - d.start.y) * ed().view.zoom > 4
@@ -224,6 +257,17 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
     const d = dragRef.current
     updateDrag(null)
     if (!d) return
+    if (d.kind === 'zone-new') {
+      const x = Math.min(d.a.x, d.b.x), y = Math.min(d.a.y, d.b.y), w = Math.abs(d.b.x - d.a.x), h = Math.abs(d.b.y - d.a.y)
+      if (w > 12 && h > 12) ed().addZone({ x, y, w, h })
+      else ed().setZoneDrawing(false)
+      return
+    }
+    if (d.kind === 'zone') {
+      const z = zoneRect(d)
+      if (z.x !== d.orig.x || z.y !== d.orig.y || z.w !== d.orig.w || z.h !== d.orig.h) ed().updateZone(d.id, { x: z.x, y: z.y, w: z.w, h: z.h })
+      return
+    }
     if (d.kind === 'cp') {
       const rel = sheet.relationships?.find(x => x.id === d.relId)
       const b = rel && r.layout.boxes.get(d.which === 1 ? rel.end1 : rel.end2)
@@ -421,13 +465,14 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
 
   return (
     <div ref={wrap} className={'map-canvas' + (relating ? ' relating' : '') + (commenting ? ' commenting' : '')} tabIndex={0} data-testid="map-canvas"
-      style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : relating ? 'crosshair' : 'default' }}
+      style={{ background: bg, cursor: drag?.kind === 'pan' ? 'grabbing' : relating || zoneDrawing ? 'crosshair' : 'default' }}
       onPointerDownCapture={onCommentPointerDown} onPointerDown={onBgPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
       onContextMenu={e => {
         e.preventDefault()
         const g = (e.target as Element).closest('.topic') as SVGGElement | null
         const id = g?.dataset.id
-        if (!id || readOnly || ed().editingId) return
+        if (readOnly || ed().editingId) return
+        if (!id) { if (!(e.target as Element).closest('.rel, .boundary, .zone, .cm-pin, .cm-pop')) openCanvasMenu(e.clientX, e.clientY, toWorld(e.clientX, e.clientY)); return }
         if (!ed().selection.includes(id)) ed().select([id])
         openTopicMenu(e.clientX, e.clientY, id)
       }}
@@ -439,6 +484,40 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       }}>
       <svg className="bg" width="100%" height="100%" style={{ display: 'block' }}>
         <g transform={`translate(${view.x},${view.y}) scale(${view.zoom})`}>
+          {(sheet.zones ?? []).map(z0 => {
+            const z = drag?.kind === 'zone' && drag.id === z0.id ? { ...z0, ...zoneRect(drag) } : z0
+            const sel = element?.kind === 'zone' && element.id === z.id
+            const title = z.title ?? 'Зона'
+            const tw = Math.max(36, measureLabel(title) + 20)
+            const startZone = (e: React.PointerEvent, mode: string) => {
+              if (e.button !== 0 || readOnly) return
+              e.stopPropagation()
+              ed().selectElement({ kind: 'zone', id: z0.id })
+              ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+              const p = toWorld(e.clientX, e.clientY)
+              updateDrag({ kind: 'zone', id: z0.id, mode, start: p, cur: p, orig: z0 })
+            }
+            return (
+              <g key={z.id} className="zone" data-testid="zone">
+                <g style={{ cursor: readOnly ? 'default' : 'move' }} onPointerDown={e => startZone(e, 'move')}
+                  onDoubleClick={e => { e.stopPropagation(); if (!readOnly) setLabelEdit({ kind: 'zone', id: z.id, x: z.x, y: z.y - 12, value: title }) }}>
+                  <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={4} fill={z.fill ?? 'rgba(155,155,155,.2)'} stroke="rgba(0,0,0,.4)" strokeWidth={1 / Math.max(1, view.zoom)} />
+                  <rect x={z.x} y={z.y - 26} width={tw} height={22} rx={4} fill="rgba(155,155,155,.55)" />
+                  <text x={z.x + 10} y={z.y - 11} fontSize={12} fill="#101010" fontFamily={MAP_FONT} style={{ userSelect: 'none' }}>{title}</text>
+                </g>
+                {sel && <>
+                  <rect x={z.x - 3} y={z.y - 3} width={z.w + 6} height={z.h + 6} rx={5} fill="none" stroke="#2ebdff" strokeWidth={2} pointerEvents="none" />
+                  {!readOnly && ([['nw', 0, 0], ['n', .5, 0], ['ne', 1, 0], ['e', 1, .5], ['se', 1, 1], ['s', .5, 1], ['sw', 0, 1], ['w', 0, .5]] as const).map(([m, fx, fy]) => (
+                    <rect key={m} className="zone-handle" x={z.x - 3 + (z.w + 6) * fx - 3.5} y={z.y - 3 + (z.h + 6) * fy - 3.5} width={7} height={7} rx={1.5}
+                      fill="#fff" stroke="#2ebdff" strokeWidth={1.5} style={{ cursor: m.length === 2 ? (m === 'nw' || m === 'se' ? 'nwse-resize' : 'nesw-resize') : m === 'n' || m === 's' ? 'ns-resize' : 'ew-resize' }}
+                      onPointerDown={e => startZone(e, m)} />
+                  ))}
+                </>}
+              </g>
+            )
+          })}
+          {drag?.kind === 'zone-new' && <rect x={Math.min(drag.a.x, drag.b.x)} y={Math.min(drag.a.y, drag.b.y)} width={Math.abs(drag.b.x - drag.a.x)} height={Math.abs(drag.b.y - drag.a.y)}
+            rx={4} fill="rgba(155,155,155,.2)" stroke="#2ebdff" strokeWidth={1.5} strokeDasharray="4 3" />}
           {r.layout.boundaries.map(b => {
             const color = b.color ?? relColor
             const sel = element?.kind === 'boundary' && element.id === b.id
@@ -575,7 +654,8 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           )}
         </g>
       </svg>
-      {!focusIds && <CommentLayer sheet={sheet} boxes={r.layout.boxes} view={view} readOnly={readOnly} />}
+      {!focusIds && !commentsHidden && <CommentLayer sheet={sheet} boxes={r.layout.boxes} view={view} readOnly={readOnly} />}
+      {zoneDrawing && <div className="relating-hint">Протяните прямоугольник, чтобы создать зону. Esc — отмена.</div>}
       {commenting && <div className="relating-hint">Щёлкните в любом месте карты, чтобы добавить комментарий. Esc — отмена.</div>}
       {peers.filter(p => p.cursor).map(p => (
         <div key={'pc' + p.clientId} className="peer-cursor" data-testid="peer-cursor"
@@ -598,7 +678,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
       {labelEdit && (
         <input className="label-editor" autoFocus defaultValue={labelEdit.value}
           style={{ left: labelEdit.x * view.zoom + view.x - (labelEdit.kind === 'relationship' ? 80 : 0), top: labelEdit.y * view.zoom + view.y - 14 }}
-          placeholder={labelEdit.kind === 'relationship' ? 'Подпись связи' : 'Заголовок границы'}
+          placeholder={labelEdit.kind === 'relationship' ? 'Подпись связи' : labelEdit.kind === 'zone' ? 'Название зоны' : 'Заголовок границы'}
           onKeyDown={e => {
             e.stopPropagation()
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -607,6 +687,7 @@ export default function MapCanvas({ sheet: realSheet, readOnly = false, focusIds
           onBlur={e => {
             const v = e.target.value
             if (labelEdit.kind === 'relationship') ed().updateRelationship(labelEdit.id, { title: v })
+            else if (labelEdit.kind === 'zone') ed().updateZone(labelEdit.id, { title: v || 'Зона' })
             else ed().updateBoundary(labelEdit.id, { title: v })
             setLabelEdit(null)
           }} />

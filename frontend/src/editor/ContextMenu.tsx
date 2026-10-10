@@ -9,8 +9,12 @@ import { MenuItem, SubMenu } from './Chrome'
 import { pickFile, uploadToTopic } from './actions'
 import { insertTask } from './Gantt'
 
-export const useContextMenu = create<{ at: { x: number; y: number; id: string } | null }>(() => ({ at: null }))
+export const useContextMenu = create<{ at: { x: number; y: number; id: string; world?: { x: number; y: number } } | null }>(() => ({ at: null }))
 export const openTopicMenu = (x: number, y: number, id: string) => useContextMenu.setState({ at: { x, y, id } })
+/** меню пустого места холста; world — точка на карте для плавающей темы */
+export const openCanvasMenu = (x: number, y: number, world: { x: number; y: number }) => useContextMenu.setState({ at: { x, y, id: '', world } })
+/** «Скрыть все комментарии» */
+export const useCommentsHidden = create<{ hidden: boolean }>(() => ({ hidden: false }))
 
 export default function ContextMenu() {
   const at = useContextMenu(s => s.at)
@@ -34,6 +38,27 @@ export default function ContextMenu() {
   if (!at) return null
   const ed = useEditor.getState()
   const sheet = ed.sheet()
+  const style = { position: 'fixed' as const, zIndex: 1000, left: pos?.left ?? at.x, top: pos?.top ?? at.y, visibility: (pos ? 'visible' : 'hidden') as 'visible' | 'hidden' }
+  if (!at.id && sheet) {
+    const run = (fn: () => void) => () => { close(); fn() }
+    const hidden = useCommentsHidden.getState().hidden
+    return (
+      <div ref={ref} className="menu ctx-menu" role="menu" aria-label="Меню холста" onContextMenu={e => e.preventDefault()} style={style}>
+        <i className="mm-main" hidden />
+        <MenuItem label="Вставить" hint="⌘ V" disabled={!ed.clipboard} onClick={run(() => { ed.select([]); ed.paste() })} />
+        <div className="menu-sep" />
+        <MenuItem label="Создать зону" hint="⌘ ⌥ Z" onClick={run(() => ed.setZoneDrawing(true))} />
+        <MenuItem label="Вставить плавающую тему" onClick={run(() => ed.addFloating(at.world!.x, at.world!.y - 15))} />
+        <MenuItem label="Вставить связь" hint="⌘ ⇧ R" disabled={!ed.selection.length} onClick={run(() => ed.startRelating())} />
+        <div className="menu-sep" />
+        <MenuItem label="Развернуть все подветки" hint="⌘ ⌥ /" onClick={run(() => { ed.select([sheet.rootTopic.id]); ed.foldAll(false) })} />
+        <MenuItem label={hidden ? 'Показать все комментарии' : 'Скрыть все комментарии'} onClick={run(() => useCommentsHidden.setState({ hidden: !hidden }))} />
+        <div className="menu-sep" />
+        <MenuItem label="Перейти к центральной теме" hint="⌘ R" onClick={run(() => ed.goCentral())} />
+        <MenuItem label="Выделить всё" hint="⌘ A" onClick={run(() => ed.selectAll())} />
+      </div>
+    )
+  }
   const ref0 = sheet ? indexSheet(sheet).get(at.id) : undefined
   if (!sheet || !ref0) return null
   const t = ref0.topic, id = at.id
@@ -42,7 +67,7 @@ export default function ContextMenu() {
   const hasKids = !!t.children?.length
   return (
     <div ref={ref} className={'menu ctx-menu' + ((pos?.left ?? at.x) > window.innerWidth / 2 ? ' flip' : '')} role="menu" aria-label="Меню темы" onContextMenu={e => e.preventDefault()}
-      style={{ position: 'fixed', zIndex: 1000, left: pos?.left ?? at.x, top: pos?.top ?? at.y, visibility: pos ? 'visible' : 'hidden' }}>
+      style={style}>
       <i className="mm-main" hidden />
       <SubMenu label="Вставить">
         <MenuItem icon="note" label="Заметка" onClick={run(() => ed.setPanel('notes'))} />

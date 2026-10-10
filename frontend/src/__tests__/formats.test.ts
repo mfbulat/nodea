@@ -28,7 +28,7 @@ describe('форматы', () => {
     expect(titles(back.sheets[0].rootTopic)).toBe(titles(doc.sheets[0].rootTopic))
   })
   it('маркеры ↔ XMind', () => {
-    for (const m of ['priority-3', 'task-4', 'month-2', 'week-7', 'smiley-sad', 'symbol-check', 'person-red', 'flag-blue'])
+    for (const m of ['priority-3', 'task-4', 'month-2', 'week-7', 'smiley-sad', 'symbol-check', 'person-red', 'flag-blue', 'tag-purple', 'tag-gray', 'symbol-heart', 'symbol-pin'])
       expect(fromXMarker(toXMarker(m))).toBe(m)
   })
   it('.xmind туда и обратно', async () => {
@@ -38,5 +38,11 @@ describe('форматы', () => {
     expect(back.sheets[0].structure).toBe('logic-right')
     expect(r.children![0]).toMatchObject({ markers: ['priority-1', 'task-8'], labels: ['важно'] })
     expect(r.children![0].children![0].task).toEqual({ done: true })
+  })
+  it('.xmind сохраняет зоны и настройки листа', async () => {
+    const d = structuredClone(doc)
+    Object.assign(d.sheets[0], { zones: [{ id: 'z', x: 1, y: 2, w: 30, h: 40, title: 'Идеи' }], palette: 'iris', pitchTheme: 'light', taskSkipWeekends: true })
+    const back = await fromXmind(await toXmind(d))
+    expect(back.sheets[0]).toMatchObject({ zones: [{ id: 'z', title: 'Идеи', w: 30 }], palette: 'iris', pitchTheme: 'light', taskSkipWeekends: true, structure: 'logic-right' })
   })
 })

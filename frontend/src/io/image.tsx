@@ -7,7 +7,7 @@ import { CalloutTail, RelLabel, renderSheet } from '../editor/MapCanvas'
 import { TopicNode, dashOf } from '../editor/TopicView'
 import { edgePath } from '../editor/paths'
 import { relGeometry } from '../editor/relations'
-import { isColored, sheetBackground } from '../editor/themes'
+import { isColored, sheetBackground, MAP_FONT } from '../editor/themes'
 
 const PAD = 40
 const noop = () => {}
@@ -15,7 +15,10 @@ const noop = () => {}
 function StaticMap({ sheet, equations }: { sheet: Sheet; equations: Map<string, string> }) {
   const r = renderSheet(sheet)
   const idx = indexSheet(sheet)
-  const b = r.layout.bounds
+  const lb = r.layout.bounds, zs = sheet.zones ?? []
+  // зоны расширяют границы изображения (с учётом ярлыка над зоной)
+  const b = zs.length ? { minX: Math.min(lb.minX, ...zs.map(z => z.x)), minY: Math.min(lb.minY, ...zs.map(z => z.y - 26)),
+    maxX: Math.max(lb.maxX, ...zs.map(z => z.x + z.w)), maxY: Math.max(lb.maxY, ...zs.map(z => z.y + z.h)) } : lb
   const w = Math.ceil(b.maxX - b.minX + PAD * 2), h = Math.ceil(b.maxY - b.minY + PAD * 2)
   const bg = sheetBackground(sheet)
   const rootStyle = r.styles.get(sheet.rootTopic.id)!
@@ -25,6 +28,13 @@ function StaticMap({ sheet, equations }: { sheet: Sheet; equations: Map<string, 
       style={{ background: bg }}>
       <rect width={w} height={h} fill={bg} />
       <g transform={`translate(${PAD - b.minX},${PAD - b.minY})`}>
+        {zs.map(z => (
+          <g key={z.id}>
+            <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={4} fill={z.fill ?? 'rgba(155,155,155,.2)'} stroke="rgba(0,0,0,.4)" strokeWidth={1} />
+            <rect x={z.x} y={z.y - 26} width={Math.max(36, (z.title ?? 'Зона').length * 7 + 20)} height={22} rx={4} fill="rgba(155,155,155,.55)" />
+            <text x={z.x + 10} y={z.y - 11} fontSize={12} fill="#101010" fontFamily={MAP_FONT}>{z.title ?? 'Зона'}</text>
+          </g>
+        ))}
         {r.layout.boundaries.map(bd => {
           const color = bd.color ?? relColor
           return <g key={bd.id}>

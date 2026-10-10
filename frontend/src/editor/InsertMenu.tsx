@@ -28,7 +28,7 @@ export default function InsertMenu() {
     )}>
       {close => <>
         {item('summary', 'Сводка', ed.addSummary, none || !isChild)(close)}
-        {item('boundary', 'Зона', ed.addBoundary, none, '⌘ ⇧ B')(close)}
+        {item('zone', 'Зона', ed.createZone, false, '⌘ ⌥ Z')(close)}
         <div className="menu-sep" />
         {item('note', 'Заметка', () => ed.setPanel('notes'), none, '⌘ ⇧ N')(close)}
         {item('label', 'Метка', () => ed.setDialog({ kind: 'labels', id }), none, '⌘ ⇧ L')(close)}

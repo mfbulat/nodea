@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import { useDoc } from '../store/doc'
-import type { Boundary, MapDocument, Relationship, Sheet, StructureId, Topic, TopicStyle } from './model'
+import type { Boundary, MapDocument, Relationship, Sheet, StructureId, Topic, TopicStyle, Zone } from './model'
 import { cloneWithNewIds, indexSheet, isAncestor, uid } from './model'
 import { markerGroup } from './markers'
 import { collab } from '../collab/session'
@@ -75,7 +75,7 @@ function prune(sheet: Sheet) {
   }
 }
 
-export type ElementSel = { kind: 'relationship' | 'boundary'; id: string } | null
+export type ElementSel = { kind: 'relationship' | 'boundary' | 'zone'; id: string } | null
 export type PanelId = 'format' | 'versions' | 'notes' | 'comments' | 'markers' | 'filter' | null
 
 let layoutRef: LayoutResult | null = null
@@ -107,6 +107,13 @@ interface EditorState {
   setToolbarText: (v: boolean) => void
   /** правка всего документа (все листы) одним шагом отмены */
   mutateDocument: (fn: (d: MapDocument) => void) => void
+  /** режим рисования зоны (протянуть прямоугольник на холсте) */
+  zoneDrawing: boolean
+  setZoneDrawing: (v: boolean) => void
+  addZone: (z: Omit<Zone, 'id'>) => void
+  /** «Создать зону»: вокруг выделенных тем или режим рисования */
+  createZone: () => void
+  updateZone: (id: string, patch: Partial<Zone>) => void
   /** режим «щёлкните по карте, чтобы прокомментировать» */
   commenting: boolean
   /** открытое обсуждение: тема и (для нового) место метки */
@@ -232,6 +239,21 @@ export const useEditor = create<EditorState>((set, get) => {
     view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false, markerTab: 'markers', taskDialog: null,
     setMarkerTab: t => set({ markerTab: t }),
     commenting: false, thread: null,
+    zoneDrawing: false,
+    setZoneDrawing: v => set({ zoneDrawing: v }),
+    createZone: () => {
+      const boxes = get().selection.map(id => currentLayout()?.boxes.get(id)).filter(Boolean) as { x: number; y: number; w: number; h: number }[]
+      if (!boxes.length) { set({ zoneDrawing: true }); return }
+      const x1 = Math.min(...boxes.map(b => b.x)) - 24, y1 = Math.min(...boxes.map(b => b.y)) - 24
+      const x2 = Math.max(...boxes.map(b => b.x + b.w)) + 24, y2 = Math.max(...boxes.map(b => b.y + b.h)) + 24
+      get().addZone({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 })
+    },
+    addZone: z => {
+      const id = uid()
+      mutate(sh => { (sh.zones ??= []).push({ id, title: 'Зона', ...z }) })
+      set({ zoneDrawing: false, selection: [], element: { kind: 'zone', id } })
+    },
+    updateZone: (id, patch) => mutate(sh => { const z = sh.zones?.find(x => x.id === id); if (z) Object.assign(z, patch) }),
     nav: null, setNav: n => set(n ? { nav: n, taskDialog: null } : { nav: null }),
     toolbarText: (() => { try { return localStorage.getItem('mm.toolbarText') === '1' } catch { return false } })(),
     setToolbarText: v => { try { localStorage.setItem('mm.toolbarText', v ? '1' : '0') } catch { /* нет хранилища */ } set({ toolbarText: v }) },
@@ -577,6 +599,7 @@ export const useEditor = create<EditorState>((set, get) => {
       const e = get().element
       if (!e) return
       if (e.kind === 'relationship') mutate(sh => { sh.relationships = sh.relationships?.filter(r => r.id !== e.id) })
+      else if (e.kind === 'zone') mutate(sh => { sh.zones = sh.zones?.filter(z => z.id !== e.id); if (!sh.zones?.length) delete sh.zones })
       else mutate(sh => {
         const walk = (t: Topic) => {
           if (t.boundaries) t.boundaries = t.boundaries.filter(b => b.id !== e.id)

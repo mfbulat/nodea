@@ -199,7 +199,8 @@ export async function toXmind(doc: MapDocument): Promise<Blob> {
         controlPoints: r.cp1 && r.cp2 ? { 0: r.cp1, 1: r.cp2 } : undefined,
         'x-mindmap': r,
       })),
-      'x-mindmap': { theme: sh.theme, background: sh.background, rainbow: sh.rainbow, structure: sh.structure },
+      // все собственные настройки листа (тема, цветовая тема, зоны, презентация, задачи…) — в своём поле
+      'x-mindmap': Object.fromEntries(Object.entries(sh).filter(([k]) => !['id', 'title', 'rootTopic', 'floatingTopics', 'relationships'].includes(k))),
     })
   }
   zip.file('content.json', JSON.stringify(sheets))
@@ -309,8 +310,8 @@ export async function fromXmind(file: Blob): Promise<MapDocument> {
     const own = (xs['x-mindmap'] ?? {}) as Partial<Sheet>
     const sheet: Sheet = {
       id: String(xs.id ?? uid()), title: String(xs.title ?? 'Лист'), rootTopic,
+      ...own,
       structure: own.structure ?? fromXStruct(root.structureClass as string) ?? 'mindmap',
-      theme: own.theme, background: own.background, rainbow: own.rainbow,
     }
     delete rootTopic.structure
     if (ch.detached?.length) sheet.floatingTopics = await Promise.all(ch.detached.map(topic))

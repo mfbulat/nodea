@@ -82,6 +82,8 @@ export interface Topic {
   [k: string]: unknown
 }
 
+export interface Zone { id: string; x: number; y: number; w: number; h: number; title?: string; fill?: string }
+
 export interface Comment { id: string; author: string; text: string; createdAt: string }
 
 export interface Boundary { id: string; ids: string[]; title?: string; color?: string; lineStyle?: BorderStyle; fill?: string }
@@ -136,6 +138,8 @@ export interface Sheet {
   /** подписи маркеров в легенде */
   markerNames?: Record<string, string>
   relationships?: Relationship[]
+  /** зоны: свободные области на холсте с заголовком (как «Zone» в веб-версии) */
+  zones?: Zone[]
   [k: string]: unknown
 }
 

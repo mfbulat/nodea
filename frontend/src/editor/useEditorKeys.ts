@@ -53,6 +53,7 @@ export function useEditorKeys(enabled: boolean) {
       const k = e.key
       const handled = () => { e.preventDefault(); e.stopPropagation() }
 
+      if (mod && e.altKey && is(e, 'KeyZ')) { handled(); ed().createZone(); return }
       if (mod && is(e, 'KeyZ')) { handled(); e.shiftKey ? ed().redo() : ed().undo(); return }
       if (mod && is(e, 'KeyY')) { handled(); ed().redo(); return }
       // сочетания как в XMind (⌘ на macOS, Ctrl в других системах)
@@ -92,7 +93,7 @@ export function useEditorKeys(enabled: boolean) {
       if (mod && is(e, 'Digit0')) { handled(); e.shiftKey ? canvasApi.fit() : canvasApi.zoomTo(1); return }
       if (mod) return
 
-      if (k === 'Escape') { if (!ed().relating) ed().select([]); return }
+      if (k === 'Escape') { if (ed().zoneDrawing) { ed().setZoneDrawing(false); return } if (!ed().relating) ed().select([]); return }
       if (ed().element) {
         if (k === 'Delete' || k === 'Backspace') { handled(); ed().removeElement() }
         return
