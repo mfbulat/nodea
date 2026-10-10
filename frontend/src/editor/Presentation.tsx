@@ -30,7 +30,7 @@ export function buildSlides(root: Topic): Slide[] {
   walk(root, [], true)
   return out
 }
-const stepsOf = (s: Slide) => (s.kind === 'overview' && s.reveal ? s.items.length : 0)
+export const stepsOf = (s: Slide) => (s.kind === 'overview' && s.reveal ? s.items.length : 0)
 
 const RATIOS: Record<string, number> = { '16:9': 16 / 9, '4:3': 4 / 3, '9:16': 9 / 16, '3:4': 3 / 4 }
 

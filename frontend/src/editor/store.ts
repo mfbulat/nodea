@@ -99,6 +99,14 @@ interface EditorState {
   markerTab: 'markers' | 'stickers' | 'illustrations'
   taskDialog: string | null
   setMarkerTab: (t: EditorState['markerTab']) => void
+  /** левая навигационная панель (как в веб-версии) */
+  nav: null | 'outline' | 'notes' | 'tags' | 'resources'
+  setNav: (n: EditorState['nav']) => void
+  /** панель инструментов: только значки или значки с подписями */
+  toolbarText: boolean
+  setToolbarText: (v: boolean) => void
+  /** правка всего документа (все листы) одним шагом отмены */
+  mutateDocument: (fn: (d: MapDocument) => void) => void
   /** режим «щёлкните по карте, чтобы прокомментировать» */
   commenting: boolean
   /** открытое обсуждение: тема и (для нового) место метки */
@@ -220,9 +228,13 @@ export const useEditor = create<EditorState>((set, get) => {
     view: { zoom: 1, x: 0, y: 0 }, clipboard: null, styleClipboard: null, painting: false, gantt: false, mapShot: false, markerTab: 'markers', taskDialog: null,
     setMarkerTab: t => set({ markerTab: t }),
     commenting: false, thread: null,
+    nav: null, setNav: n => set(n ? { nav: n, taskDialog: null } : { nav: null }),
+    toolbarText: (() => { try { return localStorage.getItem('mm.toolbarText') === '1' } catch { return false } })(),
+    setToolbarText: v => { try { localStorage.setItem('mm.toolbarText', v ? '1' : '0') } catch { /* нет хранилища */ } set({ toolbarText: v }) },
+    mutateDocument: fn => mutateDoc(fn),
     setCommenting: v => set({ commenting: v }), setThread: t => set({ thread: t, commenting: false }),
     resolveThread: (id, resolved) => mutate(sh => { const t = locate(sh, id)?.topic; if (t) { if (resolved) t.commentsResolved = true; else delete t.commentsResolved } }),
-    removeThread: id => { mutate(sh => { const t = locate(sh, id)?.topic; if (t) { delete t.comments; delete t.commentPos; delete t.commentsResolved } }); if (get().thread?.id === id) set({ thread: null }) }, setTaskDialog: id => set({ taskDialog: id }),
+    removeThread: id => { mutate(sh => { const t = locate(sh, id)?.topic; if (t) { delete t.comments; delete t.commentPos; delete t.commentsResolved } }); if (get().thread?.id === id) set({ thread: null }) }, setTaskDialog: id => set(id ? { taskDialog: id, nav: null } : { taskDialog: null }),
     setGantt: v => set({ gantt: v }), setMapShot: v => set({ mapShot: v }),
     element: null, panel: null, relating: null, dialog: null, userName: '',
     viewMode: 'map', zen: false, presenting: false, drillId: null, filter: null,

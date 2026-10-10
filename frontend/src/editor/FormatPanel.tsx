@@ -554,6 +554,11 @@ function ElementFormat({ sheet }: { sheet: Sheet }) {
 export default function FormatPanel({ sheet }: { sheet: Sheet }) {
   const { element } = useEditor()
   const [tab, setTab] = useState<'style' | 'pitch' | 'map'>('style')
+  useEffect(() => {
+    const f = (e: Event) => setTab((e as CustomEvent).detail)
+    window.addEventListener('mm:format-tab', f)
+    return () => window.removeEventListener('mm:format-tab', f)
+  }, [])
   return (
     <div className="side-panel format-panel" data-testid="format-panel">
       <div className="seg-tabs">

@@ -18,7 +18,7 @@ import Dialogs from '../editor/Dialogs'
 import { Legend, MarkersPanel, NotesPanel, SheetTabs } from '../editor/SidePanels'
 import { CommentsPanel } from '../editor/Comments'
 import Outliner from '../editor/Outliner'
-import SearchBar from '../editor/SearchBar'
+import NavPanel from '../editor/NavPanel'
 import FilterPanel from '../editor/FilterPanel'
 import Presentation from '../editor/Presentation'
 import { useAuth } from '../store/auth'
@@ -47,7 +47,7 @@ function useModeKeys(enabled: boolean) {
       const mod = e.metaKey || e.ctrlKey
       const k = e.key.toLowerCase()
       const code = (c: string, ...keys: string[]) => e.code ? e.code === c : keys.includes(k)
-      if (mod && !e.shiftKey && !e.altKey && code('KeyF', 'f', 'а')) { e.preventDefault(); ed.setSearch({ open: true }) }
+      if (mod && !e.shiftKey && !e.altKey && code('KeyF', 'f', 'а')) { e.preventDefault(); ed.setNav('outline') }
       else if (mod && e.altKey && code('KeyF', 'f', 'а', 'ƒ')) { e.preventDefault(); ed.setZen(!ed.zen) }
       else if (mod && e.altKey && code('KeyG', 'g', 'п', '©')) { e.preventDefault(); ed.setGantt(!ed.gantt) }
       else if (mod && e.altKey && code('KeyO', 'o', 'щ')) { e.preventDefault(); ed.setViewMode(ed.viewMode === 'map' ? 'outline' : 'map') }
@@ -89,7 +89,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const sheetId = useEditor(s => s.sheetId)
   const panel = useEditor(s => s.panel)
   const setPanel = useEditor(s => s.setPanel)
-  const { viewMode, zen, presenting, gantt, taskDialog } = useEditor()
+  const { viewMode, zen, presenting, gantt, taskDialog, nav: navPanel } = useEditor()
   const email = useAuth(s => s.user?.email ?? '')
   const [error, setError] = useState('')
   const readOnly = role === 'view'
@@ -156,7 +156,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
   const hasPanel = !embed && !zen && !!panel && !(panel === 'format' && (viewMode !== 'map' || readOnly)) && !(panel === 'markers' && readOnly)
 
   return (
-    <div className={'editor' + (zen || embed ? ' zen' : '') + (hasPanel ? ' has-panel' : '') + (taskDialog && !zen && !embed ? ' has-task' : '')}>
+    <div className={'editor' + (zen || embed ? ' zen' : '') + (hasPanel ? ' has-panel' : '') + (taskDialog && !zen && !embed ? ' has-task' : '') + (navPanel && !zen && !embed ? ' has-nav' : '')}>
       {!zen && !embed && <div className="topbar-x">
         <TopLeft guest={!user} mapId={id} mainMenu={<MainMenu isOwner={role === 'owner'} onHelp={() => setHelp(true)}
           onShare={role === 'owner' ? () => setShareOpen(true) : undefined} onExport={doExport} onImport={doImport} onSaveTemplate={saveTemplate} />} />
@@ -165,7 +165,6 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       </div>}
       <div className="canvas">
         {viewMode === 'map' ? <MapCanvas sheet={sheet} readOnly={readOnly} /> : <Outliner sheet={sheet} readOnly={readOnly} />}
-        <SearchBar />
         {zen && !embed && <button className="island zen-exit" onClick={() => ed.setZen(false)} title="Esc">Выйти из ZEN</button>}
         {!zen && <Crumbs sheet={sheet} />}
         {!zen && <Legend sheet={sheet} readOnly={readOnly} />}
@@ -187,6 +186,7 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       <Dialogs />
       {gantt && !zen && <Gantt sheet={sheet} />}
       {!zen && !embed && <TaskPanel sheet={sheet} />}
+      {!zen && !embed && <NavPanel sheet={sheet} />}
       {help && <HelpDialog onClose={() => setHelp(false)} />}
       {shareOpen && id && <ShareDialog mapId={id} onClose={() => setShareOpen(false)} onExport={doExport} />}
     </div>

@@ -1,3 +1,4 @@
+import { create } from 'zustand'
 // Интерфейс редактора (как веб-версия): верхняя полоса на сером фоне, белый холст-карточка,
 // правая панель-карточка, нижняя строка с листами и масштабом.
 import { ReactNode, useEffect, useRef, useState } from 'react'
@@ -31,10 +32,11 @@ export function Tip({ title, keys, desc, children, below = true }: { title: stri
 export function IconButton({ icon, label, onClick, active, disabled, children, keys, desc }: {
   icon: IconName; label: string; onClick?: () => void; active?: boolean; disabled?: boolean; children?: ReactNode; keys?: string; desc?: string
 }) {
+  const withText = useEditor(s => s.toolbarText)
   return (
     <Tip title={label} keys={keys} desc={desc}>
-      <button className={'ibtn' + (active ? ' on' : '')} onClick={onClick} disabled={disabled} aria-label={label}>
-        <Icon name={icon} />{children}
+      <button className={'ibtn' + (active ? ' on' : '') + (withText ? ' with-text' : '')} onClick={onClick} disabled={disabled} aria-label={label}>
+        <Icon name={icon} />{withText && <span className="ibtn-text">{label}</span>}{children}
       </button>
     </Tip>
   )
@@ -91,26 +93,33 @@ const SAVE: Record<string, string> = {
 /** Слева: меню, название, избранное, путь */
 /** Адаптивная верхняя панель как в веб-версии: по ширине окна (открытая боковая панель отнимает ~300px)
  * прячутся «Сводка/Граница», затем «Связь», подпись под названием, «Гант», затем «Презентация/Комментарии». */
+/** «Избранное» для текущей карты: общее для звёздочки в заголовке и пункта меню «Файл» */
+export const useStar = create<{ starred: boolean; mapId: string | null }>(() => ({ starred: false, mapId: null }))
+export function toggleStar() {
+  const { starred, mapId } = useStar.getState()
+  if (!mapId) return
+  useStar.setState({ starred: !starred })
+  api(`/api/maps/${mapId}`, { method: 'PATCH', json: { starred: !starred } }).catch(() => useStar.setState({ starred }))
+}
+
 export function useBarFit() {
   const [w, setW] = useState(window.innerWidth)
   useEffect(() => { const f = () => setW(window.innerWidth); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [])
   const panel = useEditor(s => s.panel)
-  const free = w - (panel ? 300 : 0)
-  return { summary: free >= 1000, relation: free >= 930, subtitle: w - (panel ? 200 : 0) >= 900, gantt: free >= 900, present: free >= 800 }
+  const left = useEditor(s => !!(s.nav || s.taskDialog))
+  const side = (panel ? 300 : 0) + (left ? 300 : 0)
+  const free = w - side
+  return { summary: free >= 1000, relation: free >= 930, subtitle: w - side + (side ? 100 : 0) >= 900, gantt: free >= 900, present: free >= 800 }
 }
 
 export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest: boolean; mapId?: string }) {
   const { title, setTitle, role, saveState } = useDoc()
   const status = useCollab(s => s.status)
-  const [starred, setStarred] = useState(false)
+  const starred = useStar(s => s.starred)
   useEffect(() => {
-    if (role === 'owner' && mapId) api<{ starred?: boolean }>(`/api/maps/${mapId}`).then(m => setStarred(!!m.starred)).catch(() => {})
+    useStar.setState({ starred: false, mapId: mapId ?? null })
+    if (role === 'owner' && mapId) api<{ starred?: boolean }>(`/api/maps/${mapId}`).then(m => useStar.setState({ starred: !!m.starred })).catch(() => {})
   }, [mapId, role])
-  const toggleStar = () => {
-    if (!mapId) return
-    setStarred(s => !s)
-    api(`/api/maps/${mapId}`, { method: 'PATCH', json: { starred: !starred } }).catch(() => setStarred(s => !s))
-  }
   const fit = useBarFit()
   const state = status === 'offline' ? 'Нет связи — изменения синхронизируются при подключении' : status === 'connecting' ? 'Подключение…'
     : role === 'owner' ? SAVE[saveState] : role === 'view' ? 'Только просмотр' : 'Редактирование по ссылке'
@@ -190,14 +199,18 @@ export function TopRight({ onShare, isOwner, outline }: { onShare?: () => void; 
 }
 
 /** Главное меню «☰» */
+const EXPORT_MENU: [string, string][] = [['png', 'PNG'], ['jpeg', 'JPEG'], ['svg', 'SVG'], ['pdf', 'PDF'], ['md', 'Markdown'], ['docx', 'Word'], ['xlsx', 'Excel'],
+  ['pptx', 'PowerPoint (презентация)'], ['webm', 'Видео презентации'], ['opml', 'OPML'], ['textbundle', 'TextBundle'], ['tasks-xlsx', 'Excel (задачи)'], ['ics', 'Календарь (задачи)']]
+
 export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveTemplate }: {
   isOwner: boolean; onHelp: () => void; onShare?: () => void
   onExport: (fmt: string) => void; onImport: () => void; onSaveTemplate: () => void
 }) {
+  const starred = useStar(s => s.starred)
   const ed = useEditor.getState()
   const nav = useNavigate()
   const user = useAuth(s => s.user)
-  const { viewMode, zen, drillId } = useEditor()
+  const { drillId, selection, nav: navOpen, toolbarText } = useEditor()
   const cu = useCollab()
   const { past, future } = useEditor()
   const canUndo = collab() ? cu.canUndo : past.length > 0
@@ -207,58 +220,63 @@ export function MainMenu({ isOwner, onHelp, onShare, onExport, onImport, onSaveT
       <Tip title="Меню"><button className={'ibtn' + (open ? ' on' : '')} onClick={toggle} aria-label="Меню"><Icon name="hamburger" /></button></Tip>
     )}>
       {close => <>
-        {user && <MenuItem icon="chevronRight" label="Назад к файлам" onClick={() => { close(); nav('/') }} />}
+        <i className="mm-main" hidden />
+        {user && <MenuItem icon="arrowLeft" label="Назад к файлам" onClick={() => { close(); nav('/') }} />}
         <div className="menu-sep" />
-        <SubMenu label="Файл">
+        <SubMenu icon="file" label="Файл">
           {user && <MenuItem label="Новая карта" onClick={async () => { close(); const m = await api<{ id: string }>('/api/maps', { method: 'POST', json: { title: 'Новая карта' } }); nav(`/map/${m.id}`) }} />}
-          {isOwner && <MenuItem label="Новый лист" hint="⌥ ⌘ N" onClick={() => { close(); ed.addSheet() }} />}
+          {isOwner && <MenuItem label="Новый лист" onClick={() => { close(); ed.addSheet() }} />}
+          <div className="menu-sep" />
           {isOwner && <MenuItem label="Переименовать" onClick={() => { close(); (document.querySelector('.title-input') as HTMLInputElement)?.select() }} />}
+          {isOwner && <MenuItem label={starred ? 'Убрать из избранного' : 'Добавить в избранное'} onClick={() => { close(); toggleStar() }} />}
           {isOwner && <MenuItem label="История версий" onClick={() => { close(); ed.setPanel('versions') }} />}
+          <div className="menu-sep" />
           {user && <MenuItem label="Импорт файла" onClick={() => { close(); onImport() }} />}
-          <MenuItem label="Скачать (.xmind)" onClick={() => { close(); onExport('xmind') }} />
+          <MenuItem label="Скачать" onClick={() => { close(); onExport('xmind') }} />
           {user && <MenuItem label="Сохранить как шаблон" onClick={() => { close(); onSaveTemplate() }} />}
         </SubMenu>
-        <SubMenu label="Правка">
+        <SubMenu icon="edit" label="Правка">
           <MenuItem label="Отменить" hint="⌘ Z" disabled={!canUndo} onClick={() => { close(); ed.undo() }} />
           <MenuItem label="Повторить" hint="⇧ ⌘ Z" disabled={!canRedo} onClick={() => { close(); ed.redo() }} />
           <div className="menu-sep" />
-          <MenuItem label="Дублировать" hint="⌘ D" onClick={() => { close(); ed.duplicate() }} />
-          <MenuItem label="Удалить только тему" hint="⌘ ⌫" onClick={() => { close(); ed.deleteSingle() }} />
-          <MenuItem label="Свернуть все подветки" hint="⌥ ⌘ /" onClick={() => { close(); ed.foldAll() }} />
-          <MenuItem label="Перейти к центральной теме" hint="⌘ R" onClick={() => { close(); ed.goCentral() }} />
-          <SubMenu label="Выделить">
-            <MenuItem label="Все подтемы" onClick={() => { close(); ed.selectBy('subtopics') }} />
-            <MenuItem label="Все соседние темы" onClick={() => { close(); ed.selectBy('siblings') }} />
-            <MenuItem label="Все темы этого уровня" onClick={() => { close(); ed.selectBy('level') }} />
-            <MenuItem label="Все плавающие темы" onClick={() => { close(); ed.selectBy('floating') }} />
-            <MenuItem label="Всё" hint="⌘ A" onClick={() => { close(); ed.selectAll() }} />
-          </SubMenu>
-          <div className="menu-sep" />
-          <MenuItem label="Поиск" hint="⌘ F" onClick={() => { close(); ed.setSearch({ open: true }) }} />
-        </SubMenu>
-        <SubMenu label="Вид">
-          <MenuItem label={(viewMode === 'map' ? '✓ ' : '   ') + 'Интеллект-карта'} onClick={() => { close(); ed.setViewMode('map') }} />
-          <MenuItem label={(viewMode === 'outline' ? '✓ ' : '   ') + 'Структура'} onClick={() => { close(); ed.setViewMode('outline') }} />
-          <div className="menu-sep" />
-          <MenuItem label="Увеличить" hint="⌘ +" onClick={() => canvasApi.zoomBy(1.2)} />
-          <MenuItem label="Уменьшить" hint="⌘ −" onClick={() => canvasApi.zoomBy(1 / 1.2)} />
-          <MenuItem label="Реальный размер" hint="⌘ 0" onClick={() => { close(); canvasApi.zoomTo(1) }} />
-          <MenuItem label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
-          <div className="menu-sep" />
-          <MenuItem label={drillId ? 'Показать всю карту' : 'Показать только ветку'} hint="⌘ ;" onClick={() => { close(); drillId ? ed.drillUp() : ed.drillDown() }} />
-          <MenuItem label={(zen ? '✓ ' : '') + 'ZEN-режим'} hint="⌥ ⌘ F" onClick={() => { close(); ed.setZen(!zen) }} />
-          <MenuItem label="Диаграмма Ганта" hint="⌥ ⌘ G" onClick={() => { close(); ed.setGantt(true) }} />
-          <MenuItem label="Презентация" hint="⌥ ⌘ P" onClick={() => { close(); ed.setPresenting(true) }} />
-          <MenuItem label="Фильтр по маркерам и меткам" onClick={() => { close(); ed.setPanel('filter') }} />
+          <MenuItem label="Поиск" hint="⌘ F" onClick={() => { close(); ed.setNav('outline') }} />
         </SubMenu>
         <div className="menu-sep" />
-        {onShare && <MenuItem label="Поделиться" onClick={() => { close(); onShare() }} />}
-        <SubMenu label="Экспортировать как">
-          {[['png', 'PNG'], ['svg', 'SVG'], ['pdf', 'PDF'], ['md', 'Markdown'], ['docx', 'Word'], ['xlsx', 'Excel'], ['pptx', 'PowerPoint'],
-            ['opml', 'OPML'], ['mm', 'FreeMind'], ['xmind', 'XMind']].map(([f, l]) => <MenuItem key={f} label={l} onClick={() => { close(); onExport(f) }} />)}
+        <SubMenu icon="eye" label="Вид">
+          <MenuItem icon="actualSize" label="Реальный размер" onClick={() => { close(); canvasApi.zoomTo(1) }} />
+          <MenuItem icon="fit" label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
+          <div className="menu-sep" />
+          <MenuItem icon="branchOnly" label={drillId ? 'Показать всю карту' : 'Показать только ветку'} disabled={!drillId && !selection.length} onClick={() => { close(); drillId ? ed.drillUp() : ed.drillDown() }} />
+          <div className="menu-sep" />
+          <MenuItem icon="gantt" label="Диаграмма Ганта" onClick={() => { close(); ed.setGantt(true) }} />
+          <MenuItem icon="present" label="Режим презентации" onClick={() => { close(); ed.setPresenting(true) }} />
+          <div className="menu-sep" />
+          <SubMenu icon="navPanel" label="Навигационная панель">
+            <MenuItem label="Структура" checked={navOpen === 'outline'} onClick={() => { close(); ed.setNav('outline') }} />
+            <MenuItem label="Заметки" checked={navOpen === 'notes'} onClick={() => { close(); ed.setNav('notes') }} />
+            <MenuItem label="Маркеры и метки" checked={navOpen === 'tags'} onClick={() => { close(); ed.setNav('tags') }} />
+            <MenuItem label="Ресурсы" checked={navOpen === 'resources'} onClick={() => { close(); ed.setNav('resources') }} />
+          </SubMenu>
+          <SubMenu icon="panel" label="Панель формата">
+            <MenuItem label="Стиль" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'style' })), 30) }} />
+            <MenuItem label="Презентация" disabled={!selection.length} onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'pitch' })), 30) }} />
+            <MenuItem label="Карта" onClick={() => { close(); ed.setPanel('format'); setTimeout(() => window.dispatchEvent(new CustomEvent('mm:format-tab', { detail: 'map' })), 30) }} />
+          </SubMenu>
+          <div className="menu-sep" />
+          <SubMenu icon="toolbar" label="Панель инструментов">
+            <MenuItem label="Только значки" checked={!toolbarText} onClick={() => { close(); ed.setToolbarText(false) }} />
+            <MenuItem label="Значки и текст" checked={toolbarText} onClick={() => { close(); ed.setToolbarText(true) }} />
+          </SubMenu>
         </SubMenu>
-        <MenuItem label="Сочетания клавиш" onClick={() => { close(); onHelp() }} />
-        <MenuItem label="Печать" hint="⌘ P" onClick={() => { close(); setTimeout(() => window.print(), 50) }} />
+        <div className="menu-sep" />
+        {onShare && <MenuItem icon="shareNodes" label="Поделиться" onClick={() => { close(); onShare() }} />}
+        <SubMenu icon="upload" label="Экспортировать как">
+          {EXPORT_MENU.map(([f, l]) => <MenuItem key={f} label={l} onClick={() => { close(); onExport(f) }} />)}
+        </SubMenu>
+        <div className="menu-sep" />
+        <MenuItem icon="keyboard" label="Сочетания клавиш" onClick={() => { close(); onHelp() }} />
+        <MenuItem icon="print" label="Печать" onClick={() => { close(); setTimeout(() => window.print(), 50) }} />
+        <MenuItem icon="feedback" label="Отзыв" onClick={() => { close(); window.open('https://github.com/mfbulat/nodea/issues/new', '_blank', 'noopener') }} />
       </>}
     </Dropdown>
   )
@@ -276,7 +294,7 @@ export function BottomRight({ sheet }: { sheet: Sheet }) {
           <button className={'zoom-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Масштаб">{Math.round(view.zoom * 100)}%<Icon name="chevron" size={14} /></button>
         )}>
           {close => <>
-            {[50, 80, 100, 120, 150, 200, 300, 400, 500].map(z => <MenuItem key={z} label={`${z}%`} onClick={() => { close(); canvasApi.zoomTo(z / 100) }} />)}
+            {[20, 50, 80, 100, 120, 150, 200, 300, 400, 500].map(z => <MenuItem key={z} label={`${z}%`} onClick={() => { close(); canvasApi.zoomTo(z / 100) }} />)}
             <div className="menu-sep" />
             <MenuItem label="Вписать карту" onClick={() => { close(); canvasApi.fit() }} />
           </>}

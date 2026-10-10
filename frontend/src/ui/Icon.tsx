@@ -1,5 +1,15 @@
 // Собственный набор линейных иконок 20×20 (stroke = currentColor).
 const P: Record<string, JSX.Element> = {
+  arrowLeft: <path d="M16 10H4.5M9 5.5L4.5 10 9 14.5" />,
+  edit: <><path d="M15.5 10.5v5a1 1 0 01-1 1h-10a1 1 0 01-1-1v-10a1 1 0 011-1h5" /><path d="M14 3.5l2.5 2.5-6 6H8V9.5z" /></>,
+  eye: <><path d="M2.5 10S5.2 5 10 5s7.5 5 7.5 5-2.7 5-7.5 5-7.5-5-7.5-5z" /><circle cx="10" cy="10" r="2.2" /></>,
+  shareNodes: <><circle cx="5" cy="10" r="2" /><circle cx="15" cy="5" r="2" /><circle cx="15" cy="15" r="2" /><path d="M6.8 9l6.4-3.1M6.8 11l6.4 3.1" /></>,
+  feedback: <><rect x="3" y="3.5" width="14" height="11" rx="2" /><path d="M7 14.5l-1 3 4-3M6.5 7.5h7M6.5 10.5h4" /></>,
+  actualSize: <><text x="2.5" y="13.5" fontSize="7.5" fontWeight="700" stroke="none" fill="currentColor">100%</text></>,
+  fit: <><path d="M3.5 7V3.5H7M13 3.5h3.5V7M16.5 13v3.5H13M7 16.5H3.5V13" /><rect x="6.5" y="7.5" width="7" height="5" rx="1" /></>,
+  branchOnly: <path d="M6 4.5v11M14 4.5v11M10 7v6" />,
+  navPanel: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12M4.8 7.5h1.5M4.8 10h1.5" /></>,
+  toolbar: <><rect x="3" y="4.5" width="14" height="11" rx="2" /><path d="M3 8h14" /></>,
   home: <path d="M3.5 9.5L10 4l6.5 5.5M5.5 8v8h9V8" />,
   undo: <path d="M7 5L3.5 8.5 7 12M4 8.5h7.5a4 4 0 010 8H9" />,
   redo: <path d="M13 5l3.5 3.5L13 12M16 8.5H8.5a4 4 0 000 8H11" />,

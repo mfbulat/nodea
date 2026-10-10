@@ -122,8 +122,8 @@ export async function sheetToSvg(sheet: Sheet): Promise<string> {
 }
 
 /** PNG через html-to-image: встраивает шрифты (в т.ч. KaTeX) и изображения */
-export async function sheetToPng(sheet: Sheet, pixelRatio = 2): Promise<{ dataUrl: string; width: number; height: number }> {
-  const { toPng } = await import('html-to-image')
+export async function sheetToPng(sheet: Sheet, pixelRatio = 2, jpeg = false): Promise<{ dataUrl: string; width: number; height: number }> {
+  const { toPng, toJpeg } = await import('html-to-image')
   const { markup, width, height } = sheetSvgMarkup(sheet, await renderEquations(sheet))
   const host = document.createElement('div')
   host.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;height:${height}px;`
@@ -133,7 +133,7 @@ export async function sheetToPng(sheet: Sheet, pixelRatio = 2): Promise<{ dataUr
     // слишком большие карты ограничиваем по площади холста браузера
     const maxSide = 16000
     const ratio = Math.min(pixelRatio, maxSide / width, maxSide / height)
-    const dataUrl = await toPng(host.firstElementChild as HTMLElement, { pixelRatio: ratio, backgroundColor: sheetBackground(sheet), cacheBust: false })
+    const dataUrl = await (jpeg ? toJpeg : toPng)(host.firstElementChild as HTMLElement, { pixelRatio: ratio, backgroundColor: sheetBackground(sheet), cacheBust: false, quality: 0.95 })
     return { dataUrl, width, height }
   } finally {
     host.remove()

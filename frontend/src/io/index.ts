@@ -1,7 +1,7 @@
 import type { MapDocument, Sheet } from '../editor/model'
 import { indexSheet, uid } from '../editor/model'
 
-export type ExportFormat = 'xmind' | 'png' | 'svg' | 'pdf' | 'md' | 'opml' | 'mm' | 'docx' | 'xlsx' | 'pptx'
+export type ExportFormat = 'xmind' | 'png' | 'jpeg' | 'svg' | 'pdf' | 'md' | 'opml' | 'mm' | 'docx' | 'xlsx' | 'pptx' | 'webm' | 'textbundle' | 'tasks-xlsx' | 'ics'
 
 export const EXPORTS: { id: ExportFormat; label: string }[] = [
   { id: 'xmind', label: 'XMind (.xmind)' }, { id: 'png', label: 'PNG' }, { id: 'svg', label: 'SVG' },
@@ -35,6 +35,15 @@ export async function exportMap(fmt: ExportFormat, doc: MapDocument, sheet: Shee
       const { dataUrl } = await sheetToPng(sheet, 2)
       return download(await (await fetch(dataUrl)).blob(), name + '.png')
     }
+    case 'jpeg': {
+      const { sheetToPng } = await import('./image')
+      const { dataUrl } = await sheetToPng(sheet, 2, true)
+      return download(await (await fetch(dataUrl)).blob(), name + '.jpg')
+    }
+    case 'webm': { const { pitchToWebm } = await import('./video'); return download(await pitchToWebm(sheet), name + '.webm') }
+    case 'textbundle': { const { toTextBundle } = await import('./bundle'); return download(await toTextBundle(doc), name + '.textpack') }
+    case 'tasks-xlsx': { const { tasksToXlsx } = await import('./tasks'); return download(await tasksToXlsx(doc), name + ' — задачи.xlsx') }
+    case 'ics': { const { tasksToIcs } = await import('./tasks'); return download(text(tasksToIcs(doc, title), 'text/calendar'), name + '.ics') }
     case 'svg': { const { sheetToSvg } = await import('./image'); return download(text(await sheetToSvg(sheet), 'image/svg+xml'), name + '.svg') }
     case 'pdf': { const { sheetsToPdf } = await import('./image'); return download(await sheetsToPdf(doc.sheets), name + '.pdf') }
     case 'md': { const { toMarkdown } = await import('./text'); return download(text(toMarkdown(doc), 'text/markdown'), name + '.md') }
