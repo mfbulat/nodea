@@ -107,11 +107,14 @@ export default function EditorPage({ shared = false }: { shared?: boolean }) {
       setMapId(m.id)
       if (role === 'owner') api(`/api/maps/${m.id}/opened`, { method: 'POST' }).catch(() => {})
       useEditor.getState().reset()
+      // ссылка на конкретный лист: /map/:id?sheet=…
+      const openSheet = () => { const sp = new URLSearchParams(location.search).get('sheet'); if (sp && useDoc.getState().doc?.sheets.some(x => x.id === sp)) useEditor.getState().setSheetId(sp) }
+      openSheet()
       // совместная работа: документ синхронизирует комната на сервере
       startCollab(m.id, share, useAuth.getState().user?.email ?? '', d => {
         const first = !useCollab.getState().synced
         useDoc.getState().setRemoteDoc(d)
-        if (first) useEditor.getState().reset()
+        if (first) { useEditor.getState().reset(); openSheet() }
       })
     }).catch(e => setError(e.message))
     const onUnload = (e: BeforeUnloadEvent) => {

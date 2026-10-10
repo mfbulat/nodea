@@ -3,6 +3,8 @@ import { useEditor } from './store'
 import { indexSheet, type Sheet } from './model'
 import { MARKER_GROUPS, MarkerIcon, markerName, STICKER_CATEGORIES } from './markers'
 import { useDoc } from '../store/doc'
+import { MenuItem } from './Chrome'
+import { api } from '../api/client'
 import { ILLUSTRATION_CATEGORIES, ILLUSTRATIONS, illustrationSrc } from './illustrations'
 
 function Header({ title }: { title: string }) {
@@ -134,35 +136,59 @@ const NO_SHEETS: Sheet[] = []
 export function SheetTabs() {
   const active = useEditor(s => s.sheetId)
   const sheets = useDoc(s => s.doc?.sheets) ?? NO_SHEETS
+  const mapId = useDoc(s => s.mapId)
+  const role = useDoc(s => s.role)
   const ed = useEditor.getState()
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
   const current = active ?? sheets[0]?.id
+  const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!menu) return
-    const close = () => setMenu(null)
+    const close = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenu(null) }
     window.addEventListener('pointerdown', close)
     return () => window.removeEventListener('pointerdown', close)
   }, [menu])
   const rename = (id: string, title: string) => { const t = prompt('Название листа', title)?.trim(); if (t) ed.renameSheet(id, t) }
+  const editable = role !== 'view'
+  const items = (id: string) => {
+    const sh = sheets.find(x => x.id === id)!
+    const run = (fn: () => void) => () => { setMenu(null); fn() }
+    return <>
+      <i className="mm-main" hidden />
+      <MenuItem icon="link" label="Копировать ссылку" disabled={!mapId} onClick={run(() => navigator.clipboard?.writeText(`${location.origin}/map/${mapId}?sheet=${id}`).catch(() => {}))} />
+      {editable && <>
+        <div className="menu-sep" />
+        <MenuItem icon="edit" label="Переименовать" onClick={run(() => rename(id, sh.title))} />
+        <MenuItem icon="duplicate" label="Дублировать" onClick={run(() => ed.duplicateSheet(id))} />
+        <div className="menu-sep" />
+        <MenuItem icon="trash" label="Удалить" disabled={sheets.length < 2} onClick={run(() => { if (confirm('Удалить лист?')) ed.removeSheet(id) })} />
+        <div className="menu-sep" />
+        <MenuItem icon="file" label="Сохранить лист как карту" onClick={run(async () => {
+          const m = await api<{ id: string }>('/api/maps', { method: 'POST', json: { title: sh.title, document: { version: 1, sheets: [structuredClone(sh)] } } })
+          window.open(`/map/${m.id}`, '_blank')
+        })} />
+      </>}
+    </>
+  }
   return (
     <div className="sheet-tabs" data-testid="sheet-tabs">
-      {sheets.map(s => (
-        <button key={s.id} className={'sheet-tab' + (s.id === current ? ' on' : '')}
-          onClick={() => ed.setSheetId(s.id)} onDoubleClick={() => rename(s.id, s.title)}
-          onContextMenu={e => { e.preventDefault(); setMenu({ id: s.id, x: e.clientX, y: e.clientY }) }}>{s.title}</button>
+      {sheets.map((s, i) => (
+        <div key={s.id} className={'sheet-tab' + (s.id === current ? ' on' : '') + (dragId && dragId !== s.id ? ' drop' : '')}
+          draggable={editable} onDragStart={e => { setDragId(s.id); e.dataTransfer.effectAllowed = 'move' }} onDragEnd={() => setDragId(null)}
+          onDragOver={e => { if (dragId) e.preventDefault() }}
+          onDrop={e => { e.preventDefault(); if (dragId && dragId !== s.id) ed.moveSheet(dragId, i - sheets.findIndex(x => x.id === dragId)); setDragId(null) }}
+          onContextMenu={e => { e.preventDefault(); setMenu({ id: s.id, x: e.clientX, y: e.clientY }) }}>
+          <button className="sheet-name" onClick={() => ed.setSheetId(s.id)} onDoubleClick={() => editable && rename(s.id, s.title)}>{s.title}</button>
+          <button className="sheet-more" aria-label={`Меню листа ${s.title}`} onClick={e => { const r = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect(); setMenu(m => (m?.id === s.id ? null : { id: s.id, x: r.left, y: r.top })) }}>
+            <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
+          </button>
+        </div>
       ))}
-      <button className="sheet-add" onClick={ed.addSheet} title="Новый лист">+</button>
-      {menu && (
-        <div className="menu" style={{ position: 'fixed', left: menu.x, bottom: window.innerHeight - menu.y + 4 }}
-          onPointerDown={e => e.stopPropagation()}>
-          {[
-            ['Переименовать', () => rename(menu.id, sheets.find(s => s.id === menu.id)!.title)],
-            ['Дублировать', () => ed.duplicateSheet(menu.id)],
-            ['Сдвинуть влево', () => ed.moveSheet(menu.id, -1)],
-            ['Сдвинуть вправо', () => ed.moveSheet(menu.id, 1)],
-            ['Удалить', () => { if (sheets.length > 1 && confirm('Удалить лист?')) ed.removeSheet(menu.id) }],
-          ].map(([l, fn]) => <button key={l as string} onClick={() => { setMenu(null); (fn as () => void)() }}
-            disabled={l === 'Удалить' && sheets.length < 2}>{l as string}</button>)}
+      {editable && <button className="sheet-add" onClick={ed.addSheet} title="Новый лист" aria-label="Новый лист">+</button>}
+      {menu && sheets.some(x => x.id === menu.id) && (
+        <div ref={menuRef} className="menu" role="menu" style={{ position: 'fixed', left: menu.x, bottom: window.innerHeight - menu.y + 6, top: 'auto', zIndex: 1000 }}>
+          {items(menu.id)}
         </div>
       )}
     </div>

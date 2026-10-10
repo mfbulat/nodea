@@ -893,3 +893,9 @@ body { font-family: var(--font-ui); }
 .ctx-menu .mi-label { white-space: nowrap; }
 .ctx-menu.flip .menu.sub { left: auto; right: calc(100% + 4px); }
 .ctx-menu .menu.sub { min-width: 200px; }
+.bottombar-x .sheet-tab { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px 0 16px; cursor: default; }
+.sheet-tab .sheet-name { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.sheet-tab .sheet-more { width: 16px; height: 16px; border: 0; padding: 0; background: transparent; color: #1f2326; display: inline-flex; align-items: center; justify-content: center; border-radius: 3px; cursor: pointer; visibility: hidden; }
+.sheet-tab:hover .sheet-more { visibility: visible; }
+.sheet-tab .sheet-more:hover { background: rgba(0,0,0,.08); }
+.sheet-tab.drop { outline: 1px dashed #9aa1a9; }
