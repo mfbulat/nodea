@@ -128,7 +128,7 @@ export const THEMES: Theme[] = [
   theme('classic', 'Классика', '#ffffff', PALETTES[0].colors,
     { fill: 'transparent', borderStyle: 'none', borderWidth: 0, textColor: '#000000', fontSize: 30, fontWeight: 'extrabold', maxWidth: 480,
       lineWidth: 2, lineShape: 'curve', lineColor: '#9a9a9a' },
-    { fill: '#eeeeee', borderStyle: 'none', borderWidth: 0, textColor: '#000000', fontSize: 18, fontWeight: 'medium',
+    { fill: '#eeeeee', borderStyle: 'none', borderWidth: 0, textColor: '#000000', fontSize: 18, fontWeight: 'medium', textAlign: 'left',
       lineWidth: 2, lineShape: 'rounded', lineColor: '#9a9a9a' },
     { fill: '#f2f2f2', borderStyle: 'none', borderWidth: 0, textColor: '#333333', fontSize: 14, textAlign: 'left',
       lineWidth: 2, lineShape: 'rounded', lineColor: '#9a9a9a' },

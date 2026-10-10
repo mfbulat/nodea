@@ -6,7 +6,7 @@ import { indexSheet, levelOf } from './model'
 import { STRUCTURES } from './layout'
 import { COLOR_THEMES, ColorTheme, FullStyle, getColorTheme, isColored, MAP_FONT, resolveStyle, sheetBackground } from './themes'
 import { shapePath, edgePath } from './paths'
-import { useEditor } from './store'
+import { currentLayout, useEditor } from './store'
 import Icon from '../ui/Icon'
 
 // ---------- элементы управления ----------
@@ -176,7 +176,7 @@ function TopicStyleTab({ sheet }: { sheet: Sheet }) {
 
       <div className="fp-section">
         <Row label="Длина">
-          <input type="number" min={40} max={1200} placeholder="авто" value={s.width ?? ''} aria-label="Ширина темы, px"
+          <input type="number" min={40} max={1200} placeholder={String(Math.round(currentLayout()?.boxes.get(ref.topic.id)?.w ?? 0) || 'авто')} value={s.width ?? ''} aria-label="Ширина темы, px"
             onChange={e => set({ width: e.target.value ? +e.target.value : undefined })} /><span className="muted">px</span>
           <button className={'mini' + (!s.width ? ' on' : '')} onClick={() => set({ width: undefined })}>По тексту</button>
         </Row>
@@ -554,6 +554,10 @@ function ElementFormat({ sheet }: { sheet: Sheet }) {
 export default function FormatPanel({ sheet }: { sheet: Sheet }) {
   const { element } = useEditor()
   const [tab, setTab] = useState<'style' | 'pitch' | 'map'>('style')
+  const none = !useEditor(s => s.selection.length)
+  // как в веб-версии: без выделения — вкладка «Карта», «Стиль» и «Презентация» недоступны
+  useEffect(() => { setTab(t => (none ? 'map' : t === 'map' && prevNone.current ? 'style' : t)); prevNone.current = none }, [none])
+  const prevNone = useRef(none)
   useEffect(() => {
     const f = (e: Event) => setTab((e as CustomEvent).detail)
     window.addEventListener('mm:format-tab', f)
@@ -562,8 +566,8 @@ export default function FormatPanel({ sheet }: { sheet: Sheet }) {
   return (
     <div className="side-panel format-panel" data-testid="format-panel">
       <div className="seg-tabs">
-        <button className={tab === 'style' ? 'on' : ''} onClick={() => setTab('style')}>Стиль</button>
-        <button className={tab === 'pitch' ? 'on' : ''} onClick={() => setTab('pitch')}>Презентация</button>
+        <button className={tab === 'style' ? 'on' : ''} disabled={none} onClick={() => setTab('style')}>Стиль</button>
+        <button className={tab === 'pitch' ? 'on' : ''} disabled={none} onClick={() => setTab('pitch')}>Презентация</button>
         <button className={tab === 'map' ? 'on' : ''} onClick={() => setTab('map')}>Карта</button>
       </div>
       <div className="fp-scroll">
