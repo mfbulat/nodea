@@ -16,16 +16,34 @@ import { Presence } from '../collab/ShareDialog'
 import { api } from '../api/client'
 
 /** Подсказка как в веб-версии: название, сочетание клавиш, описание */
+/** Подсказка как в веб-версии: тёмная плашка под кнопкой (поверх всего, в пределах окна),
+ * заголовок, сочетание клавиш справа и описание серым */
 export function Tip({ title, keys, desc, children, below = true }: { title: string; keys?: string; desc?: string; children: ReactNode; below?: boolean }) {
   const [show, setShow] = useState(false)
   const t = useRef<ReturnType<typeof setTimeout>>()
+  const wrap = useRef<HTMLSpanElement>(null)
+  const tip = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!show || !wrap.current || !tip.current) { setPos(null); return }
+    const r = wrap.current.getBoundingClientRect(), w = tip.current.offsetWidth, h = tip.current.offsetHeight
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8))
+    let top = below ? r.bottom + 8 : r.top - h - 8
+    if (top + h > window.innerHeight - 8) top = r.top - h - 8
+    if (top < 8) top = r.bottom + 8
+    setPos({ left, top })
+  }, [show, below])
+  useEffect(() => () => clearTimeout(t.current), [])
+  const hide = () => { clearTimeout(t.current); setShow(false) }
   return (
-    <span className="tip-wrap" onMouseEnter={() => { t.current = setTimeout(() => setShow(true), 450) }}
-      onMouseLeave={() => { clearTimeout(t.current); setShow(false) }} onMouseDown={() => { clearTimeout(t.current); setShow(false) }}>
+    <span className="tip-wrap" ref={wrap} onMouseEnter={() => { clearTimeout(t.current); t.current = setTimeout(() => setShow(true), 450) }}
+      onMouseLeave={hide} onMouseDown={hide}>
       {children}
-      {show && <span className={'tip' + (below ? '' : ' above')} role="tooltip">
-        <span className="tip-head"><b>{title}</b>{keys && <kbd>{keys}</kbd>}</span>{desc && <span className="tip-desc">{desc}</span>}
-      </span>}
+      {show && createPortal(
+        <div ref={tip} className="tip" role="tooltip" style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
+          <div className="tip-head"><span>{title}</span>{keys && <span className="tip-keys">{keys}</span>}</div>
+          {desc && <div className="tip-desc">{desc}</div>}
+        </div>, document.body)}
     </span>
   )
 }
@@ -224,7 +242,7 @@ export function TopRight({ onShare, isOwner, outline, readOnly = false }: { onSh
       {onShare && <button className="share-btn" onClick={onShare}>Share</button>}
       <div className="bar-icons">
         {!outline && fit.gantt && <IconButton icon="gantt" label="Gantt" desc="Open Gantt Chart in a separate window." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
-        {fit.present && <IconButton icon="present" label="Pitch" keys="⌥ ⌘ P" desc="Access into Pitch Mode to present your ideas." onClick={() => ed.setPresenting(true)} />}
+        {fit.present && <IconButton icon="present" label="Pitch" desc="Access into Pitch Mode to present your ideas." onClick={() => ed.setPresenting(true)} />}
         {!outline && fit.present && <IconButton icon="comment" label="Comment" desc="Open Comments panel to view and add comments." onClick={() => toggle('comments')} active={panel === 'comments'} />}
         {!readOnly && <IconButton icon="marker" label="Marker" desc="Add a marker to selected topics." onClick={() => toggle('markers')} active={panel === 'markers'} />}
         {!outline && !readOnly && <IconButton icon="panel" label="Format" keys="⌘ ]" desc="Show or hide style and format options." onClick={() => toggle('format')} active={panel === 'format'} />}

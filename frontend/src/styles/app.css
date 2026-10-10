@@ -511,12 +511,6 @@ body { font-family: var(--font-ui); }
 .style-preview { background: #fff; border: 1px solid var(--border-muted); border-radius: 8px; padding: 12px; }
 /* тултипы */
 .tip-wrap { position: relative; display: inline-flex; }
-.tip { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 60; background: #1f2326; color: #fff; border-radius: 6px;
-  padding: 8px 10px; width: max-content; max-width: 240px; font-size: 12px; pointer-events: none; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-ui); }
-.tip.above { top: auto; bottom: calc(100% + 8px); }
-.tip-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.tip kbd { background: rgba(255,255,255,.14); border: none; color: #fff; font-size: 11px; }
-.tip-desc { color: rgba(255,255,255,.7); line-height: 1.35; }
 /* подменю */
 .submenu { position: relative; }
 .menu.sub { position: absolute; left: calc(100% + 4px); top: -8px; }
@@ -993,3 +987,9 @@ body { font-family: var(--font-ui); }
 .cp-wheel input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .cp-theme { border-top: 1px solid rgba(18,20,22,.06); padding: 16px; }
 .cp-cap { font: 600 13px/17px var(--font-ui); color: #000; margin-bottom: 4px; }
+/* подсказки как в веб-версии */
+.tip { position: fixed; z-index: 2000; max-width: 420px; padding: 8px 12px; border-radius: 4px; background: #343638; color: #fff; pointer-events: none; font-family: var(--font-ui);
+  font-size: 12px; line-height: 16px; white-space: nowrap; box-shadow: 0 0 10px rgba(0,0,0,.05), inset 0 0 1px rgba(0,0,0,.2); }
+.tip-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 14px; line-height: 17.5px; }
+.tip-keys { color: rgba(255,255,255,.6); font-size: 14px; letter-spacing: .5px; }
+.tip-desc { margin-top: 4px; color: #949699; font-size: 13.5px; line-height: 20px; }
