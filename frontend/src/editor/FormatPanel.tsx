@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react'
 import type { Boundary, BorderStyle, LineShape, Relationship, ShapeId, Sheet, StructureId, Topic, TopicStyle } from './model'
 import { indexSheet, levelOf } from './model'
 import { STRUCTURES } from './layout'
-import { FullStyle, getTheme, isColored, MAP_FONT, PALETTES, resolveStyle, THEMES } from './themes'
+import { COLOR_THEMES, ColorTheme, FullStyle, getColorTheme, isColored, MAP_FONT, resolveStyle, sheetBackground } from './themes'
 import { shapePath, edgePath } from './paths'
 import { useEditor } from './store'
 import Icon from '../ui/Icon'
@@ -239,7 +239,7 @@ function TopicStyleTab({ sheet }: { sheet: Sheet }) {
         </div>
         {isRoot && <>
           <label className="fp-toggle"><span>Цветные ветки</span><Toggle on={isColored(sheet)} onChange={v => ed.setSheet({ rainbow: v })} /></label>
-          {isColored(sheet) && <PaletteSelect sheet={sheet} />}
+          {isColored(sheet) && <ColorThemeSelect sheet={sheet} />}
         </>}
       </Section>
 
@@ -257,18 +257,71 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
   return <button role="switch" aria-checked={on} aria-label={label} className={'toggle-sw' + (on ? ' on' : '')} onClick={() => onChange(!on)}><span /></button>
 }
 
-function PaletteSelect({ sheet }: { sheet: Sheet }) {
+const Swatch = ({ t }: { t: ColorTheme }) => (
+  t.id === 'rainbow'
+    ? <span className="ct-bar" style={{ background: `linear-gradient(90deg, ${t.colors.join(', ')})` }} />
+    : <span className="ct-bar">{(t.swatch ?? t.colors).slice(0, 6).map((c, i) => <i key={i} style={{ background: c }} />)}</span>
+)
+
+/** «Цветовая тема» как в веб-версии: кнопка с образцом и всплывающий выбор «Цветные / Классические». */
+function ColorThemeSelect({ sheet }: { sheet: Sheet }) {
   const ed = useEditor.getState()
-  const cur = sheet.palette ?? 'dawn'
+  const cur = getColorTheme(sheet.palette)
+  const [open, setOpen] = useState(false)
+  const [group, setGroup] = useState<ColorTheme['group']>(cur.group)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [open])
   return (
-    <div className="palette-list">
-      {PALETTES.map(p => (
-        <button key={p.id} className={'palette' + (cur === p.id ? ' on' : '')} title={p.name} aria-label={'Палитра ' + p.name}
-          onClick={() => ed.setSheet({ palette: p.id, rainbow: true })}>
-          {p.colors.map(c => <span key={c} style={{ background: c }} />)}
-        </button>
-      ))}
+    <div className="ct-select" ref={ref}>
+      <button className="ct-btn" aria-label="Цветовая тема" aria-expanded={open} onClick={() => { setGroup(cur.group); setOpen(o => !o) }}>
+        <span className="ct-mini">{cur.colors.slice(0, 6).map((c, i) => <i key={i} style={{ background: c }} />)}</span>
+        <span className="ct-name">{cur.name}</span>
+        <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
+      </button>
+      {open && (
+        <div className="ct-pop" role="dialog" aria-label="Выбор цветовой темы" style={(() => {
+          const r = ref.current!.getBoundingClientRect()
+          return { top: Math.max(60, Math.min(r.top - 80, window.innerHeight - 420)), left: r.left - 330 }
+        })()}>
+          <div className="ct-tabs">
+            <button className={group === 'colorful' ? 'on' : ''} onClick={() => setGroup('colorful')}>Цветные</button>
+            <button className={group === 'classic' ? 'on' : ''} onClick={() => setGroup('classic')}>Классические</button>
+          </div>
+          <div className="ct-grid">
+            {COLOR_THEMES.filter(t => t.group === group).map(t => (
+              <button key={t.id} className={'ct-item' + (t.id === cur.id ? ' on' : '')} aria-label={'Цветовая тема ' + t.name}
+                onClick={() => ed.setSheet({ palette: t.id, theme: 'classic', rainbow: undefined, background: undefined })}>
+                <span className="ct-label">{t.name}</span><Swatch t={t} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+/** Карточка структуры карты (как вверху вкладки «Карта» в веб-версии) */
+function StructureCard({ sheet }: { sheet: Sheet }) {
+  const ed = useEditor.getState()
+  const cur = STRUCTURES.find(st => st.id === (sheet.structure ?? 'mindmap')) ?? STRUCTURES[0]
+  return (
+    <label className="struct-card">
+      <svg width={64} height={32} viewBox="0 0 64 32" fill="none" stroke="#bdc2c7" strokeWidth={1.2} strokeLinecap="round">
+        <rect x={24} y={13} width={16} height={6} rx={2} /><path d="M24 16C18 16 18 8 12 8M24 16C18 16 18 24 12 24M40 16C46 16 46 8 52 8M40 16C46 16 46 24 52 24" />
+        <path d="M4 8h8M4 24h8M52 8h8M52 24h8" />
+      </svg>
+      <span>{cur.name}</span>
+      <svg width={10} height={10} viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.2} /></svg>
+      <select value={cur.id} aria-label="Структура карты" onChange={e => ed.setSheet({ structure: e.target.value as StructureId })}>
+        {STRUCTURES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+      </select>
+    </label>
   )
 }
 
@@ -309,59 +362,37 @@ function TopicElements({ topic }: { topic: Topic }) {
 
 // ---------- вкладка «Карта» ----------
 
-function ThemeCard({ id, on, onClick }: { id: string; on: boolean; onClick: () => void }) {
-  const th = getTheme(id)
-  const lv = th.levels
-  const main = (i: number) => th.colored ? th.rainbow[i] : lv.main.fill
-  return (
-    <button className={'theme-card' + (on ? ' on' : '')} onClick={onClick} title={th.name} aria-label={'Тема ' + th.name}>
-      <svg width="100%" viewBox="0 0 120 60" style={{ background: th.background, borderRadius: 6 }}>
-        {[[20, 14], [20, 46], [100, 14], [100, 46]].map(([x, y], i) => (
-          <g key={i}><path d={`M60,30Q${x < 60 ? 45 : 75},${y} ${x < 60 ? x + 12 : x - 12},${y}`} fill="none" stroke={th.colored ? th.rainbow[i] : lv.main.lineColor} strokeWidth={1.5} />
-            <rect x={x - 12} y={y - 5} width={24} height={10} rx={3} fill={main(i) === 'transparent' ? '#fff' : main(i)} stroke={lv.main.borderStyle === 'none' ? 'none' : lv.main.borderColor} strokeWidth={1} /></g>
-        ))}
-        <rect x={42} y={23} width={36} height={14} rx={4} fill={lv.central.fill === 'transparent' ? th.background : lv.central.fill}
-          stroke={lv.central.borderStyle === 'none' ? 'none' : lv.central.borderColor} />
-        <rect x={50} y={28} width={20} height={4} rx={2} fill={lv.central.textColor} />
-      </svg>
-      <span>{th.name}</span>
-    </button>
-  )
-}
-
 function MapTab({ sheet }: { sheet: Sheet }) {
   const ed = useEditor.getState()
-  const th = getTheme(sheet.theme)
   const tog = (label: string, key: keyof Sheet, val?: boolean) => (
     <label className="fp-toggle"><span>{label}</span><Toggle label={label} on={val ?? !!sheet[key]} onChange={v => ed.setSheet({ [key]: v } as Partial<Sheet>)} /></label>
   )
   return (
     <>
       <div className="fp-section">
-        <div className="theme-grid">
-          {THEMES.map(t => <ThemeCard key={t.id} id={t.id} on={th.id === t.id} onClick={() => ed.setSheet({ theme: t.id, background: undefined, rainbow: undefined })} />)}
-        </div>
+        <StructureCard sheet={sheet} />
       </div>
       <div className="fp-section">
-        <div className="fp-sub">Цветовая тема</div>
-        <PaletteSelect sheet={sheet} />
+        <div className="fp-cap">Цветовая тема</div>
+        <ColorThemeSelect sheet={sheet} />
       </div>
       <div className="fp-section">
-        <Row label="Цвет фона"><Color value={sheet.background || th.background} onChange={v => ed.setSheet({ background: v })} />
-          <button className="mini" onClick={() => ed.setSheet({ background: undefined })} title="Как в теме">↺</button></Row>
+        <Row label="Цвет фона"><Color value={sheetBackground(sheet)} onChange={v => ed.setSheet({ background: v })} />
+          {sheet.background && <button className="mini" onClick={() => ed.setSheet({ background: undefined })} title="Как в цветовой теме" aria-label="Сбросить цвет фона">↺</button>}</Row>
       </div>
       <div className="fp-section">
-        <div className="fp-sub">Шрифт карты</div>
+        <div className="fp-cap">Шрифт карты</div>
         <select className="wide" value={sheet.globalFont ?? ''} onChange={e => ed.setSheet({ globalFont: e.target.value || undefined })} aria-label="Шрифт карты">
           <option value="">По умолчанию</option>
           {FONTS.map(f => <option key={f} value={f}>{fontName(f)}</option>)}
         </select>
-        <div className="fp-sub">Толщина линий веток</div>
+        <div className="fp-cap">Толщина линий веток</div>
         <select className="wide" value={sheet.branchLineWidth ?? ''} onChange={e => ed.setSheet({ branchLineWidth: e.target.value ? +e.target.value : undefined })} aria-label="Толщина линий веток">
           <option value="">По умолчанию</option>
           {THICK.slice(1).map(([w, n]) => <option key={w} value={w}>{n}</option>)}
         </select>
-        {tog('Цветные ветки', 'rainbow', isColored(sheet))}
+        <label className="fp-check"><input type="checkbox" role="switch" aria-label="Цветные ветки" checked={isColored(sheet)} onChange={e => ed.setSheet({ rainbow: e.target.checked })} />
+          <span>Цветные ветки</span></label>
       </div>
       <div className="fp-section">
         <div className="fp-title">Стиль карты</div>

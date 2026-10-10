@@ -48,10 +48,12 @@ test('раскладки и стиль через панель формата', 
   await topic(page, 'Центральная тема').click()
   await page.getByTestId('format-panel').locator('select[aria-label="Структура"]').selectOption('org-down')
   await page.getByRole('button', { name: 'Карта', exact: true }).last().click()
-  await page.getByRole('button', { name: 'Тема Тёмная' }).click()
-  await page.getByRole('switch', { name: 'Цветные ветки' }).click()
+  await page.getByRole('button', { name: 'Цветовая тема', exact: true }).click()
+  await page.getByRole('button', { name: 'Цветовая тема Космос' }).click()
+  await page.getByRole('switch', { name: 'Цветные ветки' }).last().click()
   await expect.poll(async () => (await docOf(page, id)).sheets[0], { timeout: 10_000 })
-    .toMatchObject({ structure: 'org-down', theme: 'dark', rainbow: true })
+    .toMatchObject({ structure: 'org-down', palette: 'space', rainbow: false })
+  await expect(page.getByTestId('map-canvas')).toHaveCSS('background-color', 'rgb(13, 47, 66)')
 })
 
 test('структура (outliner) и поиск', async ({ page }) => {
