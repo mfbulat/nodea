@@ -173,6 +173,7 @@ export default function MapsPage() {
           <div className="spacer" />
           <label className="search"><Icon name="search" size={16} />
             <input ref={searchRef} placeholder="Поиск файлов" value={query} onChange={e => setQuery(e.target.value)} /></label>
+          {view === 'recent' && <>
           <Dropdown align="right" trigger={(_, toggle) => (
             <button className="btn-create" onClick={toggle}><Icon name="plus" size={16} />Создать</button>
           )}>
@@ -188,6 +189,7 @@ export default function MapsPage() {
                 <span><b>Импорт</b><small>Откройте файл .xmind, Markdown, OPML или FreeMind</small></span></button>
             </div>}
           </Dropdown>
+          </>}
           <button className="ibtn" aria-label={layout === 'grid' ? 'Списком' : 'Сеткой'} title={layout === 'grid' ? 'Списком' : 'Сеткой'}
             onClick={() => setLayout(l => (l === 'grid' ? 'list' : 'grid'))}><Icon name={layout === 'grid' ? 'grid' : 'list'} size={18} /></button>
           <span className="head-sep" />
@@ -236,7 +238,8 @@ export default function MapsPage() {
                   </Dropdown>
                 </div>
               </>}
-              <div className="section-label">Карты</div>
+              {view === 'trash' && <div className="trash-note">Карты хранятся в корзине 30 дней, после этого удаляются навсегда.</div>}
+              {(view === 'shared' ? sharedList.length : list.length) > 0 && <div className="section-label">Карты</div>}
               {view === 'shared' ? (
                 sharedList.length ? <div className={'file-grid ' + layout}>
                   {sharedList.map(m => (
@@ -246,14 +249,14 @@ export default function MapsPage() {
                         <span className="name">{m.title}</span><span className="caption">{m.owner_email} · {ago(m.visited_at)}</span></div></div>
                     </div>
                   ))}
-                </div> : <Empty text="Здесь появятся карты, которые вы открывали по ссылке." />
+                </div> : <Empty icon="users" title="Нет общих карт." text="Недавно открытые общие карты появятся здесь." />
               ) : list.length ? (
                 <div className={'file-grid ' + layout}>
                   {list.map(m => (
                     <div className={'file-card' + (focusId === m.id ? ' focused' : '')} key={m.id} data-testid="map-card" ref={el => { if (el && focusId === m.id) el.scrollIntoView({ block: 'nearest' }) }}
                       onClick={() => view !== 'trash' && nav(`/map/${m.id}`)}>
                       <Thumb id={m.id} />
-                      {view !== 'trash' && <button className={'star-badge' + (m.starred ? ' on' : '')} title={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'}
+                      {view !== 'trash' && view !== 'starred' && <button className={'star-badge' + (m.starred ? ' on' : '')} title={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'}
                         aria-label={m.starred ? 'Убрать из избранного' : 'Добавить в избранное'} onClick={e => { e.stopPropagation(); star(m) }}><Icon name="star" size={14} /></button>}
                       <div className="card-foot">
                         <div className="card-text">
@@ -292,7 +295,9 @@ export default function MapsPage() {
                     </div>
                   ))}
                 </div>
-              ) : <Empty text={view === 'trash' ? 'Корзина пуста.' : view === 'starred' ? 'Отмечайте карты звёздочкой, чтобы они были здесь.' : 'Карт пока нет — нажмите «Создать».'} />}
+              ) : <Empty icon={view === 'trash' ? 'trash' : view === 'starred' ? 'star' : 'folder'}
+                title={view === 'trash' ? 'Корзина пуста' : view === 'starred' ? 'Нет избранных карт.' : 'Карт пока нет.'}
+                text={view === 'trash' ? 'Недавно удалённые карты появятся здесь.' : view === 'starred' ? 'Отмеченные звёздочкой карты появятся здесь.' : 'Нажмите «Создать», чтобы начать новую карту.'} />}
             </>
           )}
         </div>
@@ -328,8 +333,8 @@ function QcPreview({ t }: { t: { id: string; make: () => MapDocument } }) {
   return <img src={src} alt="" />
 }
 
-function Empty({ text }: { text: string }) {
-  return <div className="empty"><Icon name="folder" size={36} /><p>{text}</p></div>
+function Empty({ icon, title, text }: { icon: IconName; title: string; text: string }) {
+  return <div className="empty"><Icon name={icon} size={72} /><b>{title}</b><p>{text}</p></div>
 }
 
 function brainstormDoc(): MapDocument {

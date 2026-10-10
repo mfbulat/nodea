@@ -1,6 +1,6 @@
 import copy
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -45,6 +45,12 @@ def list_maps(view: str = "recent", user: User = Depends(current_user), db: Sess
     """view: recent | all | starred | trash"""
     q = select(Map).where(Map.owner_id == user.id)
     if view == "trash":
+        # как в веб-версии: карты хранятся в корзине 30 дней
+        old = db.scalars(select(Map).where(Map.owner_id == user.id, Map.deleted_at < datetime.now(timezone.utc) - timedelta(days=30))).all()
+        for m in old:
+            db.delete(m)
+        if old:
+            db.commit()
         q = q.where(Map.deleted_at.is_not(None)).order_by(Map.deleted_at.desc())
     else:
         q = q.where(Map.deleted_at.is_(None))

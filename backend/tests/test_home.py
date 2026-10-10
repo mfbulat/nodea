@@ -37,3 +37,17 @@ def test_remove_from_recent(client, user):
     assert [m["id"] for m in client.get("/api/maps?view=all").json()] == [a["id"]]
     client.post(f"/api/maps/{a['id']}/opened")
     assert [m["id"] for m in client.get("/api/maps?view=recent").json()] == [a["id"]]
+
+
+def test_trash_purged_after_30_days(client, user):
+    from datetime import datetime, timedelta, timezone
+    from app.db import SessionLocal
+    from app.models import Map
+    a = client.post("/api/maps", json={"title": "Старая"}).json()
+    client.post(f"/api/maps/{a['id']}/trash")
+    with SessionLocal() as db:
+        m = db.get(Map, __import__('uuid').UUID(a["id"]))
+        m.deleted_at = datetime.now(timezone.utc) - timedelta(days=31)
+        db.commit()
+    assert client.get("/api/maps?view=trash").json() == []
+    assert client.get(f"/api/maps/{a['id']}").status_code == 404
