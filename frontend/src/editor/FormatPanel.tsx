@@ -11,6 +11,7 @@ import { currentLayout, useEditor } from './store'
 import { sheetSvgMarkup } from '../io/image'
 import Icon from '../ui/Icon'
 import { Select } from '../ui/Select'
+import { ColorPicker } from '../ui/ColorPicker'
 
 // ---------- элементы управления ----------
 
@@ -48,11 +49,14 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 }
 
 export function Color({ value, onChange, allowNone }: { value: string; onChange: (v: string | undefined) => void; allowNone?: boolean }) {
+  // «Current Theme» — цвета текущей цветовой темы листа
+  const sheet = useEditor.getState().sheet()
+  const theme = sheet ? getColorTheme(sheet.palette) : undefined
+  const themeColors = theme ? [...new Set(theme.colors)].slice(0, 9) : undefined
   const isNone = value === 'transparent' || value === 'none'
   return (
     <span className="color-well">
-      <span className="swatch" style={{ background: isNone ? 'repeating-linear-gradient(45deg,#fff 0 4px,#ddd 4px 8px)' : value }} />
-      <input type="color" aria-label="Color" value={isNone || !/^#[0-9a-f]{6}$/i.test(value) ? '#ffffff' : value} onChange={e => onChange(e.target.value)} />
+      <ColorPicker value={value} onChange={onChange} themeColors={themeColors} />
       {allowNone && <button className={'mini' + (isNone ? ' on' : '')} onClick={() => onChange('transparent')} title="No Fill">∅</button>}
     </span>
   )
