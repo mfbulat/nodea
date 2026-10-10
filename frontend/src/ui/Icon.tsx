@@ -1,5 +1,7 @@
 // Собственный набор линейных иконок 20×20 (stroke = currentColor).
 const P: Record<string, JSX.Element> = {
+  chevronsLeft: <path d="M10 5l-5 5 5 5M15 5l-5 5 5 5" />,
+  chevronsRight: <path d="M5 5l5 5-5 5M10 5l5 5-5 5" />,
   arrowLeft: <path d="M16 10H4.5M9 5.5L4.5 10 9 14.5" />,
   edit: <><path d="M15.5 10.5v5a1 1 0 01-1 1h-10a1 1 0 01-1-1v-10a1 1 0 011-1h5" /><path d="M14 3.5l2.5 2.5-6 6H8V9.5z" /></>,
   eye: <><path d="M2.5 10S5.2 5 10 5s7.5 5 7.5 5-2.7 5-7.5 5-7.5-5-7.5-5z" /><circle cx="10" cy="10" r="2.2" /></>,

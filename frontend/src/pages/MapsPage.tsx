@@ -92,17 +92,34 @@ export default function MapsPage() {
       : (b.last_opened_at ?? b.updated_at).localeCompare(a.last_opened_at ?? a.updated_at))
   const sharedList = shared.filter(m => m.title.toLowerCase().includes(q))
 
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('mm.sideCollapsed') === '1' } catch { return false } })
   const item = (v: View, icon: IconName) => (
-    <button className={'side-item' + (view === v ? ' on' : '')} onClick={() => nav(v === 'recent' ? '/' : `/home/${v}`)}>
-      <Icon name={icon} size={18} /><span>{TITLES[v]}</span>
+    <button className={'side-item' + (view === v ? ' on' : '')} title={collapsed ? TITLES[v] : undefined} onClick={() => nav(v === 'recent' ? '/' : `/home/${v}`)}>
+      <Icon name={icon} size={18} />{!collapsed && <span>{TITLES[v]}</span>}
     </button>
   )
 
+  const toggleSide = () => setCollapsed(c => { try { localStorage.setItem('mm.sideCollapsed', c ? '0' : '1') } catch { /* нет хранилища */ } return !c })
   return (
-    <div className="home">
+    <div className={'home' + (collapsed ? ' side-collapsed' : '')}>
       <aside className="home-side">
         <div className="side-top">
-          <div className="workspace"><span className="ws-icon"><Icon name="folder" size={16} /></span>Мои карты</div>
+          {collapsed && <button className="side-item side-expand" aria-label="Развернуть боковую панель" title="Развернуть" onClick={toggleSide}><Icon name="chevronsRight" size={18} /></button>}
+          <div className="workspace-row">
+            <Dropdown trigger={(open, toggle) => (
+              <button className={'workspace' + (open ? ' on' : '')} onClick={toggle} aria-label="Рабочее пространство">
+                <span className="ws-icon"><Icon name="folder" size={16} /></span>{!collapsed && <>Мои карты<Icon name="chevron" size={14} /></>}
+              </button>
+            )}>
+              {close => <div className="ws-menu">
+                <div className="ws-head"><span className="ws-icon big"><Icon name="folder" size={22} /></span><span><b>Мои карты</b><small>{user?.email}</small></span></div>
+                <MenuItem icon="settings" label="Настройки" onClick={() => { close(); nav('/account') }} />
+                <div className="menu-sep" />
+                <MenuItem label="Мои карты" checked onClick={close} />
+              </div>}
+            </Dropdown>
+            {!collapsed && <button className="ibtn side-collapse" aria-label="Свернуть боковую панель" title="Свернуть" onClick={toggleSide}><Icon name="chevronsLeft" size={18} /></button>}
+          </div>
           <nav>
             {item('recent', 'clock')}
           </nav>
@@ -112,15 +129,20 @@ export default function MapsPage() {
           <nav>
             {item('starred', 'star')}
             {item('shared', 'users')}
-            <button className="side-item" onClick={() => setGallery(true)}><Icon name="template" size={18} /><span>Шаблоны</span></button>
+            <button className="side-item" title={collapsed ? 'Шаблоны' : undefined} onClick={() => setGallery(true)}><Icon name="template" size={18} />{!collapsed && <span>Шаблоны</span>}</button>
             {item('trash', 'trash')}
           </nav>
         </div>
         <div className="side-user">
+          <Dropdown up align="right" trigger={(open, toggle) => (
+            <button className={'ibtn bell-btn' + (open ? ' on' : '')} onClick={toggle} aria-label="Уведомления" title="Уведомления"><Icon name="bell" size={18} /></button>
+          )}>
+            {() => <div className="bell-pop"><b>Уведомления</b><span>Новых уведомлений нет.</span></div>}
+          </Dropdown>
           <Dropdown up trigger={(_, toggle) => (
             <button className="user-btn" onClick={toggle}>
               <span className="avatar">{user?.email.slice(0, 1).toUpperCase()}</span>
-              <span className="email" title={user?.email}>{user?.email}</span>
+              {!collapsed && <span className="email" title={user?.email}>{user?.email}</span>}
             </button>
           )}>
             {close => <>
@@ -153,10 +175,11 @@ export default function MapsPage() {
           </Dropdown>
           <button className="ibtn" aria-label={layout === 'grid' ? 'Списком' : 'Сеткой'} title={layout === 'grid' ? 'Списком' : 'Сеткой'}
             onClick={() => setLayout(l => (l === 'grid' ? 'list' : 'grid'))}><Icon name={layout === 'grid' ? 'grid' : 'list'} size={18} /></button>
+          <span className="head-sep" />
           <Dropdown align="right" trigger={(_, toggle) => <button className="ibtn" aria-label="Сортировка" title="Сортировка" onClick={toggle}><Icon name="sort" size={18} /></button>}>
             {close => <>
               {([['opened', 'По дате открытия'], ['updated', 'По дате изменения'], ['name', 'По названию']] as const).map(([v, l]) =>
-                <MenuItem key={v} label={(sort === v ? '✓ ' : '   ') + l} onClick={() => { close(); setSort(v) }} />)}
+                <MenuItem key={v} label={l} checked={sort === v} onClick={() => { close(); setSort(v) }} />)}
             </>}
           </Dropdown>
         </div>

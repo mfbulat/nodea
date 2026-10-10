@@ -826,3 +826,36 @@ body { font-family: var(--font-ui); }
 .toggle-sw span { width: 14px; height: 14px; box-shadow: none; }
 .toggle-sw.on { background: #383c40; }
 .toggle-sw.on span { left: 16px; }
+/* главная как в веб-версии: адаптивная сетка карточек и шапка в две строки на узкой области */
+.home-main { container-type: inline-size; }
+.file-grid.grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 32px; }
+.file-card .thumb { height: auto; aspect-ratio: 16 / 9; }
+.head-sep { width: 1px; height: 16px; background: #d6dade; margin: 0 2px; }
+@container (max-width: 720px) {
+  .home-head { flex-wrap: wrap; row-gap: 12px; }
+  .home-head h1 { flex-basis: 100%; }
+  .home-head .spacer { display: none; }
+  .home-head .search { flex: 1; width: auto; }
+  .file-grid.grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+}
+/* боковая панель главной: меню пространства, сворачивание, уведомления */
+.workspace-row { display: flex; align-items: center; justify-content: space-between; padding-right: 12px; }
+.workspace-row .workspace { border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; gap: 8px; font: 700 15px var(--font-ui); color: #000; border-radius: 6px; }
+.workspace-row .workspace:hover, .workspace-row .workspace.on { background: rgba(0,0,0,.04); }
+.side-collapse { opacity: 0; transition: opacity .15s; }
+.home-side:hover .side-collapse { opacity: 1; }
+.ws-menu { width: 252px; }
+.ws-head { display: flex; align-items: center; gap: 10px; padding: 6px 8px 10px; }
+.ws-head b { display: block; font-size: 15px; }
+.ws-head small { display: block; font-size: 10px; color: #878c92; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+.ws-icon.big { width: 36px; height: 36px; border-radius: 8px; }
+.side-user { display: flex; align-items: center; justify-content: space-between; flex-direction: row-reverse; }
+.bell-pop { width: 260px; padding: 10px 8px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.bell-pop span { color: #878c92; font-size: 12px; padding: 20px 0; text-align: center; }
+.home.side-collapsed .home-side { width: 58px; }
+.home.side-collapsed .home-side nav { padding: 0 8px; }
+.home.side-collapsed .side-item { justify-content: center; padding: 0; }
+.home.side-collapsed .workspace-row { justify-content: center; padding: 0; }
+.home.side-collapsed .side-expand { margin: 0 8px 8px; width: auto; }
+.home.side-collapsed .side-user { flex-direction: column-reverse; gap: 10px; }
+.home.side-collapsed .side-expand { background: rgba(0,0,0,.05); }
