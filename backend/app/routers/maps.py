@@ -53,6 +53,8 @@ def list_maps(view: str = "recent", user: User = Depends(current_user), db: Sess
         if view == "all":
             q = q.order_by(Map.title)
         else:
+            if view == "recent":
+                q = q.where(Map.hidden_from_recent.is_(False))
             q = q.order_by(func.coalesce(Map.last_opened_at, Map.updated_at).desc())
     return db.scalars(q).all()
 
@@ -100,6 +102,16 @@ def get_map(map_id: uuid.UUID, user: User = Depends(current_user), db: Session =
 def mark_opened(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
     m = _own_map(map_id, user, db)
     m.last_opened_at = datetime.now(timezone.utc)
+    m.hidden_from_recent = False
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{map_id}/remove-recent")
+def remove_from_recent(map_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """«Убрать из недавних»: карта остаётся во «Всех картах», вернётся в недавние при следующем открытии"""
+    m = _own_map(map_id, user, db)
+    m.hidden_from_recent = True
     db.commit()
     return {"ok": True}
 

@@ -8,6 +8,7 @@ import type { Sheet, Topic } from './model'
 import { displaySheet } from './MapCanvas'
 import { useEditor } from './store'
 import { useCollab } from '../collab/session'
+import Icon from '../ui/Icon'
 
 type Layout = NonNullable<NonNullable<Topic['pitch']>['layout']>
 interface TitleSlide { kind: 'title'; topic: Topic; crumbs: string[] }
@@ -181,7 +182,7 @@ export default function Presentation({ sheet: realSheet }: { sheet: Sheet }) {
         </button>
         <div className="pitch-group">
           <button className={'pitch-btn' + (pop === 'settings' ? ' on' : '')} aria-label="Настройки" title="Настройки" onClick={() => setPop(p => (p === 'settings' ? null : 'settings'))}>
-            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3}><circle cx={8} cy={8} r={2.2} /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>
+            <Icon name="settings" size={14} />
           </button>
           <button className="pitch-btn" aria-label={fs ? 'Выйти из полноэкранного режима' : 'Полный экран'} title={fs ? 'Выйти из полноэкранного режима' : 'Полный экран'}
             onClick={() => (document.fullscreenElement ? document.exitFullscreen() : root.current?.requestFullscreen())?.catch?.(() => {})}>

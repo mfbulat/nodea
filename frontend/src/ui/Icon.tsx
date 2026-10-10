@@ -2,6 +2,7 @@
 const P: Record<string, JSX.Element> = {
   chevronsLeft: <path d="M10 5l-5 5 5 5M15 5l-5 5 5 5" />,
   chevronsRight: <path d="M5 5l5 5-5 5M10 5l5 5-5 5" />,
+  duplicate: <><rect x="6.5" y="6.5" width="10" height="10" rx="2" /><path d="M13.5 6.5V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v7A1.5 1.5 0 005 13.5h1.5" /></>,
   arrowLeft: <path d="M16 10H4.5M9 5.5L4.5 10 9 14.5" />,
   edit: <><path d="M15.5 10.5v5a1 1 0 01-1 1h-10a1 1 0 01-1-1v-10a1 1 0 011-1h5" /><path d="M14 3.5l2.5 2.5-6 6H8V9.5z" /></>,
   eye: <><path d="M2.5 10S5.2 5 10 5s7.5 5 7.5 5-2.7 5-7.5 5-7.5-5-7.5-5z" /><circle cx="10" cy="10" r="2.2" /></>,
@@ -75,7 +76,7 @@ const P: Record<string, JSX.Element> = {
   sticker: <><path d="M4 4h12v7l-5 5H4z" /><path d="M11 16v-5h5" /></>,
   illustration: <><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M3.5 13.5l3.5-3.5 2.5 2.5 3-4 4 5" /><circle cx="13.5" cy="7.5" r="1.2" /></>,
   equation: <path d="M14.5 4.5H6.5l4 5.5-4 5.5h8M14.5 15.5" />,
-  settings: <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6L15 15M5 15l1.4-1.4M13.6 6.4L15 5" /></>,
+  settings: <><path d="M8.6 3h2.8l.4 1.9 1.4.8 1.8-.7 1.4 2.4-1.4 1.3v1.6l1.4 1.3-1.4 2.4-1.8-.7-1.4.8-.4 1.9H8.6l-.4-1.9-1.4-.8-1.8.7-1.4-2.4 1.4-1.3V9.4L3.6 8.1 5 5.7l1.8.7 1.4-.8z" strokeLinejoin="round" /><circle cx="10" cy="10" r="2.3" /></>,
 }
 
 export type IconName = keyof typeof P

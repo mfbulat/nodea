@@ -28,3 +28,12 @@ def test_shared_with_me(client, user):
     other.get(f"/api/shared/{s['token']}")
     got = other.get("/api/maps/shared/with-me").json()
     assert [g["title"] for g in got] == ["Общая"] and got[0]["share_token"] == s["token"]
+
+
+def test_remove_from_recent(client, user):
+    a = client.post("/api/maps", json={"title": "Альфа"}).json()
+    client.post(f"/api/maps/{a['id']}/remove-recent")
+    assert client.get("/api/maps?view=recent").json() == []
+    assert [m["id"] for m in client.get("/api/maps?view=all").json()] == [a["id"]]
+    client.post(f"/api/maps/{a['id']}/opened")
+    assert [m["id"] for m in client.get("/api/maps?view=recent").json()] == [a["id"]]
