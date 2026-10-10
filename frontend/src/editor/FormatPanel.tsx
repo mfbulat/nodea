@@ -120,9 +120,9 @@ const STRUCT_OPTS: [StructureId, string][] = STRUCTURES.map(s => [s.id, s.name])
 
 // ---------- вкладка «Стиль» для темы ----------
 
-function StylePreview({ s, label }: { s: FullStyle; label: string }) {
+function StylePreview({ s, label, bg }: { s: FullStyle; label: string; bg?: string }) {
   return (
-    <div className="style-preview">
+    <div className="style-preview" style={bg ? { background: bg } : undefined}>
       <div className="sp-topic" style={{
         background: s.fill === 'transparent' ? 'transparent' : s.fill, color: s.textColor,
         border: s.borderStyle === 'none' || !s.borderWidth ? '1px solid transparent' : `${Math.min(3, s.borderWidth)}px ${s.borderStyle} ${s.borderColor}`,
@@ -153,7 +153,7 @@ function TopicStyleTab({ sheet }: { sheet: Sheet }) {
   return (
     <>
       {selection.length > 1 && <p className="muted" style={{ margin: '0 0 8px' }}>Выбрано тем: {selection.length}</p>}
-      <StylePreview s={s} label={LEVEL_NAME[level]} />
+      <StylePreview s={s} label={LEVEL_NAME[level]} bg={sheetBackground(sheet)} />
 
       <Section title="Фигура" right={<Picker label="Фигура" value={s.shape} options={SHAPES} render={v => <ShapeIcon s={v} />} onChange={v => set({ shape: v })} />}>
         <Row label="Заливка">

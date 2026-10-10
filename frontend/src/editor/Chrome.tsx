@@ -89,6 +89,16 @@ const SAVE: Record<string, string> = {
 }
 
 /** Слева: меню, название, избранное, путь */
+/** Адаптивная верхняя панель как в веб-версии: по ширине окна (открытая боковая панель отнимает ~300px)
+ * прячутся «Сводка/Граница», затем «Связь», подпись под названием, «Гант», затем «Презентация/Комментарии». */
+export function useBarFit() {
+  const [w, setW] = useState(window.innerWidth)
+  useEffect(() => { const f = () => setW(window.innerWidth); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [])
+  const panel = useEditor(s => s.panel)
+  const free = w - (panel ? 300 : 0)
+  return { summary: free >= 1000, relation: free >= 900, subtitle: w - (panel ? 200 : 0) >= 900, gantt: free >= 900, present: free >= 800 }
+}
+
 export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest: boolean; mapId?: string }) {
   const { title, setTitle, role, saveState } = useDoc()
   const status = useCollab(s => s.status)
@@ -101,6 +111,7 @@ export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest
     setStarred(s => !s)
     api(`/api/maps/${mapId}`, { method: 'PATCH', json: { starred: !starred } }).catch(() => setStarred(s => !s))
   }
+  const fit = useBarFit()
   const state = status === 'offline' ? 'Нет связи — изменения синхронизируются при подключении' : status === 'connecting' ? 'Подключение…'
     : role === 'owner' ? SAVE[saveState] : role === 'view' ? 'Только просмотр' : 'Редактирование по ссылке'
   return (
@@ -114,7 +125,7 @@ export function TopLeft({ mainMenu, guest, mapId }: { mainMenu: ReactNode; guest
             <button className={'star-btn' + (starred ? ' on' : '')} onClick={toggleStar} aria-label="Избранное"><Icon name="star" size={16} /></button>
           </Tip>}
         </div>
-        <span className="crumb" data-testid="save-state" title={state}>
+        <span className="crumb" data-testid="save-state" title={state} hidden={!fit.subtitle}>
           {guest ? <Link to="/login">Войти</Link> : <Link to="/">Мои карты</Link>}<span className="dot">·</span>{state}
         </span>
       </div>
@@ -127,15 +138,16 @@ export function TopCenter() {
   const { selection } = useEditor()
   const ed = useEditor.getState()
   const none = !selection.length
+  const fit = useBarFit()
   return (
     <div className="bar-center toolbar" role="toolbar" aria-label="Инструменты">
       <IconButton icon="topic" label="Тема" keys="⏎" desc="Добавить тему после выбранной." onClick={() => ed.addSibling(false)} disabled={none} />
       <IconButton icon="subtopic" label="Подтема" keys="⇥" desc="Добавить дочернюю тему к выбранной." onClick={ed.addChild} disabled={none} />
       <span className="sep" />
-      <IconButton icon="relationship" label="Связь" keys="⌘ ⇧ R" desc="Создать связь между двумя темами." onClick={ed.startRelating} disabled={none} />
-      <IconButton icon="summary" label="Сводка" desc="Добавить сводку к выбранным темам." onClick={ed.addSummary} disabled={none} />
-      <IconButton icon="boundary" label="Граница" keys="⌘ ⇧ B" desc="Объединить выбранные темы границей." onClick={ed.addBoundary} disabled={none} />
-      <span className="sep" />
+      {fit.relation && <IconButton icon="relationship" label="Связь" keys="⌘ ⇧ R" desc="Создать связь между двумя темами." onClick={ed.startRelating} disabled={none} />}
+      {fit.summary && <IconButton icon="summary" label="Сводка" desc="Добавить сводку к выбранным темам." onClick={ed.addSummary} disabled={none} />}
+      {fit.summary && <IconButton icon="boundary" label="Граница" keys="⌘ ⇧ B" desc="Объединить выбранные темы границей." onClick={ed.addBoundary} disabled={none} />}
+      {fit.relation && <span className="sep" />}
       <InsertMenu />
     </div>
   )
@@ -161,14 +173,15 @@ export function TopRight({ onShare, isOwner, outline }: { onShare?: () => void; 
   const { panel, gantt } = useEditor()
   const ed = useEditor.getState()
   const toggle = (p: typeof panel) => ed.setPanel(panel === p ? null : p)
+  const fit = useBarFit()
   return (
     <div className="bar-right">
       <Presence />
       {onShare && <button className="share-btn" onClick={onShare}>Поделиться</button>}
       <div className="bar-icons">
-        {!outline && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта в отдельном окне." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
-        <IconButton icon="present" label="Презентация" keys="⌥ ⌘ P" desc="Перейти в режим презентации." onClick={() => ed.setPresenting(true)} />
-        {!outline && <IconButton icon="comment" label="Комментарии" desc="Открыть панель комментариев." onClick={() => toggle('comments')} active={panel === 'comments'} />}
+        {!outline && fit.gantt && <IconButton icon="gantt" label="Гант" desc="Открыть диаграмму Ганта в отдельном окне." onClick={() => ed.setGantt(!gantt)} active={gantt} />}
+        {fit.present && <IconButton icon="present" label="Презентация" keys="⌥ ⌘ P" desc="Перейти в режим презентации." onClick={() => ed.setPresenting(true)} />}
+        {!outline && fit.present && <IconButton icon="comment" label="Комментарии" desc="Открыть панель комментариев." onClick={() => toggle('comments')} active={panel === 'comments'} />}
         {isOwner !== undefined && <IconButton icon="marker" label="Маркер" desc="Добавить маркер к выбранным темам." onClick={() => toggle('markers')} active={panel === 'markers'} />}
         {!outline && <IconButton icon="panel" label="Формат" keys="⌘ ]" desc="Показать или скрыть параметры стиля и формата." onClick={() => toggle('format')} active={panel === 'format'} />}
       </div>
